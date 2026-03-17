@@ -427,6 +427,16 @@
       <div style="font-size:17px;font-weight:700;color:var(--cream)">⚙️ הגדרות</div>
       <button onclick="closeSettings()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer">✕</button>
     </div>
+
+    <!-- Cache / Refresh -->
+    <div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600">רענון</div>
+      <div style="display:flex;gap:8px">
+        <button onclick="softReload()" style="flex:1;background:var(--card);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:10px;font-size:12px;cursor:pointer;font-family:'Heebo',sans-serif">🔄 רענון רגיל</button>
+        <button onclick="hardReload()" style="flex:1;background:var(--card);border:1px solid var(--gold-dim);color:var(--gold);padding:8px;border-radius:10px;font-size:12px;cursor:pointer;font-family:'Heebo',sans-serif">🧹 ניקוי Cache</button>
+      </div>
+    </div>
+
     <div class="settings-row">
       <label>גודל גופן</label>
       <div class="font-buttons">
@@ -464,6 +474,17 @@
         <label class="toggle"><input type="checkbox" id="tog-parasha" onchange="toggleReminder('parasha', this.checked)" /><span class="toggle-slider"></span></label>
       </div>
     </div>
+    <div class="settings-row">
+      <label>תזכורת אגרת הרמב"ן</label>
+      <div style="display:flex;align-items:center;gap:6px">
+        <select id="rem-igeret-day" onchange="saveReminderDay('igeret', this.value)" style="background:var(--card);border:1px solid var(--border);color:var(--cream);padding:5px 8px;border-radius:8px;font-size:12px;font-family:'Heebo',sans-serif;direction:rtl">
+          <option value="0">ראשון</option><option value="1">שני</option><option value="2">שלישי</option>
+          <option value="3">רביעי</option><option value="4">חמישי</option><option value="5">שישי</option><option value="6">שבת</option>
+        </select>
+        <input type="time" id="rem-igeret" value="20:00" onchange="saveReminder('igeret', this.value)" />
+        <label class="toggle"><input type="checkbox" id="tog-igeret" onchange="toggleReminder('igeret', this.checked)" /><span class="toggle-slider"></span></label>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -485,6 +506,7 @@
   <button class="tab" onclick="showTab('parasha')" id="t-parasha"><span class="icon">📜</span>פרשה</button>
   <button class="tab" onclick="showTab('lashon')" id="t-lashon"><span class="icon">🗣</span>לשה"ר</button>
   <button class="tab" onclick="showTab('igeret')" id="t-igeret"><span class="icon">✉️</span>אגרת</button>
+  <button class="tab" onclick="showTab('logs')" id="t-logs"><span class="icon">🐛</span>לוגים</button>
 </div>
 
 <!-- ─── PAGE: CALENDAR ─────────────────────── -->
@@ -505,9 +527,33 @@
     <div class="card-header">
       <div>
         <div class="card-title"><span class="emoji">⏰</span>זמני היום</div>
-        <div class="card-subtitle" id="zmanim-location">לפי מיקומך</div>
+        <div class="card-subtitle" id="zmanim-location">פתח תקווה</div>
       </div>
-      <button onclick="detectLocation()" style="background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:6px 10px;border-radius:8px;font-size:11px;cursor:pointer;font-family:'Heebo',sans-serif">📍 עדכן</button>
+    </div>
+    <!-- Location selector -->
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <select id="city-select" onchange="setCity(this.value)" style="flex:1;background:var(--surface);border:1px solid var(--border);color:var(--cream);padding:7px 10px;border-radius:10px;font-size:13px;font-family:'Heebo',sans-serif;direction:rtl;min-width:0">
+        <option value="petah_tikva">פתח תקווה</option>
+        <option value="jerusalem">ירושלים</option>
+        <option value="tel_aviv">תל אביב</option>
+        <option value="haifa">חיפה</option>
+        <option value="beersheba">באר שבע</option>
+        <option value="bnei_brak">בני ברק</option>
+        <option value="rehovot">רחובות</option>
+        <option value="ashdod">אשדוד</option>
+        <option value="netanya">נתניה</option>
+        <option value="modiin">מודיעין</option>
+        <option value="raanana">רעננה</option>
+        <option value="herzliya">הרצליה</option>
+        <option value="kfar_saba">כפר סבא</option>
+        <option value="safed">צפת</option>
+        <option value="tiberias">טבריה</option>
+        <option value="gps">📍 GPS אוטומטי</option>
+      </select>
+    </div>
+    <!-- Date display for zmanim -->
+    <div id="zmanim-date-display" style="font-size:12px;color:var(--muted);margin-bottom:12px;padding:7px 10px;background:var(--surface);border-radius:8px;border:1px solid var(--border)">
+      טוען תאריך...
     </div>
     <div class="zmanim-grid" id="zmanim-grid">
       <div class="zman-item"><div class="label">עולה השחר</div><div class="time" id="z-alot">--:--</div></div>
@@ -551,12 +597,12 @@
   <div class="card" style="padding:12px 14px;margin-bottom:12px">
     <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600">בחר מקור הלכה</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap" id="halacha-source-tabs">
-      <button class="aliya-tab active" onclick="setHalachaSource('mb', this)">משנה ברורה יומי 🏆</button>
-      <button class="aliya-tab" onclick="setHalachaSource('aruch', this)">ערוך השולחן</button>
-      <button class="aliya-tab" onclick="setHalachaSource('kitzur', this)">קיצור שולחן ערוך</button>
+      <button class="aliya-tab active" onclick="setHalachaSource('kitzur', this)">קיצור שו"ע יומי 🏆</button>
+      <button class="aliya-tab" onclick="setHalachaSource('chayei', this)">חיי אדם</button>
+      <button class="aliya-tab" onclick="setHalachaSource('shut', this)">שו"ת יומי</button>
     </div>
     <div id="halacha-source-desc" style="font-size:11px;color:var(--muted);margin-top:8px">
-      משנה ברורה – הפוסק המרכזי לאשכנזים (ר' ישראל מאיר הכהן – החפץ חיים). לימוד יומי לפי לוח "משנה ברורה יומי".
+      קיצור שולחן ערוך (221 פרקים) – מדריך הלכתי יומיומי לאשכנזים של הרב שלמה גנצפריד. פרק אחד ביום.
     </div>
   </div>
 
@@ -564,7 +610,7 @@
     <div class="card-header">
       <div>
         <div class="card-title"><span class="emoji">📖</span>הלכה יומית</div>
-        <div class="card-subtitle" id="halacha-source-subtitle">משנה ברורה יומי • ספריא</div>
+        <div class="card-subtitle" id="halacha-source-subtitle">קיצור שולחן ערוך – הרב שלמה גנצפריד • ספריא</div>
       </div>
       <div id="done-halacha"></div>
     </div>
@@ -573,7 +619,7 @@
     <div style="font-size:12px;color:var(--muted);margin-bottom:6px">מקור</div>
     <div id="halacha-ref" style="font-size:13px;color:var(--gold)"></div>
     <div class="source-link" id="halacha-source-link">
-      מקור: <a href="https://www.sefaria.org/Mishnah_Berurah" target="_blank">משנה ברורה – ספריא</a>
+      מקור: <a href="https://www.sefaria.org/Kitzur_Shulchan_Arukh" target="_blank">קיצור שולחן ערוך – ספריא</a>
     </div>
   </div>
 
@@ -581,9 +627,9 @@
     <div class="card-title" style="margin-bottom:10px"><span class="emoji">🔗</span>לימוד הלכה נוסף</div>
     <div style="display:flex;flex-direction:column;gap:8px">
       <a href="https://ph.yhb.org.il/pninayomit/" target="_blank" style="color:var(--gold-dim);font-size:13px;text-decoration:none">🌐 פניני הלכה יומי – הרב אליעזר מלמד (ציונות דתית)</a>
+      <a href="https://www.sefaria.org/Kitzur_Shulchan_Arukh" target="_blank" style="color:var(--gold-dim);font-size:13px;text-decoration:none">🌐 קיצור שולחן ערוך (כל הספר) – ספריא</a>
+      <a href="https://www.sefaria.org/Chayei_Adam" target="_blank" style="color:var(--gold-dim);font-size:13px;text-decoration:none">🌐 חיי אדם (כל הספר) – ספריא</a>
       <a href="https://www.yeshiva.org.il/ask" target="_blank" style="color:var(--gold-dim);font-size:13px;text-decoration:none">🌐 שאל שאלת הלכה – ישיבה.אורג</a>
-      <a href="https://www.sefaria.org/Mishnah_Berurah" target="_blank" style="color:var(--gold-dim);font-size:13px;text-decoration:none">🌐 משנה ברורה (כל הספר) – ספריא</a>
-      <a href="https://www.sefaria.org/Arukh_HaShulchan" target="_blank" style="color:var(--gold-dim);font-size:13px;text-decoration:none">🌐 ערוך השולחן (כל הספר) – ספריא</a>
     </div>
   </div>
 </div>
@@ -591,13 +637,18 @@
 <!-- ─── PAGE: TEHILIM ─────────────────────── -->
 <div class="page" id="page-tehilim">
   <div class="card" style="background:rgba(201,165,74,.04)">
-    <div class="card-title" style="margin-bottom:10px"><span class="emoji">🙏</span>תהילים יומי לפי תאריך עברי</div>
+    <div class="card-title" style="margin-bottom:10px"><span class="emoji">🙏</span>תהילים לפי תאריך עברי</div>
     <div id="tehilim-day-info" style="font-size:13px;color:var(--muted);margin-bottom:12px">מחשב...</div>
+    <!-- Day-of-month selector -->
+    <div style="margin-bottom:10px">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">בחר יום בחודש העברי:</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap" id="tehilim-day-btns"></div>
+    </div>
+    <!-- Chapter selector -->
     <div class="tehilim-nav">
       <select id="tehilim-select" onchange="loadTehilim(this.value)">
-        <option value="">-- בחר ספר תהילים --</option>
+        <option value="">-- בחר פרק ספציפי --</option>
       </select>
-      <button onclick="loadTodayTehilim()">היום</button>
     </div>
   </div>
 
@@ -618,6 +669,17 @@
 
 <!-- ─── PAGE: PARASHA ─────────────────────── -->
 <div class="page" id="page-parasha">
+  <!-- Parasha selector -->
+  <div class="card" style="padding:12px 14px;margin-bottom:12px">
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600">בחר פרשה</div>
+    <div style="display:flex;gap:8px">
+      <select id="parasha-select" onchange="loadSpecificParasha(this.value)" style="flex:1;background:var(--surface);border:1px solid var(--border);color:var(--cream);padding:7px 10px;border-radius:10px;font-size:13px;font-family:'Heebo',sans-serif;direction:rtl">
+        <option value="">טוען רשימת פרשיות...</option>
+      </select>
+      <button onclick="loadParasha()" style="background:var(--card);border:1px solid var(--gold-dim);color:var(--gold);padding:7px 12px;border-radius:10px;font-size:12px;cursor:pointer;font-family:'Heebo',sans-serif;white-space:nowrap">הפרשה הנוכחית</button>
+    </div>
+  </div>
+
   <div class="card">
     <div class="card-header">
       <div>
@@ -666,7 +728,7 @@
     <div id="lashon-content" class="content-text loading">טוען...</div>
     <div id="lashon-section" style="margin-top:12px;font-size:12px;color:var(--gold)"></div>
     <div class="source-link">
-      מקור: <a href="https://www.sefaria.org/Chofetz_Chaim" target="_blank">חפץ חיים – ספריא</a>
+      מקור: <a href="https://www.sefaria.org/Chafetz_Chaim" target="_blank">חפץ חיים – ספריא</a>
     </div>
   </div>
 
@@ -695,6 +757,21 @@
   </div>
 </div>
 
+<!-- ─── PAGE: LOGS ────────────────────────── -->
+<div class="page" id="page-logs">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <div style="font-family:'Frank Ruhl Libre',serif;font-size:15px;color:var(--gold);font-weight:700">🐛 לוגי מערכת</div>
+    <div style="display:flex;gap:8px">
+      <button onclick="clearLogs()" style="background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:5px 12px;border-radius:8px;font-size:11px;cursor:pointer;font-family:'Heebo',sans-serif">נקה</button>
+      <button onclick="copyLogs()" style="background:var(--surface);border:1px solid var(--gold-dim);color:var(--gold);padding:5px 12px;border-radius:8px;font-size:11px;cursor:pointer;font-family:'Heebo',sans-serif">📋 העתק</button>
+    </div>
+  </div>
+  <div id="log-stats" style="font-size:11px;color:var(--muted);margin-bottom:10px"></div>
+  <div id="log-container" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;max-height:70vh;overflow-y:auto;direction:ltr">
+    <div style="color:var(--muted);font-size:12px;text-align:center;padding:20px">אין לוגים עדיין</div>
+  </div>
+</div>
+
 <!-- BOTTOM NAV -->
 <div id="bottom-nav">
   <button class="bnav-btn active" onclick="showTab('calendar')" id="bn-calendar"><span class="bicon">📅</span>לוח</button>
@@ -703,14 +780,80 @@
   <button class="bnav-btn" onclick="showTab('parasha')" id="bn-parasha"><span class="bicon">📜</span>פרשה</button>
   <button class="bnav-btn" onclick="showTab('lashon')" id="bn-lashon"><span class="bicon">🗣</span>לשה"ר</button>
   <button class="bnav-btn" onclick="showTab('igeret')" id="bn-igeret"><span class="bicon">✉️</span>אגרת</button>
+  <button class="bnav-btn" onclick="showTab('logs')" id="bn-logs"><span class="bicon">🐛</span>לוגים</button>
 </div>
 
 <script>
 // ═══════════════════════════════════════════
+// LOG CAPTURE SYSTEM
+// ═══════════════════════════════════════════
+const appLogs = [];
+const MAX_LOGS = 300;
+
+function addLog(level, args) {
+  const msg = args.map(a => {
+    if (a === null) return 'null';
+    if (a === undefined) return 'undefined';
+    if (typeof a === 'object') { try { return JSON.stringify(a).slice(0,200); } catch { return String(a); } }
+    return String(a);
+  }).join(' ');
+  appLogs.push({ level, msg, time: new Date().toLocaleTimeString('he-IL', {hour:'2-digit',minute:'2-digit',second:'2-digit'}) });
+  if (appLogs.length > MAX_LOGS) appLogs.shift();
+  // If logs tab is visible, refresh it
+  if (document.getElementById('page-logs')?.classList.contains('active')) {
+    renderLogs();
+  }
+}
+
+// Override console methods
+const _origLog   = console.log.bind(console);
+const _origWarn  = console.warn.bind(console);
+const _origError = console.error.bind(console);
+console.log   = (...a) => { _origLog(...a);   addLog('log',   a); };
+console.warn  = (...a) => { _origWarn(...a);  addLog('warn',  a); };
+console.error = (...a) => { _origError(...a); addLog('error', a); };
+
+function renderLogs() {
+  const el = document.getElementById('log-container');
+  const stats = document.getElementById('log-stats');
+  if (!el) return;
+  const errors = appLogs.filter(l => l.level === 'error').length;
+  const warns  = appLogs.filter(l => l.level === 'warn').length;
+  if (stats) stats.textContent = `סה"כ: ${appLogs.length} | שגיאות: ${errors} | אזהרות: ${warns}`;
+  if (!appLogs.length) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center;padding:20px">אין לוגים</div>';
+    return;
+  }
+  el.innerHTML = [...appLogs].reverse().map(l => {
+    const color = l.level === 'error' ? '#e05555' : l.level === 'warn' ? '#c9913a' : '#7ab87a';
+    const bg    = l.level === 'error' ? 'rgba(224,85,85,.08)' : l.level === 'warn' ? 'rgba(201,145,58,.08)' : 'transparent';
+    return `<div style="padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.04);background:${bg};font-family:monospace;font-size:11px;line-height:1.5">
+      <span style="color:var(--muted);margin-left:8px">${l.time}</span>
+      <span style="color:${color}">[${l.level.toUpperCase()}]</span>
+      <span style="color:#d4c9aa;white-space:pre-wrap;word-break:break-all">${l.msg}</span>
+    </div>`;
+  }).join('');
+}
+
+function clearLogs() {
+  appLogs.length = 0;
+  renderLogs();
+  console.log('[Logs] cleared');
+}
+
+function copyLogs() {
+  const text = appLogs.map(l => `[${l.time}][${l.level.toUpperCase()}] ${l.msg}`).join('\n');
+  navigator.clipboard?.writeText(text).then(() => {
+    const btn = document.querySelector('[onclick="copyLogs()"]');
+    if (btn) { btn.textContent = '✅ הועתק'; setTimeout(() => btn.textContent = '📋 העתק', 2000); }
+  });
+}
+
+// ═══════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════
 let currentOffset = 0; // days from today
-let userLat = 31.7683, userLon = 35.2137; // default: Jerusalem
+let userLat = 32.0833, userLon = 34.8878; // default: Petah Tikva
 let currentTab = 'calendar';
 let loaded = {};
 let aliyot = [];
@@ -822,6 +965,7 @@ function showTab(name) {
   if (tab) tab.classList.add('active');
   if (bn)  bn.classList.add('active');
   currentTab = name;
+  if (name === 'logs') { renderLogs(); return; } // always re-render logs
   if (!loaded[name]) {
     console.log(`[showTab] "${name}" not yet loaded, calling loadTab`);
     loadTab(name);
@@ -839,6 +983,7 @@ function loadTab(name) {
   if (name === 'parasha')   loadParasha();
   if (name === 'lashon')    loadLashon();
   if (name === 'igeret')    loadIgeret();
+  if (name === 'logs')      renderLogs();
 }
 
 // ═══════════════════════════════════════════
@@ -928,28 +1073,79 @@ function getTehilimChapters(hebrewDay) {
   return TEHILIM_SCHEDULE[key] || TEHILIM_SCHEDULE[1];
 }
 
+let selectedTehilimHebrewDay = null; // tracks which day button is active
+
 function initTehilim() {
+  // Build chapter dropdown
   const sel = document.getElementById('tehilim-select');
-  sel.innerHTML = '<option value="">-- בחר פרק --</option>';
+  sel.innerHTML = '<option value="">-- בחר פרק ספציפי --</option>';
   for (let i = 1; i <= 150; i++) {
     const opt = document.createElement('option');
-    opt.value = i; opt.textContent = `תהילים פרק ${i}`;
+    opt.value = i; opt.textContent = `פרק ${i}`;
     sel.appendChild(opt);
   }
+
+  // Build 30 day buttons
+  const btnsEl = document.getElementById('tehilim-day-btns');
+  if (btnsEl) {
+    btnsEl.innerHTML = '';
+    for (let day = 1; day <= 30; day++) {
+      const btn = document.createElement('button');
+      btn.textContent = day;
+      btn.id = `tehilim-day-${day}`;
+      btn.style.cssText = `
+        min-width:32px; padding:5px 4px; font-size:12px; border-radius:8px; cursor:pointer;
+        background:var(--surface); border:1px solid var(--border); color:var(--muted);
+        font-family:'Heebo',sans-serif; transition:all .15s;
+      `;
+      btn.onclick = () => selectTehilimDay(day);
+      btnsEl.appendChild(btn);
+    }
+  }
+
   loadTodayTehilim();
+}
+
+function selectTehilimDay(day) {
+  selectedTehilimHebrewDay = day;
+  // Update button styles
+  for (let d = 1; d <= 30; d++) {
+    const btn = document.getElementById(`tehilim-day-${d}`);
+    if (!btn) continue;
+    if (d === day) {
+      btn.style.background = 'rgba(201,165,74,.15)';
+      btn.style.borderColor = 'var(--gold)';
+      btn.style.color = 'var(--gold)';
+    } else {
+      btn.style.background = 'var(--surface)';
+      btn.style.borderColor = 'var(--border)';
+      btn.style.color = 'var(--muted)';
+    }
+  }
+  const chapters = getTehilimChapters(day);
+  const infoEl = document.getElementById('tehilim-day-info');
+  if (infoEl) infoEl.textContent = `יום ${day} בחודש | פרקים: ${chapters.join(', ')}`;
+  // Load first chapter of the day
+  const sel = document.getElementById('tehilim-select');
+  if (sel) sel.value = chapters[0];
+  loadTehilim(chapters[0]);
 }
 
 async function loadTodayTehilim() {
   const d = getTargetDate();
   const ds = formatDate(d);
+  console.log('[Tehilim] fetching today Hebrew date:', ds);
   try {
     const data = await fetchWithDelay(`https://www.hebcal.com/converter?cfg=json&date=${ds}&g2h=1&strict=1`);
-    const chapters = getTehilimChapters(data.hd);
-    const chapter = chapters[0];
-    document.getElementById('tehilim-select').value = chapter;
-    loadTehilim(chapter);
+    console.log('[Tehilim] Hebrew date response:', JSON.stringify(data).slice(0,150));
+    const hebrewDay = data.hd || 1;
+    const heDateStr = data.hebrew || '';
+    const infoEl = document.getElementById('tehilim-day-info');
+    if (infoEl) infoEl.textContent = `${heDateStr} | פרקים להיום: ${getTehilimChapters(hebrewDay).join(', ')}`;
+    selectTehilimDay(hebrewDay);
   } catch(e) {
-    loadTehilim(1);
+    console.error('[Tehilim] failed to get Hebrew date:', e.message);
+    selectTehilimDay(1);
   }
 }
 
@@ -981,50 +1177,93 @@ async function loadTehilim(chapter) {
 // ═══════════════════════════════════════════
 // CALENDAR & ZMANIM
 // ═══════════════════════════════════════════
+const CITIES = {
+  petah_tikva: { name: 'פתח תקווה',  lat: 32.0833, lon: 34.8878 },
+  jerusalem:   { name: 'ירושלים',    lat: 31.7683, lon: 35.2137 },
+  tel_aviv:    { name: 'תל אביב',    lat: 32.0853, lon: 34.7818 },
+  haifa:       { name: 'חיפה',       lat: 32.7940, lon: 34.9896 },
+  beersheba:   { name: 'באר שבע',    lat: 31.2518, lon: 34.7915 },
+  bnei_brak:   { name: 'בני ברק',    lat: 32.0841, lon: 34.8337 },
+  rehovot:     { name: 'רחובות',     lat: 31.8928, lon: 34.8113 },
+  ashdod:      { name: 'אשדוד',      lat: 31.8044, lon: 34.6553 },
+  netanya:     { name: 'נתניה',      lat: 32.3215, lon: 34.8532 },
+  modiin:      { name: 'מודיעין',    lat: 31.8969, lon: 35.0095 },
+  raanana:     { name: 'רעננה',      lat: 32.1840, lon: 34.8706 },
+  herzliya:    { name: 'הרצליה',     lat: 32.1663, lon: 34.8434 },
+  kfar_saba:   { name: 'כפר סבא',   lat: 32.1787, lon: 34.9078 },
+  safed:       { name: 'צפת',        lat: 32.9642, lon: 35.4960 },
+  tiberias:    { name: 'טבריה',      lat: 32.7933, lon: 35.5311 },
+};
+
+function setCity(cityKey) {
+  if (cityKey === 'gps') {
+    console.log('[Location] GPS selected, requesting...');
+    if (navigator.geolocation) {
+      document.getElementById('zmanim-location').textContent = '📍 מאתר מיקום...';
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          userLat = pos.coords.latitude;
+          userLon = pos.coords.longitude;
+          console.log('[Location] GPS OK:', userLat, userLon);
+          document.getElementById('zmanim-location').textContent = `📍 ${userLat.toFixed(3)}, ${userLon.toFixed(3)}`;
+          appState.cityKey = 'gps'; appState.gpsLat = userLat; appState.gpsLon = userLon; saveState();
+          loadZmanim(formatDate(getTargetDate()));
+        },
+        err => {
+          console.warn('[Location] GPS failed:', err.message);
+          document.getElementById('zmanim-location').textContent = '⚠️ GPS נכשל, משתמש בפתח תקווה';
+          document.getElementById('city-select').value = 'petah_tikva';
+          setCity('petah_tikva');
+        }
+      );
+    }
+    return;
+  }
+  const city = CITIES[cityKey];
+  if (!city) return;
+  userLat = city.lat; userLon = city.lon;
+  document.getElementById('zmanim-location').textContent = `📍 ${city.name}`;
+  appState.cityKey = cityKey; saveState();
+  console.log('[Location] set to', city.name, userLat, userLon);
+  loadZmanim(formatDate(getTargetDate()));
+}
+
 async function loadCalendar() {
   const d = getTargetDate();
   const ds = formatDate(d);
   console.log('[loadCalendar] date:', ds, 'lat:', userLat, 'lon:', userLon);
   document.getElementById('cal-greg').textContent = formatDisplayDate(d);
+
+  // Restore saved city
+  const savedCity = appState.cityKey || 'petah_tikva';
+  const sel = document.getElementById('city-select');
+  if (sel) sel.value = savedCity;
+  if (savedCity === 'gps' && appState.gpsLat) {
+    userLat = appState.gpsLat; userLon = appState.gpsLon;
+    document.getElementById('zmanim-location').textContent = `📍 ${userLat.toFixed(3)}, ${userLon.toFixed(3)}`;
+  } else if (CITIES[savedCity]) {
+    const c = CITIES[savedCity];
+    userLat = c.lat; userLon = c.lon;
+    document.getElementById('zmanim-location').textContent = `📍 ${c.name}`;
+  }
+
   loadHebrewDate();
-  // Load zmanim with defaults immediately
   loadZmanim(ds);
   loadEvents(ds);
-  // Then try to upgrade with GPS
-  if (navigator.geolocation) {
-    console.log('[loadCalendar] requesting GPS...');
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        userLat = pos.coords.latitude;
-        userLon = pos.coords.longitude;
-        console.log('[loadCalendar] GPS OK:', userLat, userLon);
-        loadZmanim(ds);
-      },
-      err => console.warn('[loadCalendar] GPS denied/failed:', err.message)
-    );
-  } else {
-    console.log('[loadCalendar] geolocation not available');
-  }
-}
-
-function detectLocation() {
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(pos => {
-      userLat = pos.coords.latitude; userLon = pos.coords.longitude;
-      const d = getTargetDate();
-      loadZmanim(formatDate(d));
-      document.getElementById('zmanim-location').textContent = `📍 ${userLat.toFixed(3)}, ${userLon.toFixed(3)}`;
-    });
-  }
 }
 
 async function loadZmanim(ds) {
-  // Don't call if location not ready
   if (!userLat || !userLon) return;
+  console.log('[Zmanim] loading for', ds, userLat, userLon);
+  // Update date display
+  const dateEl = document.getElementById('zmanim-date-display');
+  const d = getTargetDate();
+  if (dateEl) dateEl.textContent = `📅 טוען: ${formatDisplayDate(d)}...`;
   try {
     const url = `https://www.hebcal.com/zmanim?cfg=json&date=${ds}&latitude=${userLat.toFixed(6)}&longitude=${userLon.toFixed(6)}&tzid=Asia/Jerusalem`;
     const data = await fetchWithDelay(url, 300);
     const z = data?.times || {};
+    console.log('[Zmanim] got times:', Object.keys(z).length, 'entries');
     function fmtT(iso) {
       if (!iso) return '--:--';
       return new Date(iso).toLocaleTimeString('he-IL', {hour:'2-digit',minute:'2-digit',hour12:false});
@@ -1042,9 +1281,14 @@ async function loadZmanim(ds) {
     );
     const candles = (evData?.items || []).find(e => e.category === 'candles');
     document.getElementById('z-candles').textContent = candles ? fmtT(candles.date) : '--:--';
-    document.getElementById('zmanim-location').textContent = `📍 ${userLat.toFixed(3)}, ${userLon.toFixed(3)}`;
+    // Update date display with Hebrew date
+    try {
+      const conv = await fetchWithDelay(`https://www.hebcal.com/converter?cfg=json&date=${ds}&g2h=1&strict=1`, 200);
+      if (dateEl) dateEl.textContent = `📅 ${formatDisplayDate(d)} | ${conv.hebrew || ''}`;
+    } catch {}
   } catch(e) {
-    console.warn('Zmanim error', e);
+    console.error('[Zmanim] error:', e);
+    if (dateEl) dateEl.textContent = `⚠️ שגיאה: ${e.message}`;
   }
 }
 
@@ -1096,37 +1340,68 @@ function holidayIcon(title) {
 }
 
 // ═══════════════════════════════════════════
-// HALACHA – Mishna Berura Yomi (Ashkenazi)
+// HALACHA – Daily Halacha (Ashkenazi)
 // ═══════════════════════════════════════════
-let currentHalachaSource = 'mb';
+let currentHalachaSource = 'kitzur';
+
+// Kitzur: 221 chapters × avg ~10 seifim each = ~2210 seifim ÷ 2 per day = ~1105 days cycle
+// We show seif pairs: day 1 → seifim 1-2 of chapter 1, day 2 → seifim 3-4, etc.
+// When chapter exhausted, move to next chapter.
+// Simple approach: global seif index, 2 seifim per day
+function getKitzurRef(d) {
+  const start = new Date(d.getFullYear(), 0, 1);
+  const dayOfYear = Math.floor((d - start) / 86400000) + 1;
+  // 221 chapters; rotate through them with 2 seifim per day
+  // Each chapter averages ~10 seifim. We track by chapter + seif pair.
+  // For simplicity: chapter cycles through 1-221, within each chapter show pair (day mod chapterLen)
+  // Since we don't know chapter length upfront, we use chapter per day (day % 221)+1, seif pair = 1+2*(within chapter day)
+  // Practical: rotate days 1-110 through each chapter (2 seifim each pass), then next chapter
+  const chapterIdx = (dayOfYear - 1) % 221;
+  const chapter = chapterIdx + 1;
+  const seifPairIdx = Math.floor((dayOfYear - 1) / 221) % 5; // show pairs 1-2, 3-4, 5-6, 7-8, 9-10
+  const seif1 = seifPairIdx * 2 + 1;
+  const seif2 = seif1 + 1;
+  return { ref: `Kitzur_Shulchan_Arukh.${chapter}`, chapter, seif1, seif2 };
+}
+
+function getChayeiAdamSection(d) {
+  const start = new Date(d.getFullYear(), 0, 1);
+  const day = Math.floor((d - start) / 86400000) + 1;
+  return ((day - 1) % 67) + 1;
+}
+
+// Shut Maharam Lublin – accessible Ashkenazi responsa on Sefaria
+const SHUT_BOOKS = [
+  { ref: 'Responsa_Maharam_Lublin', name: 'שו"ת מהרם לובלין', chapters: 140 },
+  { ref: 'Responsa_Tzitz_Eliezer', name: 'שו"ת ציץ אליעזר', chapters: 20 },
+  { ref: 'Noda_BiYehudah,_Orach_Chaim', name: 'נודע ביהודה – אורח חיים', chapters: 40 },
+];
+function getShutRef(d) {
+  const start = new Date(d.getFullYear(), 0, 1);
+  const day = Math.floor((d - start) / 86400000) + 1;
+  const book = SHUT_BOOKS[day % SHUT_BOOKS.length];
+  const chapter = ((day - 1) % book.chapters) + 1;
+  return { ref: `${book.ref}.${chapter}`, name: book.name, chapter };
+}
 
 const HALACHA_SOURCES = {
-  mb: {
-    name: 'משנה ברורה יומי',
-    subtitle: 'משנה ברורה – ר\' ישראל מאיר הכהן (חפץ חיים) • ספריא',
-    link: '<a href="https://www.sefaria.org/Mishnah_Berurah" target="_blank">משנה ברורה – ספריא</a>',
-    desc: 'משנה ברורה – הפוסק המרכזי לאשכנזים (ר\' ישראל מאיר הכהן – החפץ חיים). לימוד יומי לפי לוח "משנה ברורה יומי".',
-    calKey: 'Mishna Berura',
-    fallbackBase: 'Mishnah_Berurah',
-    fallbackChapters: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70],
-  },
-  aruch: {
-    name: 'ערוך השולחן יומי',
-    subtitle: 'ערוך השולחן – הרב יחיאל מיכל עפשטיין • ספריא',
-    link: '<a href="https://www.sefaria.org/Arukh_HaShulchan" target="_blank">ערוך השולחן – ספריא</a>',
-    desc: 'ערוך השולחן – פוסק אשכנזי מרכזי, נחשב לפוסק אחרון בפועל. מכסה את כל השולחן ערוך.',
-    calKey: 'Arukh HaShulchan Yomi',
-    fallbackBase: 'Arukh_HaShulchan,_Orach_Chaim',
-    fallbackChapters: [1,2,3,4,5,6,7,8,9,10],
-  },
   kitzur: {
-    name: 'קיצור שולחן ערוך',
-    subtitle: 'קיצור שולחן ערוך • ספריא',
+    name: 'קיצור שולחן ערוך יומי',
+    subtitle: 'קיצור שולחן ערוך – הרב שלמה גנצפריד • ספריא',
     link: '<a href="https://www.sefaria.org/Kitzur_Shulchan_Arukh" target="_blank">קיצור שולחן ערוך – ספריא</a>',
-    desc: 'קיצור שולחן ערוך של הרב שלמה גנצפריד – מדריך הלכתי מקיף ופופולרי.',
-    calKey: null,
-    fallbackBase: 'Kitzur_Shulchan_Arukh',
-    fallbackChapters: [1,2,3,4,5,6,7,8,9,10],
+    desc: 'קיצור שולחן ערוך (221 פרקים) – שני סעיפים ביום. מדריך הלכתי יומיומי לאשכנזים.',
+  },
+  chayei: {
+    name: 'חיי אדם יומי',
+    subtitle: 'חיי אדם – הרב אברהם דנציג • ספריא',
+    link: '<a href="https://www.sefaria.org/Chayei_Adam" target="_blank">חיי אדם – ספריא</a>',
+    desc: 'חיי אדם – ספר הלכה אשכנזי קלאסי של הרב אברהם דנציג.',
+  },
+  shut: {
+    name: 'שו"ת יומי',
+    subtitle: 'שאלות ותשובות – פוסקים אשכנזים • ספריא',
+    link: '<a href="https://www.sefaria.org/texts/Responsa" target="_blank">שו"ת – ספריא</a>',
+    desc: 'שאלה ותשובה יומית מפוסקים אשכנזים: מהרם לובלין, נודע ביהודה, ציץ אליעזר ועוד.',
   },
 };
 
@@ -1147,55 +1422,61 @@ async function loadHalacha() {
   const refEl = document.getElementById('halacha-ref');
   el.className = 'content-text loading';
   el.textContent = 'טוען הלכה יומית...';
-  const src = HALACHA_SOURCES[currentHalachaSource];
   const d = getTargetDate();
   const ds = formatDate(d);
+  console.log('[Halacha] source:', currentHalachaSource, 'date:', ds);
 
   try {
-    let textRef = null;
-    let heRef = null;
+    if (currentHalachaSource === 'kitzur') {
+      const { ref, chapter, seif1, seif2 } = getKitzurRef(d);
+      refEl.textContent = `קיצור שולחן ערוך – פרק ${chapter}, סעיפים ${seif1}–${seif2}`;
+      console.log('[Halacha] kitzur ref:', ref, 'seifim:', seif1, seif2);
+      const data = await sefariaText(ref, 400);
+      const flat = heFlat(data);
+      console.log('[Halacha] kitzur got', flat.length, 'seifim total');
+      if (!flat.length) throw new Error(`אין טקסט לפרק ${chapter}`);
+      // Show 2 seifim: seif1-1 and seif2-1 indices (0-based)
+      const idx1 = Math.min(seif1 - 1, flat.length - 1);
+      const idx2 = Math.min(seif2 - 1, flat.length - 1);
+      const toShow = idx1 === idx2 ? [flat[idx1]] : [flat[idx1], flat[idx2]].filter(Boolean);
+      el.className = 'content-text';
+      el.innerHTML = toShow.map((v, i) =>
+        `<div style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+           <div style="font-size:11px;color:var(--gold);margin-bottom:6px">סעיף ${seif1 + i}</div>
+           <div>${v}</div>
+         </div>`
+      ).join('');
 
-    // Try Sefaria calendar first (no custom param needed - returns all schedules)
-    if (src.calKey) {
-      try {
-        console.log('[Halacha] fetching calendar for key:', src.calKey);
-        const cal = await fetchWithDelay(`https://www.sefaria.org/api/calendars?diaspora=0`, 300);
-        console.log('[Halacha] calendar items:', cal?.calendar_items?.map(i=>i.title?.en));
-        const item = (cal?.calendar_items || []).find(i =>
-          (i.title?.en || '').toLowerCase().includes(src.calKey.toLowerCase()) ||
-          (i.title?.he || '').includes(src.calKey)
-        );
-        if (item) {
-          textRef = item.ref; heRef = item.heRef;
-          console.log('[Halacha] calendar match:', textRef);
-        } else {
-          console.warn('[Halacha] no calendar match for key:', src.calKey);
-        }
-      } catch(e) {
-        console.warn('[Halacha] calendar fetch failed:', e.message);
-      }
+    } else if (currentHalachaSource === 'chayei') {
+      const section = getChayeiAdamSection(d);
+      const ref = `Chayei_Adam.${section}`;
+      refEl.textContent = `חיי אדם – כלל ${section}`;
+      console.log('[Halacha] chayei adam ref:', ref);
+      const data = await sefariaText(ref, 400);
+      const flat = heFlat(data);
+      if (!flat.length) throw new Error(`אין טקסט לכלל ${section}`);
+      el.className = 'content-text';
+      el.innerHTML = flat.map((v, i) =>
+        `<div style="margin-bottom:8px"><span style="color:var(--gold-dim);font-size:11px">${i + 1} </span>${v}</div>`
+      ).join('');
+
+    } else if (currentHalachaSource === 'shut') {
+      const { ref, name, chapter } = getShutRef(d);
+      refEl.textContent = `${name} – סימן ${chapter}`;
+      console.log('[Halacha] shut ref:', ref);
+      const data = await sefariaText(ref, 400);
+      const flat = heFlat(data);
+      if (!flat.length) throw new Error(`אין טקסט ל-${ref}`);
+      el.className = 'content-text';
+      // For shut: show question label + answer
+      el.innerHTML = `<div style="background:rgba(201,165,74,.06);border-right:3px solid var(--gold-dim);padding:10px 12px;border-radius:0 8px 8px 0;margin-bottom:14px">
+        <div style="font-size:10px;color:var(--gold);margin-bottom:6px">שאלה ותשובה – ${name}, סימן ${chapter}</div>
+        ${flat.map((v, i) => `<div style="margin-bottom:8px"><span style="color:var(--gold-dim);font-size:11px">${i + 1} </span>${v}</div>`).join('')}
+      </div>`;
     }
 
-    // Fallback: calculate section by day of year
-    if (!textRef) {
-      const dayOfYear = getDayOfYear(d);
-      const chapters = src.fallbackChapters;
-      const chapter = chapters[(dayOfYear - 1) % chapters.length];
-      textRef = `${src.fallbackBase}.${chapter}`;
-      heRef = src.name + ' – סימן ' + chapter;
-    }
-
-    refEl.textContent = heRef || textRef;
-    console.log('[Halacha] loading text for ref:', textRef);
-    const data = await sefariaText(textRef, 400);
-    const flat = heFlat(data);
-    if (!flat.length) throw new Error(`אין טקסט עברי עבור ${textRef}`);
-    el.className = 'content-text';
-    el.innerHTML = flat.map((v,i) =>
-      `<div style="margin-bottom:8px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}</div>`
-    ).join('');
     updateDoneButton('halacha', ds);
-    console.log(`[Halacha] OK – ${flat.length} sections`);
+    console.log('[Halacha] OK');
   } catch(e) {
     console.error('[Halacha] error:', e);
     el.textContent = 'שגיאה בטעינת ההלכה: ' + e.message;
@@ -1244,6 +1525,55 @@ function renderParasha() {
   }
 }
 
+// All 54 Torah portions with Sefaria refs
+const ALL_PARASHIOT = [
+  { he: 'בראשית', ref: 'Genesis 1:1-6:8' }, { he: 'נח', ref: 'Genesis 6:9-11:32' },
+  { he: 'לך לך', ref: 'Genesis 12:1-17:27' }, { he: 'וירא', ref: 'Genesis 18:1-22:24' },
+  { he: 'חיי שרה', ref: 'Genesis 23:1-25:18' }, { he: 'תולדות', ref: 'Genesis 25:19-28:9' },
+  { he: 'ויצא', ref: 'Genesis 28:10-32:3' }, { he: 'וישלח', ref: 'Genesis 32:4-36:43' },
+  { he: 'וישב', ref: 'Genesis 37:1-40:23' }, { he: 'מקץ', ref: 'Genesis 41:1-44:17' },
+  { he: 'ויגש', ref: 'Genesis 44:18-47:27' }, { he: 'ויחי', ref: 'Genesis 47:28-50:26' },
+  { he: 'שמות', ref: 'Exodus 1:1-6:1' }, { he: 'וארא', ref: 'Exodus 6:2-9:35' },
+  { he: 'בא', ref: 'Exodus 10:1-13:16' }, { he: 'בשלח', ref: 'Exodus 13:17-17:16' },
+  { he: 'יתרו', ref: 'Exodus 18:1-20:23' }, { he: 'משפטים', ref: 'Exodus 21:1-24:18' },
+  { he: 'תרומה', ref: 'Exodus 25:1-27:19' }, { he: 'תצוה', ref: 'Exodus 27:20-30:10' },
+  { he: 'כי תשא', ref: 'Exodus 30:11-34:35' }, { he: 'ויקהל', ref: 'Exodus 35:1-38:20' },
+  { he: 'פקודי', ref: 'Exodus 38:21-40:38' }, { he: 'ויקרא', ref: 'Leviticus 1:1-5:26' },
+  { he: 'צו', ref: 'Leviticus 6:1-8:36' }, { he: 'שמיני', ref: 'Leviticus 9:1-11:47' },
+  { he: 'תזריע', ref: 'Leviticus 12:1-13:59' }, { he: 'מצורע', ref: 'Leviticus 14:1-15:33' },
+  { he: 'אחרי מות', ref: 'Leviticus 16:1-18:30' }, { he: 'קדושים', ref: 'Leviticus 19:1-20:27' },
+  { he: 'אמור', ref: 'Leviticus 21:1-24:23' }, { he: 'בהר', ref: 'Leviticus 25:1-26:2' },
+  { he: 'בחוקותי', ref: 'Leviticus 26:3-27:34' }, { he: 'במדבר', ref: 'Numbers 1:1-4:20' },
+  { he: 'נשא', ref: 'Numbers 4:21-7:89' }, { he: 'בהעלותך', ref: 'Numbers 8:1-12:16' },
+  { he: 'שלח', ref: 'Numbers 13:1-15:41' }, { he: 'קורח', ref: 'Numbers 16:1-18:32' },
+  { he: 'חקת', ref: 'Numbers 19:1-22:1' }, { he: 'בלק', ref: 'Numbers 22:2-25:9' },
+  { he: 'פינחס', ref: 'Numbers 25:10-30:1' }, { he: 'מטות', ref: 'Numbers 30:2-32:42' },
+  { he: 'מסעי', ref: 'Numbers 33:1-36:13' }, { he: 'דברים', ref: 'Deuteronomy 1:1-3:22' },
+  { he: 'ואתחנן', ref: 'Deuteronomy 3:23-7:11' }, { he: 'עקב', ref: 'Deuteronomy 7:12-11:25' },
+  { he: 'ראה', ref: 'Deuteronomy 11:26-16:17' }, { he: 'שופטים', ref: 'Deuteronomy 16:18-21:9' },
+  { he: 'כי תצא', ref: 'Deuteronomy 21:10-25:19' }, { he: 'כי תבוא', ref: 'Deuteronomy 26:1-29:8' },
+  { he: 'נצבים', ref: 'Deuteronomy 29:9-30:20' }, { he: 'וילך', ref: 'Deuteronomy 31:1-31:30' },
+  { he: 'האזינו', ref: 'Deuteronomy 32:1-32:52' }, { he: 'וזאת הברכה', ref: 'Deuteronomy 33:1-34:12' },
+];
+
+function populateParashaDropdown(currentRef) {
+  const sel = document.getElementById('parasha-select');
+  if (!sel) return;
+  sel.innerHTML = ALL_PARASHIOT.map(p =>
+    `<option value="${p.ref}" ${p.ref === currentRef ? 'selected' : ''}>${p.he}</option>`
+  ).join('');
+}
+
+async function loadSpecificParasha(ref) {
+  if (!ref) return;
+  const p = ALL_PARASHIOT.find(x => x.ref === ref);
+  if (p) document.getElementById('parasha-name').textContent = p.he;
+  aliyot = []; // clear aliyot when loading specific parasha
+  document.getElementById('aliya-tabs').innerHTML = '<div class="aliya-tab active" onclick="showAliya(\'all\', this)">הכל</div>';
+  currentParashaRef = ref;
+  await loadAliyaText(ref);
+}
+
 async function loadParasha() {
   const loadingEl = document.getElementById('parasha-loading');
   const nameEl    = document.getElementById('parasha-name');
@@ -1252,6 +1582,9 @@ async function loadParasha() {
   loadingEl.textContent = 'טוען פרשת השבוע...';
   loadingEl.style.display = 'block';
   document.getElementById('parasha-content').innerHTML = '';
+
+  // Always populate the dropdown
+  populateParashaDropdown(null);
 
   try {
     console.log('[Parasha] fetching calendar...');
@@ -1263,13 +1596,18 @@ async function loadParasha() {
     );
     if (!parasha) {
       console.warn('[Parasha] no parasha found in calendar');
-      loadingEl.textContent = 'לא נמצאה פרשה';
+      loadingEl.textContent = 'לא נמצאה פרשה – בחר מהרשימה';
       return;
     }
-    console.log('[Parasha] found:', parasha.displayValue?.he, 'ref:', parasha.ref);
-    nameEl.textContent = parasha.displayValue?.he || parasha.displayValue?.en || parasha.ref;
+    const heName = parasha.displayValue?.he || parasha.displayValue?.en || '';
+    console.log('[Parasha] found:', heName, 'ref:', parasha.ref);
+    nameEl.textContent = heName;
     aliyot = parasha.extraDetails?.aliyot || [];
-    console.log('[Parasha] aliyot:', aliyot);
+
+    // Update dropdown to select current parasha by matching Hebrew name
+    const matchP = ALL_PARASHIOT.find(p => heName.includes(p.he) || p.he.includes(heName.replace('פרשת ','')));
+    populateParashaDropdown(matchP?.ref || null);
+    if (matchP) document.getElementById('parasha-select').value = matchP.ref;
 
     tabsEl.innerHTML = '<div class="aliya-tab active" onclick="showAliya(\'all\', this)">הכל</div>';
     const aliyaNames = ['א','ב','ג','ד','ה','ו','ז','מפטיר'];
@@ -1371,7 +1709,7 @@ async function loadLashon() {
     } else {
       const dayOfYear = getDayOfYear(getTargetDate());
       const part = ((dayOfYear - 1) % 30) + 1;
-      ref = `Chofetz_Chaim,_Part_One.${part}`;
+      ref = `Chafetz_Chaim,_Part_One.${part}`;
       secEl.textContent = `חלק ראשון, סימן ${part}`;
       console.log('[Lashon] fallback ref:', ref);
     }
@@ -1385,7 +1723,7 @@ async function loadLashon() {
   } catch(e) {
     console.error('[Lashon] primary failed:', e, '– trying fallback');
     try {
-      const data = await sefariaText('Chofetz_Chaim,_Part_One.1');
+      const data = await sefariaText('Chafetz_Chaim,_Part_One.1');
       const flat = heFlat(data);
       el.className = 'content-text';
       el.innerHTML = flat.map((v,i) => `<div style="margin-bottom:8px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}</div>`).join('');
@@ -1467,16 +1805,27 @@ function setFont(size) {
 function loadSettingsState() {
   if (appState.fontSize) setFont(appState.fontSize);
   const reminders = appState.reminders || {};
-  ['halacha','tehilim','lashon','parasha'].forEach(k => {
+  ['halacha','tehilim','lashon','parasha','igeret'].forEach(k => {
     const r = reminders[k] || {};
-    if (r.time) document.getElementById('rem-'+k).value = r.time;
-    if (document.getElementById('tog-'+k)) document.getElementById('tog-'+k).checked = !!r.enabled;
+    const timeEl = document.getElementById('rem-'+k);
+    const togEl  = document.getElementById('tog-'+k);
+    if (timeEl && r.time) timeEl.value = r.time;
+    if (togEl) togEl.checked = !!r.enabled;
   });
+  // Restore igeret day
+  const igeretDay = (appState.reminders?.igeret?.day ?? 5).toString(); // default Friday
+  const dayEl = document.getElementById('rem-igeret-day');
+  if (dayEl) dayEl.value = igeretDay;
 }
 function saveReminder(key, time) {
   if (!appState.reminders) appState.reminders = {};
   if (!appState.reminders[key]) appState.reminders[key] = {};
   appState.reminders[key].time = time; saveState();
+}
+function saveReminderDay(key, day) {
+  if (!appState.reminders) appState.reminders = {};
+  if (!appState.reminders[key]) appState.reminders[key] = {};
+  appState.reminders[key].day = parseInt(day); saveState();
 }
 function toggleReminder(key, enabled) {
   if (!appState.reminders) appState.reminders = {};
@@ -1488,14 +1837,50 @@ function scheduleReminder(key) {
   if (!('Notification' in window)) return;
   Notification.requestPermission().then(perm => {
     if (perm !== 'granted') return;
-    const names = {halacha:'הלכה יומית',tehilim:'תהילים',lashon:'לשון הרע',parasha:'פרשת השבוע'};
-    const [h,m] = (appState.reminders?.[key]?.time || '08:00').split(':').map(Number);
+    const names = {
+      halacha: 'הלכה יומית', tehilim: 'תהילים',
+      lashon: 'לשון הרע', parasha: 'פרשת השבוע', igeret: 'אגרת הרמב"ן'
+    };
+    const r = appState.reminders?.[key] || {};
+    const [h,m] = (r.time || '08:00').split(':').map(Number);
     const now = new Date(), target = new Date();
-    target.setHours(h,m,0,0);
-    if (target < now) target.setDate(target.getDate()+1);
+    target.setHours(h, m, 0, 0);
+    // For igeret: find next occurrence of the chosen weekday
+    if (key === 'igeret' && r.day !== undefined) {
+      const targetDay = r.day; // 0=Sun … 6=Sat
+      const daysUntil = (targetDay - now.getDay() + 7) % 7 || 7;
+      target.setDate(now.getDate() + daysUntil);
+      target.setHours(h, m, 0, 0);
+    } else {
+      if (target <= now) target.setDate(target.getDate() + 1);
+    }
     const delay = target - now;
-    setTimeout(() => new Notification('לימוד יומי 📖', { body: 'הגיע זמן: '+names[key], icon: 'icons/icon-192.png' }), delay);
+    console.log(`[Reminder] scheduled "${names[key]}" in ${Math.round(delay/60000)} min`);
+    setTimeout(() => new Notification('לימוד יומי 📖', {
+      body: 'הגיע זמן: ' + names[key],
+      icon: 'icons/icon-192.png'
+    }), delay);
   });
+}
+
+function softReload() {
+  closeSettings();
+  window.location.reload(false); // reload from cache
+}
+async function hardReload() {
+  closeSettings();
+  console.log('[Cache] clearing service worker caches...');
+  if ('caches' in window) {
+    const keys = await caches.keys();
+    await Promise.all(keys.map(k => caches.delete(k)));
+    console.log('[Cache] deleted', keys.length, 'caches');
+  }
+  if ('serviceWorker' in navigator) {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map(r => r.unregister()));
+    console.log('[Cache] unregistered service workers');
+  }
+  window.location.reload(true); // force fresh from server
 }
 
 // ═══════════════════════════════════════════
