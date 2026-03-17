@@ -519,6 +519,11 @@
     </div>
     <button onclick="changeDay(1)">←</button>
   </div>
+  <div id="today-btn-wrapper" style="display:none;text-align:center;margin-bottom:10px">
+    <button onclick="goToToday()" style="background:rgba(201,165,74,.15);border:1px solid var(--gold-dim);color:var(--gold);padding:6px 20px;border-radius:20px;font-size:12px;cursor:pointer;font-family:'Heebo',sans-serif">
+      📅 חזור להיום
+    </button>
+  </div>
 
   <div id="special-event-banner"></div>
 
@@ -994,6 +999,18 @@ function changeDay(delta) {
   loaded = {};
   updateAllDates();
   loadTab(currentTab);
+  // Show/hide "back to today" button
+  const wrapper = document.getElementById('today-btn-wrapper');
+  if (wrapper) wrapper.style.display = currentOffset !== 0 ? 'block' : 'none';
+}
+
+function goToToday() {
+  currentOffset = 0;
+  loaded = {};
+  updateAllDates();
+  loadTab(currentTab);
+  const wrapper = document.getElementById('today-btn-wrapper');
+  if (wrapper) wrapper.style.display = 'none';
 }
 
 function updateAllDates() {
@@ -1107,6 +1124,7 @@ function initTehilim() {
 }
 
 function selectTehilimDay(day) {
+  day = parseInt(day) || 1;
   selectedTehilimHebrewDay = day;
   // Update button styles
   for (let d = 1; d <= 30; d++) {
@@ -1116,18 +1134,17 @@ function selectTehilimDay(day) {
       btn.style.background = 'rgba(201,165,74,.15)';
       btn.style.borderColor = 'var(--gold)';
       btn.style.color = 'var(--gold)';
+      btn.style.fontWeight = '700';
     } else {
       btn.style.background = 'var(--surface)';
       btn.style.borderColor = 'var(--border)';
       btn.style.color = 'var(--muted)';
+      btn.style.fontWeight = '';
     }
   }
   const chapters = getTehilimChapters(day);
   const infoEl = document.getElementById('tehilim-day-info');
   if (infoEl) infoEl.textContent = `יום ${day} בחודש | פרקים: ${chapters.join(', ')}`;
-  // Load first chapter of the day
-  const sel = document.getElementById('tehilim-select');
-  if (sel) sel.value = chapters[0];
   loadTehilim(chapters[0]);
 }
 
@@ -1138,19 +1155,27 @@ async function loadTodayTehilim() {
   try {
     const data = await fetchWithDelay(`https://www.hebcal.com/converter?cfg=json&date=${ds}&g2h=1&strict=1`);
     console.log('[Tehilim] Hebrew date response:', JSON.stringify(data).slice(0,150));
-    const hebrewDay = data.hd || 1;
+    const hebrewDay = parseInt(data.hd) || 1;
     const heDateStr = data.hebrew || '';
+    console.log('[Tehilim] Hebrew day:', hebrewDay, heDateStr);
     const infoEl = document.getElementById('tehilim-day-info');
     if (infoEl) infoEl.textContent = `${heDateStr} | פרקים להיום: ${getTehilimChapters(hebrewDay).join(', ')}`;
     selectTehilimDay(hebrewDay);
   } catch(e) {
     console.error('[Tehilim] failed to get Hebrew date:', e.message);
-    selectTehilimDay(1);
+    // Fallback: use JS date to estimate Hebrew day
+    const approxDay = new Date().getDate();
+    console.log('[Tehilim] using approximate day:', approxDay);
+    selectTehilimDay(approxDay);
   }
 }
 
+let currentTehilimChapter = 1;
+
 async function loadTehilim(chapter) {
-  if (!chapter) return;
+  chapter = parseInt(chapter);
+  if (!chapter || chapter < 1 || chapter > 150) return;
+  currentTehilimChapter = chapter;
   const el = document.getElementById('tehilim-content');
   const title = document.getElementById('tehilim-num-title');
   const sub = document.getElementById('tehilim-subtitle');
@@ -1158,13 +1183,24 @@ async function loadTehilim(chapter) {
   el.textContent = 'טוען...';
   title.textContent = `פרק ${chapter}`;
   sub.textContent = '';
+  // Sync dropdown
+  const sel = document.getElementById('tehilim-select');
+  if (sel) sel.value = chapter;
   try {
     console.log(`[Tehilim] loading chapter ${chapter}`);
     const data = await sefariaText(`Psalms.${chapter}`);
     const flat = heFlat(data);
     if (!flat.length) throw new Error(`אין טקסט עברי לפרק ${chapter}`);
+
+    const prevBtn = chapter > 1   ? `<button onclick="loadTehilim(${chapter-1})" style="background:var(--surface);border:1px solid var(--border);color:var(--gold);padding:6px 14px;border-radius:20px;font-size:12px;cursor:pointer;font-family:'Heebo',sans-serif">→ פרק ${chapter-1}</button>` : '<span></span>';
+    const nextBtn = chapter < 150 ? `<button onclick="loadTehilim(${chapter+1})" style="background:var(--surface);border:1px solid var(--border);color:var(--gold);padding:6px 14px;border-radius:20px;font-size:12px;cursor:pointer;font-family:'Heebo',sans-serif">פרק ${chapter+1} ←</button>` : '<span></span>';
+    const navRow  = `<div style="display:flex;justify-content:space-between;margin-bottom:14px">${prevBtn}${nextBtn}</div>`;
+
     el.className = 'content-text';
-    el.innerHTML = flat.map((v,i) => `<div style="margin-bottom:6px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}</div>`).join('');
+    el.innerHTML = navRow +
+      flat.map((v,i) => `<div style="margin-bottom:6px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}</div>`).join('') +
+      `<div style="display:flex;justify-content:space-between;margin-top:16px">${prevBtn}${nextBtn}</div>`;
+
     sub.textContent = `${flat.length} פסוקים`;
     updateDoneButton('tehilim', chapter);
     console.log(`[Tehilim] OK – ${flat.length} verses`);
@@ -1370,11 +1406,12 @@ function getChayeiAdamSection(d) {
   return ((day - 1) % 67) + 1;
 }
 
-// Shut Maharam Lublin – accessible Ashkenazi responsa on Sefaria
+// Shut – verified Sefaria refs (Ashkenazi responsa)
 const SHUT_BOOKS = [
-  { ref: 'Responsa_Maharam_Lublin', name: 'שו"ת מהרם לובלין', chapters: 140 },
-  { ref: 'Responsa_Tzitz_Eliezer', name: 'שו"ת ציץ אליעזר', chapters: 20 },
-  { ref: 'Noda_BiYehudah,_Orach_Chaim', name: 'נודע ביהודה – אורח חיים', chapters: 40 },
+  { ref: 'Responsa_Maharam_Lublin',         name: 'שו"ת מהרם לובלין',          chapters: 140 },
+  { ref: 'Noda_BiYehudah_I,_Orach_Chaim',   name: 'נודע ביהודה א – אורח חיים',  chapters: 42  },
+  { ref: 'Noda_BiYehudah_II,_Orach_Chaim',  name: 'נודע ביהודה ב – אורח חיים',  chapters: 141 },
+  { ref: 'Responsa_Chatam_Sofer,_Orach_Chaim', name: 'שו"ת חתם סופר – אורח חיים', chapters: 100 },
 ];
 function getShutRef(d) {
   const start = new Date(d.getFullYear(), 0, 1);
@@ -1694,45 +1731,49 @@ async function loadLashon() {
   const el = document.getElementById('lashon-content');
   const secEl = document.getElementById('lashon-section');
   el.className = 'content-text loading'; el.textContent = 'טוען...';
+
+  // Chafetz Chaim structure: Part One has 10 principles (כללים), Part Two has 9
+  // We cycle through all 19 + introduction = 20 sections over the month
+  const dayOfYear = getDayOfYear(getTargetDate());
+  const LASHON_SCHEDULE = [
+    { ref: 'Chafetz_Chaim,_Introduction.1',      label: 'הקדמה' },
+    { ref: 'Chafetz_Chaim,_Part_One.1',           label: 'חלק א – כלל א' },
+    { ref: 'Chafetz_Chaim,_Part_One.2',           label: 'חלק א – כלל ב' },
+    { ref: 'Chafetz_Chaim,_Part_One.3',           label: 'חלק א – כלל ג' },
+    { ref: 'Chafetz_Chaim,_Part_One.4',           label: 'חלק א – כלל ד' },
+    { ref: 'Chafetz_Chaim,_Part_One.5',           label: 'חלק א – כלל ה' },
+    { ref: 'Chafetz_Chaim,_Part_One.6',           label: 'חלק א – כלל ו' },
+    { ref: 'Chafetz_Chaim,_Part_One.7',           label: 'חלק א – כלל ז' },
+    { ref: 'Chafetz_Chaim,_Part_One.8',           label: 'חלק א – כלל ח' },
+    { ref: 'Chafetz_Chaim,_Part_One.9',           label: 'חלק א – כלל ט' },
+    { ref: 'Chafetz_Chaim,_Part_One.10',          label: 'חלק א – כלל י' },
+    { ref: 'Chafetz_Chaim,_Part_Two.1',           label: 'חלק ב (רכילות) – כלל א' },
+    { ref: 'Chafetz_Chaim,_Part_Two.2',           label: 'חלק ב – כלל ב' },
+    { ref: 'Chafetz_Chaim,_Part_Two.3',           label: 'חלק ב – כלל ג' },
+    { ref: 'Chafetz_Chaim,_Part_Two.4',           label: 'חלק ב – כלל ד' },
+    { ref: 'Chafetz_Chaim,_Part_Two.5',           label: 'חלק ב – כלל ה' },
+    { ref: 'Chafetz_Chaim,_Part_Two.6',           label: 'חלק ב – כלל ו' },
+    { ref: 'Chafetz_Chaim,_Part_Two.7',           label: 'חלק ב – כלל ז' },
+    { ref: 'Chafetz_Chaim,_Part_Two.8',           label: 'חלק ב – כלל ח' },
+    { ref: 'Chafetz_Chaim,_Part_Two.9',           label: 'חלק ב – כלל ט' },
+  ];
+
+  const idx = (dayOfYear - 1) % LASHON_SCHEDULE.length;
+  const entry = LASHON_SCHEDULE[idx];
+  console.log('[Lashon] day', dayOfYear, '→ idx', idx, '→', entry.ref);
+  secEl.textContent = entry.label;
+
   try {
-    console.log('[Lashon] fetching calendar...');
-    const cal = await fetchWithDelay(`https://www.sefaria.org/api/calendars?diaspora=0`);
-    const lashon = (cal?.calendar_items || []).find(i =>
-      (i.title?.en || '').toLowerCase().includes('chofetz') ||
-      (i.title?.he || '').includes('חפץ')
-    );
-    let ref;
-    if (lashon) {
-      ref = lashon.ref;
-      secEl.textContent = lashon.heRef || ref;
-      console.log('[Lashon] calendar ref:', ref);
-    } else {
-      const dayOfYear = getDayOfYear(getTargetDate());
-      const part = ((dayOfYear - 1) % 30) + 1;
-      ref = `Chafetz_Chaim,_Part_One.${part}`;
-      secEl.textContent = `חלק ראשון, סימן ${part}`;
-      console.log('[Lashon] fallback ref:', ref);
-    }
-    const data = await sefariaText(ref);
+    const data = await sefariaText(entry.ref);
     const flat = heFlat(data);
-    if (!flat.length) throw new Error(`אין טקסט עברי עבור ${ref}`);
+    if (!flat.length) throw new Error(`אין טקסט עברי עבור ${entry.ref}`);
     el.className = 'content-text';
     el.innerHTML = flat.map((v,i) => `<div style="margin-bottom:8px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}</div>`).join('');
-    updateDoneButton('lashon', ref);
-    console.log(`[Lashon] OK – ${flat.length} sections`);
+    updateDoneButton('lashon', entry.ref);
+    console.log(`[Lashon] OK – ${flat.length} sections for ${entry.label}`);
   } catch(e) {
-    console.error('[Lashon] primary failed:', e, '– trying fallback');
-    try {
-      const data = await sefariaText('Chafetz_Chaim,_Part_One.1');
-      const flat = heFlat(data);
-      el.className = 'content-text';
-      el.innerHTML = flat.map((v,i) => `<div style="margin-bottom:8px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}</div>`).join('');
-      document.getElementById('lashon-section').textContent = 'חפץ חיים – חלק ראשון, סימן א';
-      console.log('[Lashon] fallback OK');
-    } catch(e2) {
-      console.error('[Lashon] fallback also failed:', e2);
-      el.textContent = 'שגיאה בטעינה: ' + e2.message;
-    }
+    console.error('[Lashon] failed:', e.message, 'ref:', entry.ref);
+    el.textContent = 'שגיאה בטעינה: ' + e.message;
   }
 }
 
