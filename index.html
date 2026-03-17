@@ -758,8 +758,17 @@ function formatDisplayDate(d) {
 async function fetchWithDelay(url, delay = 300) {
   await new Promise(r => setTimeout(r, delay));
   const resp = await fetch(url);
-  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status} for ${url}`);
   return resp.json();
+}
+
+// Helper: extract Hebrew text from Sefaria v3 response
+function extractHeText(data) {
+  if (!data?.versions?.length) return [];
+  const heVer = data.versions.find(v => v.actualLanguage === 'he' || v.language === 'he');
+  const ver = heVer || data.versions[0];
+  const t = ver.text || [];
+  return Array.isArray(t[0]) ? t.flat() : t;
 }
 
 // ═══════════════════════════════════════════
@@ -904,8 +913,8 @@ async function loadTehilim(chapter) {
   title.textContent = `פרק ${chapter}`;
   sub.textContent = '';
   try {
-    const data = await fetchWithDelay(`https://www.sefaria.org/api/v3/texts/Psalms.${chapter}?version=he-primary`, 400);
-    const verses = data?.versions?.[0]?.text || [];
+    const data = await fetchWithDelay(`https://www.sefaria.org/api/v3/texts/Psalms.${chapter}`, 400);
+    const verses = extractHeText(data);
     if (!verses.length) throw new Error('empty');
     el.className = 'content-text';
     el.innerHTML = verses.map((v,i) => `<span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}<br>`).join('');
@@ -966,7 +975,7 @@ async function loadZmanim(ds) {
     document.getElementById('z-tzeit').textContent   = fmtT(z.tzeit7083deg);
     // candle lighting from events
     const evData = await fetchWithDelay(
-      `https://www.hebcal.com/hebcal?v=1&cfg=json&maj=on&min=on&nx=on&start=${ds}&end=${ds}&c=on&geo=pos&latitude=${userLat}&longitude=${userLon}&tzid=Asia/Jerusalem&i=on`, 400
+      `https://www.hebcal.com/hebcal?v=1&cfg=json&maj=on&min=on&nx=on&start=${ds}&end=${ds}&c=on&geo=pos&latitude=${userLat}&longitude=${userLon}&tzid=Asia/Jerusalem&i=1`, 400
     );
     const candles = (evData?.items || []).find(e => e.category === 'candles');
     document.getElementById('z-candles').textContent = candles ? fmtT(candles.date) : '--:--';
@@ -980,7 +989,7 @@ async function loadEvents(ds) {
   const list   = document.getElementById('events-list');
   try {
     const data = await fetchWithDelay(
-      `https://www.hebcal.com/hebcal?v=1&cfg=json&maj=on&min=on&nx=on&mf=on&ss=on&start=${ds}&end=${ds}&c=off&i=on`, 300
+      `https://www.hebcal.com/hebcal?v=1&cfg=json&maj=on&min=on&nx=on&mf=on&ss=on&start=${ds}&end=${ds}&c=off&i=1`, 300
     );
     const items = (data?.items || []).filter(e => e.category !== 'candles' && e.category !== 'havdalah');
     if (!items.length) {
@@ -1082,10 +1091,10 @@ async function loadHalacha() {
     let textRef = null;
     let heRef = null;
 
-    // Try Sefaria calendar first
+    // Try Sefaria calendar first (no custom param needed - returns all schedules)
     if (src.calKey) {
       try {
-        const cal = await fetchWithDelay(`https://www.sefaria.org/api/calendars?diaspora=0&custom=ashkenazi`, 300);
+        const cal = await fetchWithDelay(`https://www.sefaria.org/api/calendars?diaspora=0`, 300);
         const item = (cal?.calendar_items || []).find(i =>
           (i.title?.en || '').toLowerCase().includes(src.calKey.toLowerCase()) ||
           (i.title?.he || '').includes(src.calKey)
@@ -1100,15 +1109,14 @@ async function loadHalacha() {
       const chapters = src.fallbackChapters;
       const chapter = chapters[(dayOfYear - 1) % chapters.length];
       textRef = `${src.fallbackBase}.${chapter}`;
-      heRef = src.name + ' – ' + src.fallbackBase.replace(/_/g,' ') + ' ' + chapter;
+      heRef = src.name + ' – סימן ' + chapter;
     }
 
     refEl.textContent = heRef || textRef;
     const tdata = await fetchWithDelay(
-      `https://www.sefaria.org/api/v3/texts/${encodeURIComponent(textRef)}?version=he-primary`, 400
+      `https://www.sefaria.org/api/v3/texts/${encodeURIComponent(textRef)}`, 400
     );
-    const text = tdata?.versions?.[0]?.text || [];
-    const flat = Array.isArray(text[0]) ? text.flat() : text;
+    const flat = extractHeText(tdata);
     if (!flat.filter(Boolean).length) throw new Error('empty');
     el.className = 'content-text';
     el.innerHTML = flat.filter(Boolean).map((v,i) =>
@@ -1130,7 +1138,7 @@ async function loadParasha() {
   el.className  = 'content-text loading';
   el.textContent = 'טוען...';
   try {
-    const cal = await fetchWithDelay(`https://www.sefaria.org/api/calendars?diaspora=0&custom=sephardi`);
+    const cal = await fetchWithDelay(`https://www.sefaria.org/api/calendars?diaspora=0`);
     const parasha = (cal?.calendar_items || []).find(i =>
       (i.title?.en || '').toLowerCase().includes('parashat')
     );
@@ -1155,9 +1163,8 @@ async function loadAliyaText(ref) {
   const el = document.getElementById('parasha-content');
   el.className = 'content-text loading'; el.textContent = 'טוען...';
   try {
-    const tdata = await fetchWithDelay(`https://www.sefaria.org/api/v3/texts/${encodeURIComponent(ref)}?version=he-primary`, 400);
-    const text = tdata?.versions?.[0]?.text || [];
-    const flat = Array.isArray(text[0]) ? text.flat() : text;
+    const tdata = await fetchWithDelay(`https://www.sefaria.org/api/v3/texts/${encodeURIComponent(ref)}`, 400);
+    const flat = extractHeText(tdata);
     el.className = 'content-text';
     el.innerHTML = flat.map((v,i) => `<span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}<br>`).join('');
     updateDoneButton('parasha', ref);
@@ -1171,7 +1178,7 @@ async function showAliya(index, btn) {
   btn.classList.add('active');
   currentAliya = index;
   if (index === 'all') {
-    const cal = await fetchWithDelay(`https://www.sefaria.org/api/calendars?diaspora=0&custom=sephardi`);
+    const cal = await fetchWithDelay(`https://www.sefaria.org/api/calendars?diaspora=0`);
     const parasha = (cal?.calendar_items || []).find(i => (i.title?.en||'').toLowerCase().includes('parashat'));
     if (parasha) await loadAliyaText(parasha.ref);
   } else {
@@ -1189,13 +1196,12 @@ async function toggleRashi() {
     btn.textContent = 'הסתר';
     rashiVisible = true;
     try {
-      const cal = await fetchWithDelay(`https://www.sefaria.org/api/calendars?diaspora=0&custom=sephardi`);
+      const cal = await fetchWithDelay(`https://www.sefaria.org/api/calendars?diaspora=0`);
       const parasha = (cal?.calendar_items || []).find(i => (i.title?.en||'').toLowerCase().includes('parashat'));
       const ref = parasha?.ref || 'Genesis 1';
       const rashiRef = 'Rashi on ' + ref;
-      const tdata = await fetchWithDelay(`https://www.sefaria.org/api/v3/texts/${encodeURIComponent(rashiRef)}?version=he-primary`, 500);
-      const text = tdata?.versions?.[0]?.text || [];
-      const flat = Array.isArray(text[0]) ? text.flat() : text;
+      const tdata = await fetchWithDelay(`https://www.sefaria.org/api/v3/texts/${encodeURIComponent(rashiRef)}`, 500);
+      const flat = extractHeText(tdata);
       el.className = 'content-text';
       el.innerHTML = flat.filter(Boolean).map((v,i) => `<div style="margin-bottom:10px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}</div>`).join('');
       rashiLoaded = true;
@@ -1233,9 +1239,8 @@ async function loadLashon() {
       ref = `Chofetz_Chaim,_Part_One.${part}`;
       secEl.textContent = `חלק ראשון, סימן ${part}`;
     }
-    const tdata = await fetchWithDelay(`https://www.sefaria.org/api/v3/texts/${encodeURIComponent(ref)}?version=he-primary`, 400);
-    const text = tdata?.versions?.[0]?.text || [];
-    const flat = Array.isArray(text[0]) ? text.flat() : text;
+    const tdata = await fetchWithDelay(`https://www.sefaria.org/api/v3/texts/${encodeURIComponent(ref)}`, 400);
+    const flat = extractHeText(tdata);
     if (!flat.length) throw new Error('empty');
     el.className = 'content-text';
     el.innerHTML = flat.map((v,i) => `<span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}<br>`).join('');
@@ -1243,9 +1248,8 @@ async function loadLashon() {
   } catch(e) {
     // Absolute fallback
     try {
-      const tdata = await fetchWithDelay(`https://www.sefaria.org/api/v3/texts/Chofetz_Chaim%2C_Introduction.1?version=he-primary`, 400);
-      const text = tdata?.versions?.[0]?.text || [];
-      const flat = Array.isArray(text[0]) ? text.flat() : text;
+      const tdata = await fetchWithDelay(`https://www.sefaria.org/api/v3/texts/Chofetz_Chaim%2C_Introduction.1`, 400);
+      const flat = extractHeText(tdata);
       el.className = 'content-text';
       el.innerHTML = flat.map((v,i) => `<span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}<br>`).join('');
       secEl.textContent = 'הקדמה לחפץ חיים';
@@ -1268,9 +1272,8 @@ async function loadIgeret() {
   const el = document.getElementById('igeret-content');
   el.className = 'content-text loading'; el.textContent = 'טוען...';
   try {
-    const tdata = await fetchWithDelay(`https://www.sefaria.org/api/v3/texts/Iggeret_HaRamban?version=he-primary`, 400);
-    const text = tdata?.versions?.[0]?.text || [];
-    const flat = Array.isArray(text[0]) ? text.flat() : text;
+    const tdata = await fetchWithDelay(`https://www.sefaria.org/api/v3/texts/Iggeret_HaRamban`, 400);
+    const flat = extractHeText(tdata);
     el.className = 'content-text igeret-text';
     el.innerHTML = flat.filter(Boolean).map((v,i) =>
       `<div class="igeret-section"><div class="sec-num">פסקה ${i+1}</div>${v}</div>`
