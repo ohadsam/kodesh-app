@@ -626,24 +626,20 @@
       </div>
       <div id="done-parasha"></div>
     </div>
+    <!-- Aliya tabs -->
     <div class="aliya-tabs" id="aliya-tabs">
       <div class="aliya-tab active" onclick="showAliya('all', this)">הכל</div>
     </div>
-    <div id="parasha-content" class="content-text loading">טוען פרשת השבוע...</div>
-    <div class="source-link">
-      מקור: <a href="https://www.sefaria.org" target="_blank">Sefaria</a>
+    <!-- View mode toggle -->
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button id="view-text-btn" class="aliya-tab active" onclick="setParashaView('text')">📖 פסוקים בלבד</button>
+      <button id="view-rashi-btn" class="aliya-tab" onclick="setParashaView('rashi')">🖊 פסוקים + רש"י</button>
     </div>
-  </div>
-
-  <!-- Rashi toggle -->
-  <div class="card">
-    <div class="card-header">
-      <div class="card-title"><span class="emoji">🖊</span>פירוש רש"י</div>
-      <button id="rashi-toggle-btn" onclick="toggleRashi()" style="background:var(--surface);border:1px solid var(--border);color:var(--gold);padding:6px 14px;border-radius:20px;font-size:12px;cursor:pointer;font-family:'Heebo',sans-serif">הצג</button>
-    </div>
-    <div id="rashi-content" style="display:none" class="content-text">טוען...</div>
+    <div id="parasha-loading" style="color:var(--muted);font-size:13px;font-style:italic">טוען פרשת השבוע...</div>
+    <div id="parasha-content"></div>
     <div class="source-link">
-      מקור: <a href="https://www.sefaria.org/Rashi_on_Torah" target="_blank">רש"י על התורה – ספריא</a>
+      מקור: <a href="https://www.sefaria.org" target="_blank">Sefaria</a> |
+      <a href="https://www.sefaria.org/Rashi_on_Torah" target="_blank">רש"י על התורה</a>
     </div>
   </div>
 </div>
@@ -757,18 +753,57 @@ function formatDisplayDate(d) {
 // ═══════════════════════════════════════════
 async function fetchWithDelay(url, delay = 300) {
   await new Promise(r => setTimeout(r, delay));
+  console.log(`[fetch] GET ${url.length > 120 ? url.slice(0,120)+'...' : url}`);
   const resp = await fetch(url);
+  console.log(`[fetch] → ${resp.status}`);
   if (!resp.ok) throw new Error(`HTTP ${resp.status} for ${url}`);
   return resp.json();
 }
 
-// Helper: extract Hebrew text from Sefaria v3 response
+// Helper: extract Hebrew text from Sefaria - supports both v2 and v3 responses
 function extractHeText(data) {
-  if (!data?.versions?.length) return [];
-  const heVer = data.versions.find(v => v.actualLanguage === 'he' || v.language === 'he');
-  const ver = heVer || data.versions[0];
-  const t = ver.text || [];
-  return Array.isArray(t[0]) ? t.flat() : t;
+  // v2 API: data.he is the Hebrew text directly
+  if (data?.he) {
+    const t = data.he;
+    const flat = Array.isArray(t[0]) ? t.flat() : t;
+    if (flat.filter(Boolean).length) return flat;
+  }
+  // v3 API: data.versions array
+  if (data?.versions?.length) {
+    const heVer = data.versions.find(v => v.actualLanguage === 'he' || v.language === 'he');
+    const ver = heVer || data.versions[0];
+    const t = ver?.text || [];
+    return Array.isArray(t[0]) ? t.flat() : t;
+  }
+  return [];
+}
+
+// ─── Sefaria v2 fetch – the ONLY function that calls Sefaria texts ───
+async function sefariaText(ref, delay = 350) {
+  await new Promise(r => setTimeout(r, delay));
+  const url = `https://www.sefaria.org/api/texts/${encodeURIComponent(ref)}?lang=he&commentary=0&context=0`;
+  console.log(`[Sefaria] GET ${url}`);
+  const resp = await fetch(url);
+  console.log(`[Sefaria] ${resp.status} for "${ref}"`);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status} for ${ref}`);
+  const data = await resp.json();
+  // Log what came back so we can diagnose
+  if (data?.warnings) console.warn(`[Sefaria] warnings for "${ref}":`, data.warnings);
+  const heArr = data?.he;
+  const flat = heArr ? (Array.isArray(heArr[0]) ? heArr.flat() : heArr) : [];
+  const filled = flat.filter(Boolean);
+  console.log(`[Sefaria] "${ref}" → ${filled.length} verses (he), text sample: "${String(filled[0]||'').slice(0,40)}"`);
+  if (!filled.length) {
+    console.warn(`[Sefaria] EMPTY Hebrew for "${ref}" – full response:`, JSON.stringify(data).slice(0, 300));
+  }
+  return data;
+}
+
+// Helper: flatten data.he from sefariaText result
+function heFlat(data) {
+  const t = data?.he || [];
+  const flat = Array.isArray(t[0]) ? t.flat() : t;
+  return flat.filter(Boolean);
 }
 
 // ═══════════════════════════════════════════
@@ -913,15 +948,18 @@ async function loadTehilim(chapter) {
   title.textContent = `פרק ${chapter}`;
   sub.textContent = '';
   try {
-    const data = await fetchWithDelay(`https://www.sefaria.org/api/v3/texts/Psalms.${chapter}`, 400);
-    const verses = extractHeText(data);
-    if (!verses.length) throw new Error('empty');
+    console.log(`[Tehilim] loading chapter ${chapter}`);
+    const data = await sefariaText(`Psalms.${chapter}`);
+    const flat = heFlat(data);
+    if (!flat.length) throw new Error(`אין טקסט עברי לפרק ${chapter}`);
     el.className = 'content-text';
-    el.innerHTML = verses.map((v,i) => `<span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}<br>`).join('');
-    sub.textContent = `${verses.length} פסוקים`;
+    el.innerHTML = flat.map((v,i) => `<div style="margin-bottom:6px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}</div>`).join('');
+    sub.textContent = `${flat.length} פסוקים`;
     updateDoneButton('tehilim', chapter);
+    console.log(`[Tehilim] OK – ${flat.length} verses`);
   } catch(e) {
-    el.textContent = 'לא ניתן לטעון. בדוק חיבור לאינטרנט.';
+    console.error('[Tehilim] error:', e);
+    el.textContent = 'שגיאה בטעינה: ' + e.message;
   }
 }
 
@@ -932,15 +970,19 @@ async function loadCalendar() {
   const d = getTargetDate();
   const ds = formatDate(d);
   document.getElementById('cal-greg').textContent = formatDisplayDate(d);
-
   loadHebrewDate();
+  // Load with default location immediately, update if GPS granted
+  loadZmanim(ds);
+  loadEvents(ds);
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
-      pos => { userLat = pos.coords.latitude; userLon = pos.coords.longitude; loadZmanim(ds); loadEvents(ds); },
-      () => { loadZmanim(ds); loadEvents(ds); }
+      pos => {
+        userLat = pos.coords.latitude;
+        userLon = pos.coords.longitude;
+        loadZmanim(ds); // reload with real location
+      },
+      () => {} // silently fail – already loaded with defaults
     );
-  } else {
-    loadZmanim(ds); loadEvents(ds);
   }
 }
 
@@ -956,29 +998,30 @@ function detectLocation() {
 }
 
 async function loadZmanim(ds) {
+  // Don't call if location not ready
+  if (!userLat || !userLon) return;
   try {
-    const data = await fetchWithDelay(
-      `https://www.hebcal.com/zmanim?cfg=json&date=${ds}&lat=${userLat}&lon=${userLon}&tzid=Asia/Jerusalem`, 300
-    );
+    const url = `https://www.hebcal.com/zmanim?cfg=json&date=${ds}&latitude=${userLat.toFixed(6)}&longitude=${userLon.toFixed(6)}&tzid=Asia/Jerusalem`;
+    const data = await fetchWithDelay(url, 300);
     const z = data?.times || {};
     function fmtT(iso) {
       if (!iso) return '--:--';
-      const t = new Date(iso);
-      return t.toLocaleTimeString('he-IL', {hour:'2-digit',minute:'2-digit',hour12:false});
+      return new Date(iso).toLocaleTimeString('he-IL', {hour:'2-digit',minute:'2-digit',hour12:false});
     }
     document.getElementById('z-alot').textContent    = fmtT(z.alotHaShachar);
     document.getElementById('z-sunrise').textContent = fmtT(z.sunrise);
-    document.getElementById('z-shema').textContent   = fmtT(z.sofZmanShmaMGA || z.sofZmanShmaGRA);
+    document.getElementById('z-shema').textContent   = fmtT(z.sofZmanShmaGRA || z.sofZmanShmaMGA);
     document.getElementById('z-noon').textContent    = fmtT(z.chatzot);
     document.getElementById('z-mincha').textContent  = fmtT(z.minchaGedola);
     document.getElementById('z-sunset').textContent  = fmtT(z.sunset);
-    document.getElementById('z-tzeit').textContent   = fmtT(z.tzeit7083deg);
-    // candle lighting from events
+    document.getElementById('z-tzeit').textContent   = fmtT(z.tzeit7083deg || z.tzeit85deg);
+    // candle lighting
     const evData = await fetchWithDelay(
-      `https://www.hebcal.com/hebcal?v=1&cfg=json&maj=on&min=on&nx=on&start=${ds}&end=${ds}&c=on&geo=pos&latitude=${userLat}&longitude=${userLon}&tzid=Asia/Jerusalem&i=1`, 400
+      `https://www.hebcal.com/hebcal?v=1&cfg=json&maj=on&min=on&nx=on&start=${ds}&end=${ds}&c=on&geo=pos&latitude=${userLat.toFixed(6)}&longitude=${userLon.toFixed(6)}&tzid=Asia/Jerusalem&i=1`, 400
     );
     const candles = (evData?.items || []).find(e => e.category === 'candles');
     document.getElementById('z-candles').textContent = candles ? fmtT(candles.date) : '--:--';
+    document.getElementById('zmanim-location').textContent = `📍 ${userLat.toFixed(3)}, ${userLon.toFixed(3)}`;
   } catch(e) {
     console.warn('Zmanim error', e);
   }
@@ -1113,63 +1156,152 @@ async function loadHalacha() {
     }
 
     refEl.textContent = heRef || textRef;
-    const tdata = await fetchWithDelay(
-      `https://www.sefaria.org/api/v3/texts/${encodeURIComponent(textRef)}`, 400
-    );
-    const flat = extractHeText(tdata);
-    if (!flat.filter(Boolean).length) throw new Error('empty');
+    console.log('[Halacha] loading text for ref:', textRef);
+    const data = await sefariaText(textRef, 400);
+    const flat = heFlat(data);
+    if (!flat.length) throw new Error(`אין טקסט עברי עבור ${textRef}`);
     el.className = 'content-text';
-    el.innerHTML = flat.filter(Boolean).map((v,i) =>
-      `<span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}<br>`
+    el.innerHTML = flat.map((v,i) =>
+      `<div style="margin-bottom:8px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}</div>`
     ).join('');
     updateDoneButton('halacha', ds);
+    console.log(`[Halacha] OK – ${flat.length} sections`);
   } catch(e) {
-    el.textContent = 'שגיאה בטעינת ההלכה. בדוק חיבור לאינטרנט.';
+    console.error('[Halacha] error:', e);
+    el.textContent = 'שגיאה בטעינת ההלכה: ' + e.message;
   }
 }
 
 // ═══════════════════════════════════════════
 // PARASHA
 // ═══════════════════════════════════════════
-async function loadParasha() {
-  const el      = document.getElementById('parasha-content');
-  const nameEl  = document.getElementById('parasha-name');
-  const tabsEl  = document.getElementById('aliya-tabs');
-  el.className  = 'content-text loading';
-  el.textContent = 'טוען...';
-  try {
-    const cal = await fetchWithDelay(`https://www.sefaria.org/api/calendars?diaspora=0`);
-    const parasha = (cal?.calendar_items || []).find(i =>
-      (i.title?.en || '').toLowerCase().includes('parashat')
-    );
-    if (!parasha) { el.textContent = 'לא נמצאה פרשה'; return; }
-    nameEl.textContent = parasha.displayValue?.he || parasha.displayValue?.en || '';
-    aliyot = parasha.extraDetails?.aliyot || [];
+let parashaVerses = [];   // current Torah verses
+let rashiVerses   = [];   // current Rashi verses (parallel array)
+let parashaView   = 'text'; // 'text' | 'rashi'
+let currentParashaRef = null;
 
-    // build aliya tabs
+function setParashaView(mode) {
+  parashaView = mode;
+  document.getElementById('view-text-btn').classList.toggle('active', mode === 'text');
+  document.getElementById('view-rashi-btn').classList.toggle('active', mode === 'rashi');
+  renderParasha();
+}
+
+function renderParasha() {
+  const el = document.getElementById('parasha-content');
+  if (!parashaVerses.length) { el.innerHTML = ''; return; }
+
+  if (parashaView === 'text') {
+    el.innerHTML = parashaVerses.map((v,i) =>
+      `<div style="margin-bottom:8px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span><span class="content-text" style="font-size:var(--font-size)">${v}</span></div>`
+    ).join('');
+  } else {
+    // interleaved: verse → rashi comment
+    el.innerHTML = parashaVerses.map((v,i) => {
+      const r = rashiVerses[i];
+      return `
+        <div style="margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:12px">
+          <div style="margin-bottom:6px">
+            <span style="color:var(--gold-dim);font-size:11px">${i+1} </span>
+            <span style="font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);color:var(--cream);line-height:1.8">${v}</span>
+          </div>
+          ${r ? `<div style="padding:8px 10px;background:rgba(201,165,74,.06);border-right:2px solid var(--gold-dim);border-radius:0 6px 6px 0;margin-top:4px">
+            <div style="font-size:10px;color:var(--gold);font-weight:600;margin-bottom:3px">רש"י</div>
+            <span style="font-family:'Frank Ruhl Libre',serif;font-size:calc(var(--font-size)*.9);color:var(--text);line-height:1.7">${r}</span>
+          </div>` : ''}
+        </div>`;
+    }).join('');
+  }
+}
+
+async function loadParasha() {
+  const loadingEl = document.getElementById('parasha-loading');
+  const nameEl    = document.getElementById('parasha-name');
+  const tabsEl    = document.getElementById('aliya-tabs');
+  parashaVerses = []; rashiVerses = [];
+  loadingEl.textContent = 'טוען פרשת השבוע...';
+  loadingEl.style.display = 'block';
+  document.getElementById('parasha-content').innerHTML = '';
+
+  try {
+    console.log('[Parasha] fetching calendar...');
+    const cal = await fetchWithDelay(`https://www.sefaria.org/api/calendars?diaspora=0`);
+    console.log('[Parasha] calendar items:', cal?.calendar_items?.map(i=>i.title?.en));
+    const parasha = (cal?.calendar_items || []).find(i =>
+      (i.title?.en || '').toLowerCase().includes('parashat') ||
+      (i.title?.en || '').toLowerCase().includes('parasha')
+    );
+    if (!parasha) {
+      console.warn('[Parasha] no parasha found in calendar');
+      loadingEl.textContent = 'לא נמצאה פרשה';
+      return;
+    }
+    console.log('[Parasha] found:', parasha.displayValue?.he, 'ref:', parasha.ref);
+    nameEl.textContent = parasha.displayValue?.he || parasha.displayValue?.en || parasha.ref;
+    aliyot = parasha.extraDetails?.aliyot || [];
+    console.log('[Parasha] aliyot:', aliyot);
+
     tabsEl.innerHTML = '<div class="aliya-tab active" onclick="showAliya(\'all\', this)">הכל</div>';
     const aliyaNames = ['א','ב','ג','ד','ה','ו','ז','מפטיר'];
     aliyot.forEach((a,i) => {
       tabsEl.innerHTML += `<div class="aliya-tab" onclick="showAliya(${i}, this)">${aliyaNames[i]||i+1}</div>`;
     });
 
+    currentParashaRef = parasha.ref;
     await loadAliyaText(parasha.ref);
+    loadingEl.style.display = 'none';
+    updateDoneButton('parasha', parasha.ref);
   } catch(e) {
-    el.textContent = 'שגיאה בטעינה.';
+    console.error('[Parasha] loadParasha error:', e);
+    loadingEl.textContent = 'שגיאה בטעינה: ' + e.message;
   }
 }
 
 async function loadAliyaText(ref) {
-  const el = document.getElementById('parasha-content');
-  el.className = 'content-text loading'; el.textContent = 'טוען...';
+  const loadingEl = document.getElementById('parasha-loading');
+  loadingEl.style.display = 'block';
+  loadingEl.textContent = 'טוען...';
+  document.getElementById('parasha-content').innerHTML = '';
+  parashaVerses = []; rashiVerses = [];
+  rashiLoaded = false;
+
   try {
-    const tdata = await fetchWithDelay(`https://www.sefaria.org/api/v3/texts/${encodeURIComponent(ref)}`, 400);
-    const flat = extractHeText(tdata);
-    el.className = 'content-text';
-    el.innerHTML = flat.map((v,i) => `<span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}<br>`).join('');
-    updateDoneButton('parasha', ref);
+    console.log('[Parasha] loading text for ref:', ref);
+    const data = await sefariaText(ref);
+    parashaVerses = heFlat(data);
+    console.log(`[Parasha] got ${parashaVerses.length} verses`);
+    if (!parashaVerses.length) throw new Error('no Hebrew verses returned');
+
+    // Pre-load Rashi in background
+    loadRashiForRef(ref);
+
+    loadingEl.style.display = 'none';
+    renderParasha();
   } catch(e) {
-    el.textContent = 'שגיאה בטעינה.';
+    console.error('[Parasha] loadAliyaText error:', e);
+    loadingEl.textContent = 'שגיאה בטעינת הפרשה: ' + e.message;
+  }
+}
+
+async function loadRashiForRef(torahRef) {
+  const rashiRef = 'Rashi on ' + torahRef;
+  console.log('[Rashi] loading:', rashiRef);
+  try {
+    const data = await sefariaText(rashiRef, 500);
+    const raw = data?.he || [];
+    // Rashi text is nested: array of arrays (one per verse, each array = list of comments)
+    rashiVerses = raw.map(v => {
+      if (!v) return '';
+      if (Array.isArray(v)) return v.filter(Boolean).join(' ');
+      return v;
+    });
+    rashiLoaded = true;
+    console.log(`[Rashi] loaded ${rashiVerses.length} entries`);
+    // If currently in rashi view, re-render with Rashi
+    if (parashaView === 'rashi') renderParasha();
+  } catch(e) {
+    console.warn('[Rashi] failed to load:', e.message);
+    rashiVerses = [];
   }
 }
 
@@ -1177,41 +1309,13 @@ async function showAliya(index, btn) {
   document.querySelectorAll('#aliya-tabs .aliya-tab').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
   currentAliya = index;
+  console.log('[Parasha] showAliya:', index);
   if (index === 'all') {
-    const cal = await fetchWithDelay(`https://www.sefaria.org/api/calendars?diaspora=0`);
-    const parasha = (cal?.calendar_items || []).find(i => (i.title?.en||'').toLowerCase().includes('parashat'));
-    if (parasha) await loadAliyaText(parasha.ref);
+    if (currentParashaRef) await loadAliyaText(currentParashaRef);
   } else {
     const ref = aliyot[index];
+    console.log('[Parasha] aliya ref:', ref);
     if (ref) await loadAliyaText(ref);
-  }
-}
-
-async function toggleRashi() {
-  const el  = document.getElementById('rashi-content');
-  const btn = document.getElementById('rashi-toggle-btn');
-  if (!rashiLoaded) {
-    el.style.display = 'block';
-    el.textContent = 'טוען רש"י...';
-    btn.textContent = 'הסתר';
-    rashiVisible = true;
-    try {
-      const cal = await fetchWithDelay(`https://www.sefaria.org/api/calendars?diaspora=0`);
-      const parasha = (cal?.calendar_items || []).find(i => (i.title?.en||'').toLowerCase().includes('parashat'));
-      const ref = parasha?.ref || 'Genesis 1';
-      const rashiRef = 'Rashi on ' + ref;
-      const tdata = await fetchWithDelay(`https://www.sefaria.org/api/v3/texts/${encodeURIComponent(rashiRef)}`, 500);
-      const flat = extractHeText(tdata);
-      el.className = 'content-text';
-      el.innerHTML = flat.filter(Boolean).map((v,i) => `<div style="margin-bottom:10px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}</div>`).join('');
-      rashiLoaded = true;
-    } catch(e) {
-      el.textContent = 'שגיאה בטעינת רש"י.';
-    }
-  } else {
-    rashiVisible = !rashiVisible;
-    el.style.display = rashiVisible ? 'block' : 'none';
-    btn.textContent = rashiVisible ? 'הסתר' : 'הצג';
   }
 }
 
@@ -1223,6 +1327,7 @@ async function loadLashon() {
   const secEl = document.getElementById('lashon-section');
   el.className = 'content-text loading'; el.textContent = 'טוען...';
   try {
+    console.log('[Lashon] fetching calendar...');
     const cal = await fetchWithDelay(`https://www.sefaria.org/api/calendars?diaspora=0`);
     const lashon = (cal?.calendar_items || []).find(i =>
       (i.title?.en || '').toLowerCase().includes('chofetz') ||
@@ -1232,29 +1337,33 @@ async function loadLashon() {
     if (lashon) {
       ref = lashon.ref;
       secEl.textContent = lashon.heRef || ref;
+      console.log('[Lashon] calendar ref:', ref);
     } else {
-      // fallback: calculate section by day of year
       const dayOfYear = getDayOfYear(getTargetDate());
       const part = ((dayOfYear - 1) % 30) + 1;
       ref = `Chofetz_Chaim,_Part_One.${part}`;
       secEl.textContent = `חלק ראשון, סימן ${part}`;
+      console.log('[Lashon] fallback ref:', ref);
     }
-    const tdata = await fetchWithDelay(`https://www.sefaria.org/api/v3/texts/${encodeURIComponent(ref)}`, 400);
-    const flat = extractHeText(tdata);
-    if (!flat.length) throw new Error('empty');
+    const data = await sefariaText(ref);
+    const flat = heFlat(data);
+    if (!flat.length) throw new Error(`אין טקסט עברי עבור ${ref}`);
     el.className = 'content-text';
-    el.innerHTML = flat.map((v,i) => `<span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}<br>`).join('');
+    el.innerHTML = flat.map((v,i) => `<div style="margin-bottom:8px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}</div>`).join('');
     updateDoneButton('lashon', ref);
+    console.log(`[Lashon] OK – ${flat.length} sections`);
   } catch(e) {
-    // Absolute fallback
+    console.error('[Lashon] primary failed:', e, '– trying fallback');
     try {
-      const tdata = await fetchWithDelay(`https://www.sefaria.org/api/v3/texts/Chofetz_Chaim%2C_Introduction.1`, 400);
-      const flat = extractHeText(tdata);
+      const data = await sefariaText('Chofetz_Chaim,_Part_One.1');
+      const flat = heFlat(data);
       el.className = 'content-text';
-      el.innerHTML = flat.map((v,i) => `<span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}<br>`).join('');
-      secEl.textContent = 'הקדמה לחפץ חיים';
-    } catch {
-      el.textContent = 'שגיאה בטעינה.';
+      el.innerHTML = flat.map((v,i) => `<div style="margin-bottom:8px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}</div>`).join('');
+      document.getElementById('lashon-section').textContent = 'חפץ חיים – חלק ראשון, סימן א';
+      console.log('[Lashon] fallback OK');
+    } catch(e2) {
+      console.error('[Lashon] fallback also failed:', e2);
+      el.textContent = 'שגיאה בטעינה: ' + e2.message;
     }
   }
 }
@@ -1266,21 +1375,25 @@ function getDayOfYear(date) {
 }
 
 // ═══════════════════════════════════════════
-// IGERET HARAMBAM
+// IGERET HARAMBAN
 // ═══════════════════════════════════════════
 async function loadIgeret() {
   const el = document.getElementById('igeret-content');
   el.className = 'content-text loading'; el.textContent = 'טוען...';
   try {
-    const tdata = await fetchWithDelay(`https://www.sefaria.org/api/v3/texts/Iggeret_HaRamban`, 400);
-    const flat = extractHeText(tdata);
+    console.log('[Igeret] loading Iggeret_HaRamban...');
+    const data = await sefariaText('Iggeret_HaRamban');
+    const flat = heFlat(data);
+    if (!flat.length) throw new Error('אין טקסט עברי לאגרת הרמב"ן');
     el.className = 'content-text igeret-text';
-    el.innerHTML = flat.filter(Boolean).map((v,i) =>
+    el.innerHTML = flat.map((v,i) =>
       `<div class="igeret-section"><div class="sec-num">פסקה ${i+1}</div>${v}</div>`
     ).join('');
     updateDoneButton('igeret', 'igeret');
+    console.log(`[Igeret] OK – ${flat.length} sections`);
   } catch(e) {
-    el.textContent = 'שגיאה בטעינת האגרת.';
+    console.error('[Igeret] error:', e);
+    el.textContent = 'שגיאה בטעינת האגרת: ' + e.message;
   }
 }
 
