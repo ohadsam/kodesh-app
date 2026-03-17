@@ -1,0 +1,1378 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#1a0e05" />
+  <meta name="mobile-web-app-capable" content="true" />
+  <meta name="apple-mobile-web-app-capable" content="true" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="לימוד יומי" />
+  <title>לימוד יומי</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@300;400;500;700;900&family=Heebo:wght@300;400;500;700&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg:       #0e0905;
+      --surface:  #1c1208;
+      --card:     #251a0c;
+      --border:   #3d2b14;
+      --gold:     #c9a54a;
+      --gold-dim: #7a6128;
+      --cream:    #f5ead4;
+      --text:     #e8d9b8;
+      --muted:    #8a7355;
+      --accent:   #e8b84b;
+      --red:      #c94040;
+      --green:    #3d8c5a;
+      --radius:   14px;
+      --font-size: 16px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Heebo', 'Frank Ruhl Libre', serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: var(--font-size);
+      min-height: 100dvh;
+      overflow-x: hidden;
+    }
+
+    /* ─── SPLASH ─────────────────────────────── */
+    #splash {
+      position: fixed; inset: 0; z-index: 9999;
+      background: var(--bg);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 20px;
+      transition: opacity .5s ease;
+    }
+    #splash.hide { opacity: 0; pointer-events: none; }
+    #splash .logo-big {
+      font-family: 'Frank Ruhl Libre', serif;
+      font-size: 56px; font-weight: 900;
+      color: var(--gold);
+      text-shadow: 0 0 40px rgba(201,165,74,.4);
+      letter-spacing: 4px;
+    }
+    #splash p { color: var(--muted); font-size: 15px; }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid var(--border);
+      border-top-color: var(--gold);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── TOP BAR ────────────────────────────── */
+    #topbar {
+      position: sticky; top: 0; z-index: 100;
+      background: linear-gradient(180deg, rgba(14,9,5,.97) 0%, rgba(14,9,5,.85) 100%);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    #topbar .brand {
+      font-family: 'Frank Ruhl Libre', serif;
+      font-size: 19px; font-weight: 700;
+      color: var(--gold);
+    }
+    #topbar .date-chip {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 12px; color: var(--cream);
+      text-align: center; line-height: 1.4;
+    }
+    #topbar .settings-btn {
+      background: none; border: none; cursor: pointer;
+      color: var(--muted); font-size: 20px; padding: 4px;
+    }
+
+    /* ─── TABS ───────────────────────────────── */
+    #tabs {
+      display: flex;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    #tabs::-webkit-scrollbar { display: none; }
+    .tab {
+      flex: 0 0 auto;
+      padding: 10px 14px;
+      font-size: 12px; font-weight: 500;
+      color: var(--muted);
+      cursor: pointer; border: none; background: none;
+      white-space: nowrap;
+      border-bottom: 2px solid transparent;
+      transition: color .2s, border-color .2s;
+    }
+    .tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+    .tab .icon { font-size: 16px; display: block; text-align: center; margin-bottom: 2px; }
+
+    /* ─── PAGES ──────────────────────────────── */
+    .page { display: none; padding: 16px; padding-bottom: 90px; animation: fadeIn .3s ease; }
+    .page.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; } }
+
+    /* ─── CARD ───────────────────────────────── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+      margin-bottom: 14px;
+      position: relative;
+    }
+    .card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .card-title {
+      font-family: 'Frank Ruhl Libre', serif;
+      font-size: 15px; font-weight: 700;
+      color: var(--gold);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .card-title .emoji { font-size: 18px; }
+    .card-subtitle { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+    .content-text {
+      font-family: 'Frank Ruhl Libre', serif;
+      font-size: calc(var(--font-size) * 1.05);
+      line-height: 1.9;
+      color: var(--cream);
+      white-space: pre-wrap;
+    }
+    .content-text.loading { color: var(--muted); font-style: italic; font-size: 14px; }
+
+    /* ─── DIVIDER ─────────────────────────────── */
+    .divider {
+      height: 1px; background: var(--border);
+      margin: 14px 0;
+    }
+
+    /* ─── BADGE / CHIP ───────────────────────── */
+    .badge {
+      display: inline-block;
+      background: rgba(201,165,74,.15);
+      border: 1px solid var(--gold-dim);
+      color: var(--gold);
+      font-size: 11px; font-weight: 600;
+      padding: 2px 8px; border-radius: 10px;
+    }
+    .badge.done {
+      background: rgba(61,140,90,.2);
+      border-color: var(--green);
+      color: var(--green);
+    }
+
+    /* ─── DONE BUTTON ────────────────────────── */
+    .done-btn {
+      display: flex; align-items: center; gap: 6px;
+      background: none; border: 1px solid var(--border);
+      color: var(--muted); font-size: 12px; font-family: 'Heebo', sans-serif;
+      padding: 6px 12px; border-radius: 20px; cursor: pointer;
+      transition: all .2s;
+    }
+    .done-btn.done {
+      border-color: var(--green); color: var(--green);
+      background: rgba(61,140,90,.1);
+    }
+    .done-btn:active { transform: scale(.96); }
+
+    /* ─── SOURCE LINK ────────────────────────── */
+    .source-link {
+      display: block; margin-top: 14px;
+      font-size: 11px; color: var(--muted);
+      border-top: 1px solid var(--border);
+      padding-top: 10px;
+    }
+    .source-link a {
+      color: var(--gold-dim); text-decoration: none;
+    }
+    .source-link a:hover { color: var(--gold); text-decoration: underline; }
+
+    /* ─── DATE NAV ───────────────────────────── */
+    .date-nav {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 14px; margin-bottom: 16px;
+    }
+    .date-nav button {
+      background: none; border: none; cursor: pointer;
+      color: var(--gold); font-size: 18px; padding: 4px 10px;
+    }
+    .date-nav .date-label {
+      text-align: center; flex: 1;
+    }
+    .date-nav .date-label .greg { font-size: 13px; color: var(--cream); }
+    .date-nav .date-label .heb  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    /* ─── ALIYA TOGGLE ───────────────────────── */
+    .aliya-tabs {
+      display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px;
+    }
+    .aliya-tab {
+      padding: 5px 12px; font-size: 12px; border-radius: 20px; cursor: pointer;
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--muted); font-family: 'Heebo', sans-serif;
+      transition: all .15s;
+    }
+    .aliya-tab.active {
+      background: rgba(201,165,74,.15); border-color: var(--gold); color: var(--gold);
+    }
+
+    /* ─── ZMANIM TABLE ───────────────────────── */
+    .zmanim-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .zman-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px; padding: 10px 12px;
+    }
+    .zman-item .label { font-size: 11px; color: var(--muted); }
+    .zman-item .time  { font-size: 16px; color: var(--cream); font-weight: 600; margin-top: 3px; }
+
+    /* ─── CALENDAR EVENTS ────────────────────── */
+    .event-item {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 10px 0; border-bottom: 1px solid var(--border);
+    }
+    .event-item:last-child { border-bottom: none; }
+    .event-icon { font-size: 22px; flex-shrink: 0; }
+    .event-title { font-size: 15px; color: var(--cream); }
+    .event-sub   { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+    /* ─── TEHILIM SELECTOR ───────────────────── */
+    .tehilim-nav {
+      display: flex; gap: 8px; align-items: center; margin-bottom: 14px;
+    }
+    .tehilim-nav select {
+      flex: 1; background: var(--surface); border: 1px solid var(--border);
+      color: var(--cream); padding: 8px 12px; border-radius: 10px; font-size: 14px;
+      font-family: 'Heebo', sans-serif; direction: rtl;
+    }
+    .tehilim-nav button {
+      background: var(--card); border: 1px solid var(--border);
+      color: var(--gold); padding: 8px 14px; border-radius: 10px;
+      font-size: 13px; cursor: pointer; font-family: 'Heebo', sans-serif;
+    }
+
+    /* ─── SETTINGS PANEL ─────────────────────── */
+    #settings-panel {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,.7);
+      display: none; align-items: flex-end;
+    }
+    #settings-panel.open { display: flex; }
+    #settings-inner {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-radius: 20px 20px 0 0;
+      width: 100%; padding: 20px 20px 40px;
+      animation: slideUp .3s ease;
+    }
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    .settings-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 0; border-bottom: 1px solid var(--border);
+    }
+    .settings-row:last-child { border-bottom: none; }
+    .settings-row label { font-size: 14px; color: var(--cream); }
+    .font-buttons { display: flex; gap: 8px; }
+    .font-btn {
+      background: var(--card); border: 1px solid var(--border);
+      color: var(--text); padding: 6px 12px; border-radius: 8px;
+      cursor: pointer; font-family: 'Heebo', sans-serif;
+    }
+    .font-btn.active { border-color: var(--gold); color: var(--gold); }
+
+    /* ─── REMINDER SECTION ───────────────────── */
+    .reminder-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px 14px;
+      margin-bottom: 10px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .reminder-item .r-icon { font-size: 22px; }
+    .reminder-item .r-info { flex: 1; }
+    .reminder-item .r-name { font-size: 13px; color: var(--cream); }
+    .reminder-item .r-time { font-size: 11px; color: var(--muted); margin-top: 3px; }
+    .reminder-item input[type=time] {
+      background: var(--card); border: 1px solid var(--border);
+      color: var(--cream); padding: 6px 10px;
+      border-radius: 8px; font-size: 13px; font-family: 'Heebo', sans-serif;
+    }
+    .toggle {
+      position: relative; width: 44px; height: 24px; cursor: pointer;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute; inset: 0;
+      background: var(--border); border-radius: 12px;
+      transition: .2s;
+    }
+    .toggle-slider:before {
+      content: ''; position: absolute;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: var(--muted); bottom: 3px; right: 3px;
+      transition: .2s;
+    }
+    .toggle input:checked + .toggle-slider { background: rgba(201,165,74,.3); }
+    .toggle input:checked + .toggle-slider:before {
+      background: var(--gold); transform: translateX(-20px);
+    }
+
+    /* ─── BOTTOM NAV ─────────────────────────── */
+    #bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(14,9,5,.97);
+      backdrop-filter: blur(14px);
+      border-top: 1px solid var(--border);
+      display: flex;
+      padding-bottom: env(safe-area-inset-bottom, 0);
+    }
+    .bnav-btn {
+      flex: 1; border: none; background: none; cursor: pointer;
+      padding: 10px 4px;
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      color: var(--muted); font-size: 10px; font-family: 'Heebo', sans-serif;
+      transition: color .2s;
+    }
+    .bnav-btn .bicon { font-size: 20px; }
+    .bnav-btn.active { color: var(--gold); }
+
+    /* ─── HIGHLIGHT BOX ──────────────────────── */
+    .highlight-box {
+      background: rgba(201,165,74,.07);
+      border: 1px solid rgba(201,165,74,.2);
+      border-radius: 10px; padding: 12px;
+      margin-bottom: 12px;
+    }
+    .highlight-box .hl-title {
+      font-size: 12px; color: var(--gold); font-weight: 600; margin-bottom: 6px;
+    }
+    .highlight-box .hl-text {
+      font-family: 'Frank Ruhl Libre', serif;
+      font-size: calc(var(--font-size) * 1.05);
+      color: var(--cream); line-height: 1.8;
+    }
+
+    /* ─── SPECIAL DAY BANNER ─────────────────── */
+    .special-banner {
+      background: linear-gradient(135deg, rgba(201,165,74,.15), rgba(201,165,74,.05));
+      border: 1px solid var(--gold-dim);
+      border-radius: 10px; padding: 12px 14px;
+      margin-bottom: 14px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .special-banner .sb-icon { font-size: 28px; }
+    .special-banner .sb-text { font-size: 14px; color: var(--cream); font-weight: 500; }
+    .special-banner .sb-sub  { font-size: 11px; color: var(--gold); margin-top: 2px; }
+
+    /* ─── IGERET RAMBAM ──────────────────────── */
+    .igeret-text {
+      font-family: 'Frank Ruhl Libre', serif;
+      font-size: calc(var(--font-size) * 1.1);
+      line-height: 2.1;
+      color: var(--cream);
+    }
+    .igeret-section {
+      border-right: 3px solid var(--gold-dim);
+      padding-right: 14px; margin-bottom: 18px;
+    }
+    .igeret-section .sec-num {
+      font-size: 10px; color: var(--gold); font-weight: 600; margin-bottom: 4px;
+    }
+
+    /* Utility */
+    .flex-between { display: flex; align-items: center; justify-content: space-between; }
+    .mt-8 { margin-top: 8px; }
+    .empty { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 14px; }
+    .section-title {
+      font-family: 'Frank Ruhl Libre', serif;
+      font-size: 14px; font-weight: 700; color: var(--gold);
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- SPLASH -->
+<div id="splash">
+  <div class="logo-big">✡</div>
+  <div style="font-family:'Frank Ruhl Libre',serif;font-size:26px;color:var(--cream);font-weight:700">לימוד יומי</div>
+  <p>מכין את הלמידה של היום...</p>
+  <div class="spinner"></div>
+</div>
+
+<!-- SETTINGS PANEL -->
+<div id="settings-panel">
+  <div id="settings-inner">
+    <div class="flex-between" style="margin-bottom:16px">
+      <div style="font-size:17px;font-weight:700;color:var(--cream)">⚙️ הגדרות</div>
+      <button onclick="closeSettings()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer">✕</button>
+    </div>
+    <div class="settings-row">
+      <label>גודל גופן</label>
+      <div class="font-buttons">
+        <button class="font-btn" onclick="setFont(14)" id="fs14">א</button>
+        <button class="font-btn active" onclick="setFont(16)" id="fs16">א</button>
+        <button class="font-btn" onclick="setFont(19)" id="fs19" style="font-size:18px">א</button>
+        <button class="font-btn" onclick="setFont(22)" id="fs22" style="font-size:20px">א</button>
+      </div>
+    </div>
+    <div class="settings-row">
+      <label>תזכורת הלכה יומית</label>
+      <div style="display:flex;align-items:center;gap:10px">
+        <input type="time" id="rem-halacha" value="08:00" onchange="saveReminder('halacha', this.value)" />
+        <label class="toggle"><input type="checkbox" id="tog-halacha" onchange="toggleReminder('halacha', this.checked)" /><span class="toggle-slider"></span></label>
+      </div>
+    </div>
+    <div class="settings-row">
+      <label>תזכורת תהילים</label>
+      <div style="display:flex;align-items:center;gap:10px">
+        <input type="time" id="rem-tehilim" value="09:00" onchange="saveReminder('tehilim', this.value)" />
+        <label class="toggle"><input type="checkbox" id="tog-tehilim" onchange="toggleReminder('tehilim', this.checked)" /><span class="toggle-slider"></span></label>
+      </div>
+    </div>
+    <div class="settings-row">
+      <label>תזכורת לשון הרע</label>
+      <div style="display:flex;align-items:center;gap:10px">
+        <input type="time" id="rem-lashon" value="12:00" onchange="saveReminder('lashon', this.value)" />
+        <label class="toggle"><input type="checkbox" id="tog-lashon" onchange="toggleReminder('lashon', this.checked)" /><span class="toggle-slider"></span></label>
+      </div>
+    </div>
+    <div class="settings-row">
+      <label>תזכורת פרשת שבוע</label>
+      <div style="display:flex;align-items:center;gap:10px">
+        <input type="time" id="rem-parasha" value="10:00" onchange="saveReminder('parasha', this.value)" />
+        <label class="toggle"><input type="checkbox" id="tog-parasha" onchange="toggleReminder('parasha', this.checked)" /><span class="toggle-slider"></span></label>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div class="brand">✡ לימוד יומי</div>
+  <div class="date-chip" id="topbar-date">
+    <div id="topbar-greg">טוען...</div>
+    <div id="topbar-heb" style="font-size:10px;color:var(--muted)"></div>
+  </div>
+  <button class="settings-btn" onclick="openSettings()">⚙</button>
+</div>
+
+<!-- TABS -->
+<div id="tabs">
+  <button class="tab active" onclick="showTab('calendar')" id="t-calendar"><span class="icon">📅</span>לוח</button>
+  <button class="tab" onclick="showTab('halacha')" id="t-halacha"><span class="icon">📖</span>הלכה</button>
+  <button class="tab" onclick="showTab('tehilim')" id="t-tehilim"><span class="icon">🙏</span>תהילים</button>
+  <button class="tab" onclick="showTab('parasha')" id="t-parasha"><span class="icon">📜</span>פרשה</button>
+  <button class="tab" onclick="showTab('lashon')" id="t-lashon"><span class="icon">🗣</span>לשה"ר</button>
+  <button class="tab" onclick="showTab('igeret')" id="t-igeret"><span class="icon">✉️</span>אגרת</button>
+</div>
+
+<!-- ─── PAGE: CALENDAR ─────────────────────── -->
+<div class="page active" id="page-calendar">
+  <div class="date-nav">
+    <button onclick="changeDay(-1)">→</button>
+    <div class="date-label">
+      <div class="greg" id="cal-greg">טוען...</div>
+      <div class="heb" id="cal-heb"></div>
+    </div>
+    <button onclick="changeDay(1)">←</button>
+  </div>
+
+  <div id="special-event-banner"></div>
+
+  <!-- Zmanim -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title"><span class="emoji">⏰</span>זמני היום</div>
+        <div class="card-subtitle" id="zmanim-location">לפי מיקומך</div>
+      </div>
+      <button onclick="detectLocation()" style="background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:6px 10px;border-radius:8px;font-size:11px;cursor:pointer;font-family:'Heebo',sans-serif">📍 עדכן</button>
+    </div>
+    <div class="zmanim-grid" id="zmanim-grid">
+      <div class="zman-item"><div class="label">עולה השחר</div><div class="time" id="z-alot">--:--</div></div>
+      <div class="zman-item"><div class="label">הנץ החמה</div><div class="time" id="z-sunrise">--:--</div></div>
+      <div class="zman-item"><div class="label">סוף ק"ש (גר"א)</div><div class="time" id="z-shema">--:--</div></div>
+      <div class="zman-item"><div class="label">חצות היום</div><div class="time" id="z-noon">--:--</div></div>
+      <div class="zman-item"><div class="label">מנחה גדולה</div><div class="time" id="z-mincha">--:--</div></div>
+      <div class="zman-item"><div class="label">שקיעה</div><div class="time" id="z-sunset">--:--</div></div>
+      <div class="zman-item"><div class="label">צאת הכוכבים</div><div class="time" id="z-tzeit">--:--</div></div>
+      <div class="zman-item"><div class="label">הדלקת נרות</div><div class="time" id="z-candles">--:--</div></div>
+    </div>
+    <div class="source-link">
+      מקור: <a href="https://www.hebcal.com/zmanim" target="_blank">Hebcal Zmanim API</a>
+    </div>
+  </div>
+
+  <!-- Events of the day -->
+  <div class="card">
+    <div class="card-title"><span class="emoji">📅</span>אירועים ביום זה</div>
+    <div style="margin-top:12px" id="events-list">
+      <div style="color:var(--muted);font-size:13px">טוען...</div>
+    </div>
+    <div class="source-link">
+      מקור: <a href="https://www.hebcal.com" target="_blank">Hebcal Jewish Calendar</a>
+    </div>
+  </div>
+</div>
+
+<!-- ─── PAGE: HALACHA ─────────────────────── -->
+<div class="page" id="page-halacha">
+  <div class="date-nav">
+    <button onclick="changeDay(-1)">→</button>
+    <div class="date-label">
+      <div class="greg" id="hal-date">היום</div>
+      <div class="heb" id="hal-heb"></div>
+    </div>
+    <button onclick="changeDay(1)">←</button>
+  </div>
+
+  <!-- Source selector -->
+  <div class="card" style="padding:12px 14px;margin-bottom:12px">
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600">בחר מקור הלכה</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap" id="halacha-source-tabs">
+      <button class="aliya-tab active" onclick="setHalachaSource('mb', this)">משנה ברורה יומי 🏆</button>
+      <button class="aliya-tab" onclick="setHalachaSource('aruch', this)">ערוך השולחן</button>
+      <button class="aliya-tab" onclick="setHalachaSource('kitzur', this)">קיצור שולחן ערוך</button>
+    </div>
+    <div id="halacha-source-desc" style="font-size:11px;color:var(--muted);margin-top:8px">
+      משנה ברורה – הפוסק המרכזי לאשכנזים (ר' ישראל מאיר הכהן – החפץ חיים). לימוד יומי לפי לוח "משנה ברורה יומי".
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title"><span class="emoji">📖</span>הלכה יומית</div>
+        <div class="card-subtitle" id="halacha-source-subtitle">משנה ברורה יומי • ספריא</div>
+      </div>
+      <div id="done-halacha"></div>
+    </div>
+    <div id="halacha-content" class="content-text loading">טוען הלכה יומית...</div>
+    <div class="divider"></div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:6px">מקור</div>
+    <div id="halacha-ref" style="font-size:13px;color:var(--gold)"></div>
+    <div class="source-link" id="halacha-source-link">
+      מקור: <a href="https://www.sefaria.org/Mishnah_Berurah" target="_blank">משנה ברורה – ספריא</a>
+    </div>
+  </div>
+
+  <div class="card" style="background:rgba(201,165,74,.04)">
+    <div class="card-title" style="margin-bottom:10px"><span class="emoji">🔗</span>לימוד הלכה נוסף</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <a href="https://ph.yhb.org.il/pninayomit/" target="_blank" style="color:var(--gold-dim);font-size:13px;text-decoration:none">🌐 פניני הלכה יומי – הרב אליעזר מלמד (ציונות דתית)</a>
+      <a href="https://www.yeshiva.org.il/ask" target="_blank" style="color:var(--gold-dim);font-size:13px;text-decoration:none">🌐 שאל שאלת הלכה – ישיבה.אורג</a>
+      <a href="https://www.sefaria.org/Mishnah_Berurah" target="_blank" style="color:var(--gold-dim);font-size:13px;text-decoration:none">🌐 משנה ברורה (כל הספר) – ספריא</a>
+      <a href="https://www.sefaria.org/Arukh_HaShulchan" target="_blank" style="color:var(--gold-dim);font-size:13px;text-decoration:none">🌐 ערוך השולחן (כל הספר) – ספריא</a>
+    </div>
+  </div>
+</div>
+
+<!-- ─── PAGE: TEHILIM ─────────────────────── -->
+<div class="page" id="page-tehilim">
+  <div class="card" style="background:rgba(201,165,74,.04)">
+    <div class="card-title" style="margin-bottom:10px"><span class="emoji">🙏</span>תהילים יומי לפי תאריך עברי</div>
+    <div id="tehilim-day-info" style="font-size:13px;color:var(--muted);margin-bottom:12px">מחשב...</div>
+    <div class="tehilim-nav">
+      <select id="tehilim-select" onchange="loadTehilim(this.value)">
+        <option value="">-- בחר ספר תהילים --</option>
+      </select>
+      <button onclick="loadTodayTehilim()">היום</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title"><span class="emoji">📖</span>תהילים <span id="tehilim-num-title"></span></div>
+        <div class="card-subtitle" id="tehilim-subtitle"></div>
+      </div>
+      <div id="done-tehilim"></div>
+    </div>
+    <div id="tehilim-content" class="content-text loading">בחר יום לקריאת תהילים</div>
+    <div class="source-link">
+      מקור: <a href="https://www.sefaria.org/Psalms" target="_blank">Sefaria – ספר תהילים</a>
+    </div>
+  </div>
+</div>
+
+<!-- ─── PAGE: PARASHA ─────────────────────── -->
+<div class="page" id="page-parasha">
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title"><span class="emoji">📜</span>פרשת השבוע</div>
+        <div class="card-subtitle" id="parasha-name">טוען...</div>
+      </div>
+      <div id="done-parasha"></div>
+    </div>
+    <div class="aliya-tabs" id="aliya-tabs">
+      <div class="aliya-tab active" onclick="showAliya('all', this)">הכל</div>
+    </div>
+    <div id="parasha-content" class="content-text loading">טוען פרשת השבוע...</div>
+    <div class="source-link">
+      מקור: <a href="https://www.sefaria.org" target="_blank">Sefaria</a>
+    </div>
+  </div>
+
+  <!-- Rashi toggle -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title"><span class="emoji">🖊</span>פירוש רש"י</div>
+      <button id="rashi-toggle-btn" onclick="toggleRashi()" style="background:var(--surface);border:1px solid var(--border);color:var(--gold);padding:6px 14px;border-radius:20px;font-size:12px;cursor:pointer;font-family:'Heebo',sans-serif">הצג</button>
+    </div>
+    <div id="rashi-content" style="display:none" class="content-text">טוען...</div>
+    <div class="source-link">
+      מקור: <a href="https://www.sefaria.org/Rashi_on_Torah" target="_blank">רש"י על התורה – ספריא</a>
+    </div>
+  </div>
+</div>
+
+<!-- ─── PAGE: LASHON HARA ──────────────────── -->
+<div class="page" id="page-lashon">
+  <div class="date-nav">
+    <button onclick="changeDay(-1)">→</button>
+    <div class="date-label">
+      <div class="greg" id="lash-date">היום</div>
+      <div class="heb" id="lash-heb"></div>
+    </div>
+    <button onclick="changeDay(1)">←</button>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title"><span class="emoji">🗣</span>הלכות לשון הרע היומי</div>
+        <div class="card-subtitle">ספר חפץ חיים – חלקים יומיים</div>
+      </div>
+      <div id="done-lashon"></div>
+    </div>
+    <div id="lashon-content" class="content-text loading">טוען...</div>
+    <div id="lashon-section" style="margin-top:12px;font-size:12px;color:var(--gold)"></div>
+    <div class="source-link">
+      מקור: <a href="https://www.sefaria.org/Chofetz_Chaim" target="_blank">חפץ חיים – ספריא</a>
+    </div>
+  </div>
+
+  <div class="card" style="background:rgba(201,165,74,.04)">
+    <div class="card-title" style="margin-bottom:10px"><span class="emoji">💡</span>על ספר חפץ חיים</div>
+    <div style="font-size:13px;color:var(--muted);line-height:1.7">
+      ספר חפץ חיים חובר על ידי הרב ישראל מאיר הכהן (החפץ חיים) ועוסק בהלכות שמירת הלשון. הספר מחולק לחלקים יומיים המאפשרים לסיים את לימוד ההלכות במשך שנה אחת.
+    </div>
+  </div>
+</div>
+
+<!-- ─── PAGE: IGERET RAMBAN ───────────────── -->
+<div class="page" id="page-igeret">
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title"><span class="emoji">✉️</span>אגרת הרמב"ן</div>
+        <div class="card-subtitle">מכתב הרמב"ן לבנו</div>
+      </div>
+      <div id="done-igeret"></div>
+    </div>
+    <div id="igeret-content" class="content-text loading">טוען אגרת הרמב"ן...</div>
+    <div class="source-link">
+      מקור: <a href="https://www.sefaria.org/Iggeret_HaRamban" target="_blank">אגרת הרמב"ן – ספריא</a>
+    </div>
+  </div>
+</div>
+
+<!-- BOTTOM NAV -->
+<div id="bottom-nav">
+  <button class="bnav-btn active" onclick="showTab('calendar')" id="bn-calendar"><span class="bicon">📅</span>לוח</button>
+  <button class="bnav-btn" onclick="showTab('halacha')" id="bn-halacha"><span class="bicon">📖</span>הלכה</button>
+  <button class="bnav-btn" onclick="showTab('tehilim')" id="bn-tehilim"><span class="bicon">🙏</span>תהילים</button>
+  <button class="bnav-btn" onclick="showTab('parasha')" id="bn-parasha"><span class="bicon">📜</span>פרשה</button>
+  <button class="bnav-btn" onclick="showTab('lashon')" id="bn-lashon"><span class="bicon">🗣</span>לשה"ר</button>
+  <button class="bnav-btn" onclick="showTab('igeret')" id="bn-igeret"><span class="bicon">✉️</span>אגרת</button>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
+let currentOffset = 0; // days from today
+let userLat = 31.7683, userLon = 35.2137; // default: Jerusalem
+let currentTab = 'calendar';
+let loaded = {};
+let aliyot = [];
+let currentAliya = 'all';
+let rashiLoaded = false;
+let rashiVisible = false;
+
+const STORAGE_KEY = 'kodesh_app_v1';
+let appState = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+}
+
+// ═══════════════════════════════════════════
+// DATE HELPERS
+// ═══════════════════════════════════════════
+function getTargetDate(offset = currentOffset) {
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  return d;
+}
+
+function formatDate(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function hebrewDayName(d) {
+  const days = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+  return 'יום ' + days[d.getDay()];
+}
+
+function formatDisplayDate(d) {
+  const months = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()} – ${hebrewDayName(d)}`;
+}
+
+// ═══════════════════════════════════════════
+// API WITH DELAY
+// ═══════════════════════════════════════════
+async function fetchWithDelay(url, delay = 300) {
+  await new Promise(r => setTimeout(r, delay));
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  return resp.json();
+}
+
+// ═══════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════
+function showTab(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.bnav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  document.getElementById('t-'+name).classList.add('active');
+  document.getElementById('bn-'+name).classList.add('active');
+  currentTab = name;
+  if (!loaded[name]) loadTab(name);
+}
+
+function loadTab(name) {
+  loaded[name] = true;
+  if (name === 'calendar')  loadCalendar();
+  if (name === 'halacha')   loadHalacha();
+  if (name === 'tehilim')   initTehilim();
+  if (name === 'parasha')   loadParasha();
+  if (name === 'lashon')    loadLashon();
+  if (name === 'igeret')    loadIgeret();
+}
+
+// ═══════════════════════════════════════════
+// DATE NAV
+// ═══════════════════════════════════════════
+function changeDay(delta) {
+  currentOffset += delta;
+  loaded = {};
+  updateAllDates();
+  loadTab(currentTab);
+}
+
+function updateAllDates() {
+  const d = getTargetDate();
+  const display = formatDisplayDate(d);
+  document.getElementById('cal-greg').textContent = display;
+  document.getElementById('hal-date').textContent = display;
+  document.getElementById('lash-date').textContent = display;
+  document.getElementById('topbar-greg').textContent = currentOffset === 0 ? 'היום' : display;
+  loadHebrewDate();
+}
+
+async function loadHebrewDate() {
+  const d = getTargetDate();
+  const ds = formatDate(d);
+  try {
+    const data = await fetchWithDelay(`https://www.hebcal.com/converter?cfg=json&date=${ds}&g2h=1&strict=1`);
+    const hd = data.hebrew || '';
+    document.getElementById('cal-heb').textContent = hd;
+    document.getElementById('topbar-heb').textContent = hd;
+    document.getElementById('hal-heb').textContent = hd;
+    document.getElementById('lash-heb').textContent = hd;
+    if (document.getElementById('tehilim-day-info')) {
+      const day = data.hd;
+      const tehilimChapters = getTehilimChapters(day);
+      document.getElementById('tehilim-day-info').textContent =
+        `${hd} | פרקים להיום: ${tehilimChapters.join(', ')}`;
+    }
+  } catch(e) {
+    console.warn('Hebrew date error', e);
+  }
+}
+
+// ═══════════════════════════════════════════
+// TEHILIM – daily chapters by Hebrew day
+// ═══════════════════════════════════════════
+const TEHILIM_SCHEDULE = {
+  1:  [1,2,3,4,5,6,7,8,9],
+  2:  [10,11,12,13,14,15,16,17],
+  3:  [18,19,20,21,22,23,24,25,26,27,28],
+  4:  [29,30,31,32,33,34,35],
+  5:  [36,37,38,39,40,41,42,43,44,45,46],
+  6:  [47,48,49,50,51,52,53,54,55],
+  7:  [56,57,58,59,60,61,62,63,64,65],
+  8:  [66,67,68,69,70,71],
+  9:  [72,73,74,75,76,77],
+  10: [78,79,80,81,82,83,84,85],
+  11: [86,87,88,89],
+  12: [90,91,92,93,94,95,96],
+  13: [97,98,99,100,101,102,103],
+  14: [104,105],
+  15: [106,107],
+  16: [108,109,110,111,112,113,114,115,116,117,118],
+  17: [119],
+  18: [120,121,122,123,124,125,126,127,128,129,130,131,132,133,134],
+  19: [135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,150],
+  20: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20],
+  21: [21,22,23,24,25,26,27,28,29,30],
+  22: [31,32,33,34,35,36,37,38,39,40,41,42],
+  23: [43,44,45,46,47,48,49,50,51,52,53,54],
+  24: [55,56,57,58,59,60,61,62,63,64,65,66,67,68],
+  25: [69,70,71,72,73,74,75,76,77,78],
+  26: [79,80,81,82,83,84,85,86,87,88,89],
+  27: [90,91,92,93,94,95,96,97,98,99,100,101,102,103,104],
+  28: [105,106,107,108,109,110,111,112,113,114,115,116,117,118],
+  29: [119,120,121,122,123,124,125,126,127,128,129,130],
+  30: [131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,150],
+};
+
+function getTehilimChapters(hebrewDay) {
+  const day = parseInt(hebrewDay) || 1;
+  const key = Math.min(day, 30);
+  return TEHILIM_SCHEDULE[key] || TEHILIM_SCHEDULE[1];
+}
+
+function initTehilim() {
+  const sel = document.getElementById('tehilim-select');
+  sel.innerHTML = '<option value="">-- בחר פרק --</option>';
+  for (let i = 1; i <= 150; i++) {
+    const opt = document.createElement('option');
+    opt.value = i; opt.textContent = `תהילים פרק ${i}`;
+    sel.appendChild(opt);
+  }
+  loadTodayTehilim();
+}
+
+async function loadTodayTehilim() {
+  const d = getTargetDate();
+  const ds = formatDate(d);
+  try {
+    const data = await fetchWithDelay(`https://www.hebcal.com/converter?cfg=json&date=${ds}&g2h=1&strict=1`);
+    const chapters = getTehilimChapters(data.hd);
+    const chapter = chapters[0];
+    document.getElementById('tehilim-select').value = chapter;
+    loadTehilim(chapter);
+  } catch(e) {
+    loadTehilim(1);
+  }
+}
+
+async function loadTehilim(chapter) {
+  if (!chapter) return;
+  const el = document.getElementById('tehilim-content');
+  const title = document.getElementById('tehilim-num-title');
+  const sub = document.getElementById('tehilim-subtitle');
+  el.className = 'content-text loading';
+  el.textContent = 'טוען...';
+  title.textContent = `פרק ${chapter}`;
+  sub.textContent = '';
+  try {
+    const data = await fetchWithDelay(`https://www.sefaria.org/api/v3/texts/Psalms.${chapter}?version=he-primary`, 400);
+    const verses = data?.versions?.[0]?.text || [];
+    if (!verses.length) throw new Error('empty');
+    el.className = 'content-text';
+    el.innerHTML = verses.map((v,i) => `<span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}<br>`).join('');
+    sub.textContent = `${verses.length} פסוקים`;
+    updateDoneButton('tehilim', chapter);
+  } catch(e) {
+    el.textContent = 'לא ניתן לטעון. בדוק חיבור לאינטרנט.';
+  }
+}
+
+// ═══════════════════════════════════════════
+// CALENDAR & ZMANIM
+// ═══════════════════════════════════════════
+async function loadCalendar() {
+  const d = getTargetDate();
+  const ds = formatDate(d);
+  document.getElementById('cal-greg').textContent = formatDisplayDate(d);
+
+  loadHebrewDate();
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      pos => { userLat = pos.coords.latitude; userLon = pos.coords.longitude; loadZmanim(ds); loadEvents(ds); },
+      () => { loadZmanim(ds); loadEvents(ds); }
+    );
+  } else {
+    loadZmanim(ds); loadEvents(ds);
+  }
+}
+
+function detectLocation() {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(pos => {
+      userLat = pos.coords.latitude; userLon = pos.coords.longitude;
+      const d = getTargetDate();
+      loadZmanim(formatDate(d));
+      document.getElementById('zmanim-location').textContent = `📍 ${userLat.toFixed(3)}, ${userLon.toFixed(3)}`;
+    });
+  }
+}
+
+async function loadZmanim(ds) {
+  try {
+    const data = await fetchWithDelay(
+      `https://www.hebcal.com/zmanim?cfg=json&date=${ds}&lat=${userLat}&lon=${userLon}&tzid=Asia/Jerusalem`, 300
+    );
+    const z = data?.times || {};
+    function fmtT(iso) {
+      if (!iso) return '--:--';
+      const t = new Date(iso);
+      return t.toLocaleTimeString('he-IL', {hour:'2-digit',minute:'2-digit',hour12:false});
+    }
+    document.getElementById('z-alot').textContent    = fmtT(z.alotHaShachar);
+    document.getElementById('z-sunrise').textContent = fmtT(z.sunrise);
+    document.getElementById('z-shema').textContent   = fmtT(z.sofZmanShmaMGA || z.sofZmanShmaGRA);
+    document.getElementById('z-noon').textContent    = fmtT(z.chatzot);
+    document.getElementById('z-mincha').textContent  = fmtT(z.minchaGedola);
+    document.getElementById('z-sunset').textContent  = fmtT(z.sunset);
+    document.getElementById('z-tzeit').textContent   = fmtT(z.tzeit7083deg);
+    // candle lighting from events
+    const evData = await fetchWithDelay(
+      `https://www.hebcal.com/hebcal?v=1&cfg=json&maj=on&min=on&nx=on&start=${ds}&end=${ds}&c=on&geo=pos&latitude=${userLat}&longitude=${userLon}&tzid=Asia/Jerusalem&i=on`, 400
+    );
+    const candles = (evData?.items || []).find(e => e.category === 'candles');
+    document.getElementById('z-candles').textContent = candles ? fmtT(candles.date) : '--:--';
+  } catch(e) {
+    console.warn('Zmanim error', e);
+  }
+}
+
+async function loadEvents(ds) {
+  const banner = document.getElementById('special-event-banner');
+  const list   = document.getElementById('events-list');
+  try {
+    const data = await fetchWithDelay(
+      `https://www.hebcal.com/hebcal?v=1&cfg=json&maj=on&min=on&nx=on&mf=on&ss=on&start=${ds}&end=${ds}&c=off&i=on`, 300
+    );
+    const items = (data?.items || []).filter(e => e.category !== 'candles' && e.category !== 'havdalah');
+    if (!items.length) {
+      list.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:8px 0">אין אירועים מיוחדים</div>';
+      return;
+    }
+    // banner for major holiday
+    const major = items.find(e => e.yomtov || e.category === 'holiday');
+    if (major) {
+      const icon = holidayIcon(major.title);
+      banner.innerHTML = `<div class="special-banner"><div class="sb-icon">${icon}</div><div><div class="sb-text">${major.hebrew || major.title}</div><div class="sb-sub">יום טוב</div></div></div>`;
+    }
+    list.innerHTML = items.map(e => `
+      <div class="event-item">
+        <div class="event-icon">${holidayIcon(e.title)}</div>
+        <div>
+          <div class="event-title">${e.hebrew || e.title}</div>
+          <div class="event-sub">${e.title}${e.date ? ' · '+e.date : ''}</div>
+        </div>
+      </div>`).join('');
+  } catch(e) {
+    list.innerHTML = '<div style="color:var(--muted);font-size:13px">לא ניתן לטעון</div>';
+  }
+}
+
+function holidayIcon(title) {
+  const t = (title||'').toLowerCase();
+  if (t.includes('shabbat') || t.includes('שבת')) return '🕯️';
+  if (t.includes('rosh hashana') || t.includes('ראש השנה')) return '🍎';
+  if (t.includes('yom kippur') || t.includes('כיפור')) return '📿';
+  if (t.includes('sukkot') || t.includes('סוכות')) return '🌿';
+  if (t.includes('chanukah') || t.includes('חנוכה')) return '🕎';
+  if (t.includes('purim') || t.includes('פורים')) return '🎭';
+  if (t.includes('pesach') || t.includes('פסח')) return '🫓';
+  if (t.includes('shavuot') || t.includes('שבועות')) return '📖';
+  if (t.includes('fast') || t.includes('צום') || t.includes('tisha')) return '🙏';
+  if (t.includes('rosh chodesh') || t.includes('ראש חודש')) return '🌙';
+  if (t.includes('omer') || t.includes('עומר')) return '✡️';
+  return '📅';
+}
+
+// ═══════════════════════════════════════════
+// HALACHA – Mishna Berura Yomi (Ashkenazi)
+// ═══════════════════════════════════════════
+let currentHalachaSource = 'mb';
+
+const HALACHA_SOURCES = {
+  mb: {
+    name: 'משנה ברורה יומי',
+    subtitle: 'משנה ברורה – ר\' ישראל מאיר הכהן (חפץ חיים) • ספריא',
+    link: '<a href="https://www.sefaria.org/Mishnah_Berurah" target="_blank">משנה ברורה – ספריא</a>',
+    desc: 'משנה ברורה – הפוסק המרכזי לאשכנזים (ר\' ישראל מאיר הכהן – החפץ חיים). לימוד יומי לפי לוח "משנה ברורה יומי".',
+    calKey: 'Mishna Berura',
+    fallbackBase: 'Mishnah_Berurah',
+    fallbackChapters: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70],
+  },
+  aruch: {
+    name: 'ערוך השולחן יומי',
+    subtitle: 'ערוך השולחן – הרב יחיאל מיכל עפשטיין • ספריא',
+    link: '<a href="https://www.sefaria.org/Arukh_HaShulchan" target="_blank">ערוך השולחן – ספריא</a>',
+    desc: 'ערוך השולחן – פוסק אשכנזי מרכזי, נחשב לפוסק אחרון בפועל. מכסה את כל השולחן ערוך.',
+    calKey: 'Arukh HaShulchan Yomi',
+    fallbackBase: 'Arukh_HaShulchan,_Orach_Chaim',
+    fallbackChapters: [1,2,3,4,5,6,7,8,9,10],
+  },
+  kitzur: {
+    name: 'קיצור שולחן ערוך',
+    subtitle: 'קיצור שולחן ערוך • ספריא',
+    link: '<a href="https://www.sefaria.org/Kitzur_Shulchan_Arukh" target="_blank">קיצור שולחן ערוך – ספריא</a>',
+    desc: 'קיצור שולחן ערוך של הרב שלמה גנצפריד – מדריך הלכתי מקיף ופופולרי.',
+    calKey: null,
+    fallbackBase: 'Kitzur_Shulchan_Arukh',
+    fallbackChapters: [1,2,3,4,5,6,7,8,9,10],
+  },
+};
+
+function setHalachaSource(src, btn) {
+  currentHalachaSource = src;
+  document.querySelectorAll('#halacha-source-tabs .aliya-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  const s = HALACHA_SOURCES[src];
+  document.getElementById('halacha-source-desc').textContent = s.desc;
+  document.getElementById('halacha-source-subtitle').textContent = s.subtitle;
+  document.getElementById('halacha-source-link').innerHTML = 'מקור: ' + s.link;
+  loaded['halacha'] = false;
+  loadHalacha();
+}
+
+async function loadHalacha() {
+  const el = document.getElementById('halacha-content');
+  const refEl = document.getElementById('halacha-ref');
+  el.className = 'content-text loading';
+  el.textContent = 'טוען הלכה יומית...';
+  const src = HALACHA_SOURCES[currentHalachaSource];
+  const d = getTargetDate();
+  const ds = formatDate(d);
+
+  try {
+    let textRef = null;
+    let heRef = null;
+
+    // Try Sefaria calendar first
+    if (src.calKey) {
+      try {
+        const cal = await fetchWithDelay(`https://www.sefaria.org/api/calendars?diaspora=0&custom=ashkenazi`, 300);
+        const item = (cal?.calendar_items || []).find(i =>
+          (i.title?.en || '').toLowerCase().includes(src.calKey.toLowerCase()) ||
+          (i.title?.he || '').includes(src.calKey)
+        );
+        if (item) { textRef = item.ref; heRef = item.heRef; }
+      } catch {}
+    }
+
+    // Fallback: calculate section by day of year
+    if (!textRef) {
+      const dayOfYear = getDayOfYear(d);
+      const chapters = src.fallbackChapters;
+      const chapter = chapters[(dayOfYear - 1) % chapters.length];
+      textRef = `${src.fallbackBase}.${chapter}`;
+      heRef = src.name + ' – ' + src.fallbackBase.replace(/_/g,' ') + ' ' + chapter;
+    }
+
+    refEl.textContent = heRef || textRef;
+    const tdata = await fetchWithDelay(
+      `https://www.sefaria.org/api/v3/texts/${encodeURIComponent(textRef)}?version=he-primary`, 400
+    );
+    const text = tdata?.versions?.[0]?.text || [];
+    const flat = Array.isArray(text[0]) ? text.flat() : text;
+    if (!flat.filter(Boolean).length) throw new Error('empty');
+    el.className = 'content-text';
+    el.innerHTML = flat.filter(Boolean).map((v,i) =>
+      `<span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}<br>`
+    ).join('');
+    updateDoneButton('halacha', ds);
+  } catch(e) {
+    el.textContent = 'שגיאה בטעינת ההלכה. בדוק חיבור לאינטרנט.';
+  }
+}
+
+// ═══════════════════════════════════════════
+// PARASHA
+// ═══════════════════════════════════════════
+async function loadParasha() {
+  const el      = document.getElementById('parasha-content');
+  const nameEl  = document.getElementById('parasha-name');
+  const tabsEl  = document.getElementById('aliya-tabs');
+  el.className  = 'content-text loading';
+  el.textContent = 'טוען...';
+  try {
+    const cal = await fetchWithDelay(`https://www.sefaria.org/api/calendars?diaspora=0&custom=sephardi`);
+    const parasha = (cal?.calendar_items || []).find(i =>
+      (i.title?.en || '').toLowerCase().includes('parashat')
+    );
+    if (!parasha) { el.textContent = 'לא נמצאה פרשה'; return; }
+    nameEl.textContent = parasha.displayValue?.he || parasha.displayValue?.en || '';
+    aliyot = parasha.extraDetails?.aliyot || [];
+
+    // build aliya tabs
+    tabsEl.innerHTML = '<div class="aliya-tab active" onclick="showAliya(\'all\', this)">הכל</div>';
+    const aliyaNames = ['א','ב','ג','ד','ה','ו','ז','מפטיר'];
+    aliyot.forEach((a,i) => {
+      tabsEl.innerHTML += `<div class="aliya-tab" onclick="showAliya(${i}, this)">${aliyaNames[i]||i+1}</div>`;
+    });
+
+    await loadAliyaText(parasha.ref);
+  } catch(e) {
+    el.textContent = 'שגיאה בטעינה.';
+  }
+}
+
+async function loadAliyaText(ref) {
+  const el = document.getElementById('parasha-content');
+  el.className = 'content-text loading'; el.textContent = 'טוען...';
+  try {
+    const tdata = await fetchWithDelay(`https://www.sefaria.org/api/v3/texts/${encodeURIComponent(ref)}?version=he-primary`, 400);
+    const text = tdata?.versions?.[0]?.text || [];
+    const flat = Array.isArray(text[0]) ? text.flat() : text;
+    el.className = 'content-text';
+    el.innerHTML = flat.map((v,i) => `<span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}<br>`).join('');
+    updateDoneButton('parasha', ref);
+  } catch(e) {
+    el.textContent = 'שגיאה בטעינה.';
+  }
+}
+
+async function showAliya(index, btn) {
+  document.querySelectorAll('#aliya-tabs .aliya-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  currentAliya = index;
+  if (index === 'all') {
+    const cal = await fetchWithDelay(`https://www.sefaria.org/api/calendars?diaspora=0&custom=sephardi`);
+    const parasha = (cal?.calendar_items || []).find(i => (i.title?.en||'').toLowerCase().includes('parashat'));
+    if (parasha) await loadAliyaText(parasha.ref);
+  } else {
+    const ref = aliyot[index];
+    if (ref) await loadAliyaText(ref);
+  }
+}
+
+async function toggleRashi() {
+  const el  = document.getElementById('rashi-content');
+  const btn = document.getElementById('rashi-toggle-btn');
+  if (!rashiLoaded) {
+    el.style.display = 'block';
+    el.textContent = 'טוען רש"י...';
+    btn.textContent = 'הסתר';
+    rashiVisible = true;
+    try {
+      const cal = await fetchWithDelay(`https://www.sefaria.org/api/calendars?diaspora=0&custom=sephardi`);
+      const parasha = (cal?.calendar_items || []).find(i => (i.title?.en||'').toLowerCase().includes('parashat'));
+      const ref = parasha?.ref || 'Genesis 1';
+      const rashiRef = 'Rashi on ' + ref;
+      const tdata = await fetchWithDelay(`https://www.sefaria.org/api/v3/texts/${encodeURIComponent(rashiRef)}?version=he-primary`, 500);
+      const text = tdata?.versions?.[0]?.text || [];
+      const flat = Array.isArray(text[0]) ? text.flat() : text;
+      el.className = 'content-text';
+      el.innerHTML = flat.filter(Boolean).map((v,i) => `<div style="margin-bottom:10px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}</div>`).join('');
+      rashiLoaded = true;
+    } catch(e) {
+      el.textContent = 'שגיאה בטעינת רש"י.';
+    }
+  } else {
+    rashiVisible = !rashiVisible;
+    el.style.display = rashiVisible ? 'block' : 'none';
+    btn.textContent = rashiVisible ? 'הסתר' : 'הצג';
+  }
+}
+
+// ═══════════════════════════════════════════
+// LASHON HARA – Chofetz Chaim
+// ═══════════════════════════════════════════
+async function loadLashon() {
+  const el = document.getElementById('lashon-content');
+  const secEl = document.getElementById('lashon-section');
+  el.className = 'content-text loading'; el.textContent = 'טוען...';
+  try {
+    const cal = await fetchWithDelay(`https://www.sefaria.org/api/calendars?diaspora=0`);
+    const lashon = (cal?.calendar_items || []).find(i =>
+      (i.title?.en || '').toLowerCase().includes('chofetz') ||
+      (i.title?.he || '').includes('חפץ')
+    );
+    let ref;
+    if (lashon) {
+      ref = lashon.ref;
+      secEl.textContent = lashon.heRef || ref;
+    } else {
+      // fallback: calculate section by day of year
+      const dayOfYear = getDayOfYear(getTargetDate());
+      const part = ((dayOfYear - 1) % 30) + 1;
+      ref = `Chofetz_Chaim,_Part_One.${part}`;
+      secEl.textContent = `חלק ראשון, סימן ${part}`;
+    }
+    const tdata = await fetchWithDelay(`https://www.sefaria.org/api/v3/texts/${encodeURIComponent(ref)}?version=he-primary`, 400);
+    const text = tdata?.versions?.[0]?.text || [];
+    const flat = Array.isArray(text[0]) ? text.flat() : text;
+    if (!flat.length) throw new Error('empty');
+    el.className = 'content-text';
+    el.innerHTML = flat.map((v,i) => `<span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}<br>`).join('');
+    updateDoneButton('lashon', ref);
+  } catch(e) {
+    // Absolute fallback
+    try {
+      const tdata = await fetchWithDelay(`https://www.sefaria.org/api/v3/texts/Chofetz_Chaim%2C_Introduction.1?version=he-primary`, 400);
+      const text = tdata?.versions?.[0]?.text || [];
+      const flat = Array.isArray(text[0]) ? text.flat() : text;
+      el.className = 'content-text';
+      el.innerHTML = flat.map((v,i) => `<span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}<br>`).join('');
+      secEl.textContent = 'הקדמה לחפץ חיים';
+    } catch {
+      el.textContent = 'שגיאה בטעינה.';
+    }
+  }
+}
+
+function getDayOfYear(date) {
+  const start = new Date(date.getFullYear(), 0, 0);
+  const diff = date - start;
+  return Math.floor(diff / (1000*60*60*24));
+}
+
+// ═══════════════════════════════════════════
+// IGERET HARAMBAM
+// ═══════════════════════════════════════════
+async function loadIgeret() {
+  const el = document.getElementById('igeret-content');
+  el.className = 'content-text loading'; el.textContent = 'טוען...';
+  try {
+    const tdata = await fetchWithDelay(`https://www.sefaria.org/api/v3/texts/Iggeret_HaRamban?version=he-primary`, 400);
+    const text = tdata?.versions?.[0]?.text || [];
+    const flat = Array.isArray(text[0]) ? text.flat() : text;
+    el.className = 'content-text igeret-text';
+    el.innerHTML = flat.filter(Boolean).map((v,i) =>
+      `<div class="igeret-section"><div class="sec-num">פסקה ${i+1}</div>${v}</div>`
+    ).join('');
+    updateDoneButton('igeret', 'igeret');
+  } catch(e) {
+    el.textContent = 'שגיאה בטעינת האגרת.';
+  }
+}
+
+// ═══════════════════════════════════════════
+// DONE BUTTONS
+// ═══════════════════════════════════════════
+function updateDoneButton(section, key) {
+  const el = document.getElementById('done-'+section);
+  if (!el) return;
+  const doneKey = `done_${section}_${key}`;
+  const isDone = appState[doneKey];
+  el.innerHTML = `<button class="done-btn ${isDone?'done':''}" onclick="toggleDone('${section}','${key}')">
+    ${isDone ? '✅ נלמד' : '◯ סמן כנלמד'}
+  </button>`;
+}
+
+function toggleDone(section, key) {
+  const doneKey = `done_${section}_${key}`;
+  appState[doneKey] = !appState[doneKey];
+  saveState();
+  updateDoneButton(section, key);
+}
+
+// ═══════════════════════════════════════════
+// SETTINGS
+// ═══════════════════════════════════════════
+function openSettings() {
+  document.getElementById('settings-panel').classList.add('open');
+  loadSettingsState();
+}
+function closeSettings() {
+  document.getElementById('settings-panel').classList.remove('open');
+}
+function setFont(size) {
+  document.documentElement.style.setProperty('--font-size', size+'px');
+  appState.fontSize = size; saveState();
+  [14,16,19,22].forEach(s => {
+    document.getElementById('fs'+s)?.classList.toggle('active', s===size);
+  });
+}
+function loadSettingsState() {
+  if (appState.fontSize) setFont(appState.fontSize);
+  const reminders = appState.reminders || {};
+  ['halacha','tehilim','lashon','parasha'].forEach(k => {
+    const r = reminders[k] || {};
+    if (r.time) document.getElementById('rem-'+k).value = r.time;
+    if (document.getElementById('tog-'+k)) document.getElementById('tog-'+k).checked = !!r.enabled;
+  });
+}
+function saveReminder(key, time) {
+  if (!appState.reminders) appState.reminders = {};
+  if (!appState.reminders[key]) appState.reminders[key] = {};
+  appState.reminders[key].time = time; saveState();
+}
+function toggleReminder(key, enabled) {
+  if (!appState.reminders) appState.reminders = {};
+  if (!appState.reminders[key]) appState.reminders[key] = {};
+  appState.reminders[key].enabled = enabled; saveState();
+  if (enabled) scheduleReminder(key);
+}
+function scheduleReminder(key) {
+  if (!('Notification' in window)) return;
+  Notification.requestPermission().then(perm => {
+    if (perm !== 'granted') return;
+    const names = {halacha:'הלכה יומית',tehilim:'תהילים',lashon:'לשון הרע',parasha:'פרשת השבוע'};
+    const [h,m] = (appState.reminders?.[key]?.time || '08:00').split(':').map(Number);
+    const now = new Date(), target = new Date();
+    target.setHours(h,m,0,0);
+    if (target < now) target.setDate(target.getDate()+1);
+    const delay = target - now;
+    setTimeout(() => new Notification('לימוד יומי 📖', { body: 'הגיע זמן: '+names[key], icon: 'icons/icon-192.png' }), delay);
+  });
+}
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+async function init() {
+  if (appState.fontSize) {
+    document.documentElement.style.setProperty('--font-size', appState.fontSize+'px');
+  }
+  updateAllDates();
+  showTab('calendar');
+  // Register service worker
+  if ('serviceWorker' in navigator) {
+    try { await navigator.serviceWorker.register('sw.js'); } catch {}
+  }
+  // Hide splash
+  setTimeout(() => {
+    document.getElementById('splash').classList.add('hide');
+    setTimeout(() => document.getElementById('splash').remove(), 600);
+  }, 1500);
+}
+
+init();
+</script>
+</body>
+</html>
