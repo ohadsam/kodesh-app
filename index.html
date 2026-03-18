@@ -10,6 +10,8 @@
   <meta name="apple-mobile-web-app-title" content="לימוד יומי" />
   <title>לימוד יומי</title>
   <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@300;400;500;700;900&family=Heebo:wght@300;400;500;700&display=swap" rel="stylesheet" />
 
@@ -288,7 +290,10 @@
       background: var(--surface);
       border-top: 1px solid var(--border);
       border-radius: 20px 20px 0 0;
-      width: 100%; padding: 20px 20px 40px;
+      width: 100%;
+      max-height: 90dvh;
+      overflow-y: auto;
+      padding: 20px 20px 50px;
       animation: slideUp .3s ease;
     }
     @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
@@ -931,22 +936,29 @@
         z-index:20;
       "></div>
 
-      <!-- Jerusalem star marker on the needle tip -->
+      <!-- Jerusalem label on needle tip -->
       <div id="jerusalem-star" style="
         position:absolute; top:50%; left:50%;
-        font-size:18px; line-height:1;
         transform-origin: center calc(100px);
-        transform: translate(-50%,-50%) translateY(-95px);
+        transform: translate(-50%,-50%) translateY(-100px);
         transition: transform .15s ease-out;
         z-index:15; pointer-events:none;
-        filter: drop-shadow(0 0 6px rgba(201,165,74,1));
-      ">✡️</div>
+        text-align:center;
+      ">
+        <div style="
+          background:linear-gradient(135deg,rgba(201,165,74,.95),rgba(180,130,30,.9));
+          color:#0e0905; font-family:'Heebo',sans-serif; font-size:9px; font-weight:800;
+          padding:3px 7px; border-radius:10px;
+          box-shadow: 0 0 10px rgba(201,165,74,.9), 0 0 20px rgba(201,165,74,.4);
+          white-space:nowrap; letter-spacing:.5px;
+        ">כותל</div>
+      </div>
 
     </div>
 
     <!-- Bearing display -->
     <div style="margin-bottom:6px">
-      <div style="font-size:13px;color:var(--muted);margin-bottom:4px">כיוון ירושלים</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:4px">כיוון הכותל המערבי</div>
       <div style="display:flex;align-items:baseline;justify-content:center;gap:6px">
         <span id="qibla-bearing" style="font-family:'Frank Ruhl Libre',serif;font-size:52px;font-weight:700;color:var(--gold);line-height:1">--</span>
         <span style="font-size:18px;color:var(--muted)">°</span>
@@ -1435,6 +1447,67 @@ async function loadTodayTehilim() {
   }
 }
 
+// Build a reverse map: chapter → [day, indexInDay]
+const CHAPTER_TO_DAY = {};
+for (let day = 1; day <= 30; day++) {
+  const chapters = TEHILIM_SCHEDULE[day] || [];
+  chapters.forEach((ch, idx) => {
+    // A chapter may appear on 2 days (119) – keep first occurrence only
+    if (!CHAPTER_TO_DAY[ch]) CHAPTER_TO_DAY[ch] = { day, idx, total: chapters.length };
+  });
+}
+
+function getTehilimNavInfo(chapter) {
+  // Which day does this chapter belong to?
+  const info = CHAPTER_TO_DAY[chapter];
+  if (!info) return null;
+  const { day, idx, total } = info;
+  const dayChapters = TEHILIM_SCHEDULE[day] || [];
+
+  // Is this the LAST chapter of the day?
+  const isLastInDay  = idx === total - 1;
+  // Is this the FIRST chapter of the day?
+  const isFirstInDay = idx === 0;
+
+  // Previous chapter or previous day
+  let prevLabel = null, prevAction = null;
+  if (!isFirstInDay) {
+    prevLabel  = `→ פרק ${dayChapters[idx-1]}`;
+    prevAction = `loadTehilim(${dayChapters[idx-1]})`;
+  } else {
+    // first chapter of this day → go to previous day
+    if (day === 1) {
+      // wrap to day 30
+      const lastDayChapters = TEHILIM_SCHEDULE[30];
+      const lastCh = lastDayChapters[lastDayChapters.length - 1];
+      prevLabel  = `→ יום ל׳ (תחילת המחזור)`;
+      prevAction = `selectTehilimDay(30); loadTehilim(${TEHILIM_SCHEDULE[30][0]})`;
+    } else {
+      prevLabel  = `→ יום ${day-1}`;
+      prevAction = `selectTehilimDay(${day-1}); loadTehilim(${TEHILIM_SCHEDULE[day-1][0]})`;
+    }
+  }
+
+  // Next chapter or next day
+  let nextLabel = null, nextAction = null;
+  if (!isLastInDay) {
+    nextLabel  = `פרק ${dayChapters[idx+1]} ←`;
+    nextAction = `loadTehilim(${dayChapters[idx+1]})`;
+  } else {
+    // last chapter of this day → go to next day
+    if (day === 30) {
+      // wrap to day 1
+      nextLabel  = `יום א׳ (תחילת המחזור) ←`;
+      nextAction = `selectTehilimDay(1); loadTehilim(${TEHILIM_SCHEDULE[1][0]})`;
+    } else {
+      nextLabel  = `יום ${day+1} ←`;
+      nextAction = `selectTehilimDay(${day+1}); loadTehilim(${TEHILIM_SCHEDULE[day+1][0]})`;
+    }
+  }
+
+  return { prevLabel, prevAction, nextLabel, nextAction, day, isLastInDay, isFirstInDay };
+}
+
 let currentTehilimChapter = 1;
 
 async function loadTehilim(chapter) {
@@ -1448,27 +1521,36 @@ async function loadTehilim(chapter) {
   el.textContent = 'טוען...';
   title.textContent = `פרק ${chapter}`;
   sub.textContent = '';
-  // Sync dropdown
   const sel = document.getElementById('tehilim-select');
   if (sel) sel.value = chapter;
+
   try {
     console.log(`[Tehilim] loading chapter ${chapter}`);
     const data = await sefariaText(`Psalms.${chapter}`);
     const flat = heFlat(data);
     if (!flat.length) throw new Error(`אין טקסט עברי לפרק ${chapter}`);
 
-    const prevBtn = chapter > 1   ? `<button onclick="loadTehilim(${chapter-1})" style="background:var(--surface);border:1px solid var(--border);color:var(--gold);padding:6px 14px;border-radius:20px;font-size:12px;cursor:pointer;font-family:'Heebo',sans-serif">→ פרק ${chapter-1}</button>` : '<span></span>';
-    const nextBtn = chapter < 150 ? `<button onclick="loadTehilim(${chapter+1})" style="background:var(--surface);border:1px solid var(--border);color:var(--gold);padding:6px 14px;border-radius:20px;font-size:12px;cursor:pointer;font-family:'Heebo',sans-serif">פרק ${chapter+1} ←</button>` : '<span></span>';
-    const navRow  = `<div style="display:flex;justify-content:space-between;margin-bottom:14px">${prevBtn}${nextBtn}</div>`;
+    // Build smart navigation buttons
+    const nav = getTehilimNavInfo(chapter);
+    const btnStyle = `background:var(--surface);border:1px solid var(--border);color:var(--gold);padding:6px 12px;border-radius:20px;font-size:12px;cursor:pointer;font-family:'Heebo',sans-serif;max-width:48%`;
+    // For day-boundary nav, use slightly different styling
+    const dayBtnStyle = `background:rgba(201,165,74,.12);border:1px solid var(--gold-dim);color:var(--gold);padding:6px 12px;border-radius:20px;font-size:12px;cursor:pointer;font-family:'Heebo',sans-serif;max-width:48%`;
+
+    const prevBtn = nav ? `<button onclick="${nav.prevAction}" style="${nav.isFirstInDay ? dayBtnStyle : btnStyle}">${nav.prevLabel}</button>` : '<span></span>';
+    const nextBtn = nav ? `<button onclick="${nav.nextAction}" style="${nav.isLastInDay  ? dayBtnStyle : btnStyle}">${nav.nextLabel}</button>` : '<span></span>';
+    const navRow  = `<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:14px">${prevBtn}${nextBtn}</div>`;
+
+    // Day indicator
+    const dayInfo = nav ? `<div style="text-align:center;font-size:11px;color:var(--muted);margin-bottom:10px">יום ${nav.day} בחודש</div>` : '';
 
     el.className = 'content-text';
-    el.innerHTML = navRow +
+    el.innerHTML = navRow + dayInfo +
       flat.map((v,i) => `<div style="margin-bottom:6px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}</div>`).join('') +
-      `<div style="display:flex;justify-content:space-between;margin-top:16px">${prevBtn}${nextBtn}</div>`;
+      `<div style="display:flex;justify-content:space-between;gap:8px;margin-top:16px">${prevBtn}${nextBtn}</div>`;
 
     sub.textContent = `${flat.length} פסוקים`;
     updateDoneButton('tehilim', chapter);
-    console.log(`[Tehilim] OK – ${flat.length} verses`);
+    console.log(`[Tehilim] OK – ${flat.length} verses, day ${nav?.day}`);
   } catch(e) {
     console.error('[Tehilim] error:', e);
     el.textContent = 'שגיאה בטעינה: ' + e.message;
@@ -1568,17 +1650,17 @@ async function loadZmanim(ds) {
     const url = `https://www.hebcal.com/zmanim?cfg=json&date=${ds}&sec=1&latitude=${userLat.toFixed(6)}&longitude=${userLon.toFixed(6)}&elevation=${elev}&tzid=Asia/Jerusalem`;
     const data = await fetchWithDelay(url, 300);
     const z = data?.times || {};
-    console.log('[Zmanim] elevation used:', elev, 'm | keys:', Object.keys(z).length);
+    console.log('[Zmanim] elevation used:', elev, 'm | all fields:', Object.keys(z).join(', '));
     function fmtT(iso) {
       if (!iso) return '--:--';
       return new Date(iso).toLocaleTimeString('he-IL', {hour:'2-digit',minute:'2-digit',hour12:false});
     }
     document.getElementById('z-alot').textContent       = fmtT(z.alotHaShachar);
     document.getElementById('z-sunrise').textContent    = fmtT(z.sunrise);
-    document.getElementById('z-shema-gra').textContent  = fmtT(z.sofZmanShmaGRA);
-    document.getElementById('z-shema-mga').textContent  = fmtT(z.sofZmanShmaMGA);
-    document.getElementById('z-tefila-gra').textContent = fmtT(z.sofZmanTfillaGRA);
-    document.getElementById('z-tefila-mga').textContent = fmtT(z.sofZmanTfillaMGA);
+    document.getElementById('z-shema-gra').textContent  = fmtT(z.sofZmanShmaGra  || z.sofZmanShmaGRA);
+    document.getElementById('z-shema-mga').textContent  = fmtT(z.sofZmanShmaMga  || z.sofZmanShmaMGA);
+    document.getElementById('z-tefila-gra').textContent = fmtT(z.sofZmanTfilaGra || z.sofZmanTfillaGRA || z.sofZmanTfillahGRA);
+    document.getElementById('z-tefila-mga').textContent = fmtT(z.sofZmanTfilaMga || z.sofZmanTfillaMGA || z.sofZmanTfillahMGA);
     document.getElementById('z-noon').textContent       = fmtT(z.chatzot);
     document.getElementById('z-mincha').textContent     = fmtT(z.minchaGedola);
     document.getElementById('z-sunset').textContent     = fmtT(z.sunset);
@@ -2244,8 +2326,8 @@ function toggleDone(section, key) {
 }
 
 // ═══════════════════════════════════════════
-// SHUT – Real daily Q&A from halachayomit.co.il RSS
-// Uses rss2json.com as CORS proxy (free, no key needed for public feeds)
+// SHUT – Daily Halacha from halachayomit.co.il RSS
+// Uses allorigins.win CORS proxy (free, reliable)
 // Source: הלכה יומית – פסקי מרן הרב עובדיה יוסף זצ"ל
 // ═══════════════════════════════════════════
 async function loadAIShut(el, d) {
@@ -2253,59 +2335,65 @@ async function loadAIShut(el, d) {
   const cacheKey = `shut_rss_${dateStr}`;
   const cached = appState[cacheKey];
   if (cached) {
-    console.log('[Shut] using cached RSS for', dateStr);
+    console.log('[Shut] using cached for', dateStr);
     el.className = 'content-text';
     el.innerHTML = renderShutItem(cached);
     return;
   }
 
   el.className = 'content-text loading';
-  el.textContent = 'טוען שאלה ותשובה מ-halachayomit.co.il...';
+  el.textContent = 'טוען הלכה יומית מ-halachayomit.co.il...';
 
   try {
-    // rss2json is a free CORS proxy for public RSS feeds
-    const rssUrl = encodeURIComponent('https://halachayomit.co.il/he/Rss.aspx');
-    const url = `https://api.rss2json.com/v1/api.json?rss_url=${rssUrl}&count=1`;
-    console.log('[Shut] fetching RSS via rss2json...');
-    const resp = await fetch(url);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const data = await resp.json();
-    console.log('[Shut] RSS status:', data.status, 'items:', data.items?.length);
-    if (data.status !== 'ok' || !data.items?.length) throw new Error('RSS error: ' + data.message);
+    const rssUrl = 'https://halachayomit.co.il/he/Rss.aspx';
+    // allorigins.win – free, open CORS proxy that returns {contents: "...xml..."}
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`;
+    console.log('[Shut] fetching via allorigins proxy...');
+    const resp = await fetch(proxyUrl);
+    console.log('[Shut] proxy status:', resp.status);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status} from proxy`);
+    const json = await resp.json();
+    const xmlText = json.contents;
+    if (!xmlText) throw new Error('empty response from proxy');
+    console.log('[Shut] got XML, length:', xmlText.length, 'preview:', xmlText.slice(0,100));
 
-    // Find today's item or the most recent one
-    const today = dateStr; // YYYY-MM-DD
-    let item = data.items.find(i => i.pubDate?.slice(0,10) === today) || data.items[0];
-    console.log('[Shut] item title:', item.title, 'pubDate:', item.pubDate);
+    // Parse RSS XML using browser's native DOMParser
+    const parser = new DOMParser();
+    const xml = parser.parseFromString(xmlText, 'text/xml');
+    const parseErr = xml.querySelector('parsererror');
+    if (parseErr) throw new Error('XML parse error: ' + parseErr.textContent.slice(0,80));
 
-    // Strip HTML from description for clean display
-    const tmp = document.createElement('div');
-    tmp.innerHTML = item.description || '';
-    const cleanText = tmp.innerHTML; // keep as HTML for rich display
+    const items = xml.querySelectorAll('item');
+    console.log('[Shut] parsed items:', items.length);
+    if (!items.length) throw new Error('no items in RSS feed');
 
-    const parsed = {
-      title: item.title || '',
-      html: cleanText,
-      author: item.author || 'הרב עובדיה יוסף זצ"ל',
-      link: item.link || 'https://halachayomit.co.il',
-      pubDate: item.pubDate || '',
-      category: item.categories?.[0] || '',
-    };
+    // Pick the first (most recent) item
+    const item = items[0];
+    const getText = (tag) => item.querySelector(tag)?.textContent?.trim() || '';
+    const title    = getText('title');
+    const link     = getText('link');
+    const pubDate  = getText('pubDate');
+    const category = getText('category');
+    const author   = getText('author') || 'הרב עובדיה יוסף זצ"ל';
+    // description contains CDATA with HTML
+    const descRaw  = item.querySelector('description')?.textContent || '';
+    console.log('[Shut] item title:', title, '| pubDate:', pubDate);
 
+    const parsed = { title, html: descRaw, author, link, pubDate, category };
     appState[cacheKey] = parsed;
     saveState();
     el.className = 'content-text';
     el.innerHTML = renderShutItem(parsed);
 
   } catch(e) {
-    console.error('[Shut] RSS failed:', e.message);
+    console.error('[Shut] failed:', e.message);
     el.className = 'content-text';
     el.innerHTML = `
-      <div style="color:var(--muted);font-size:13px;margin-bottom:14px">לא ניתן לטעון שו"ת כרגע (${e.message})</div>
+      <div style="color:var(--muted);font-size:13px;margin-bottom:14px">⚠️ לא ניתן לטעון (${e.message})</div>
       <div style="background:rgba(201,165,74,.06);border-right:3px solid var(--gold-dim);padding:12px;border-radius:0 8px 8px 0">
         <div style="font-size:11px;color:var(--gold);margin-bottom:8px">📚 קישורים לשו"ת מוסמך:</div>
         <a href="https://halachayomit.co.il/he" target="_blank" style="display:block;color:var(--gold-dim);font-size:13px;margin-bottom:8px;text-decoration:none">🌐 הלכה יומית – מרן הרב עובדיה יוסף</a>
-        <a href="https://www.yeshiva.org.il/ask" target="_blank" style="display:block;color:var(--gold-dim);font-size:13px;margin-bottom:8px;text-decoration:none">🌐 שאל את הרב – ישיבה.אורג (ציונות דתית)</a>
+        <a href="https://www.yeshiva.org.il/ask" target="_blank" style="display:block;color:var(--gold-dim);font-size:13px;margin-bottom:8px;text-decoration:none">🌐 שאל את הרב – ישיבה.אורג</a>
         <a href="http://www.shut-halacha.co.il/" target="_blank" style="display:block;color:var(--gold-dim);font-size:13px;text-decoration:none">🌐 שו"ת הלכה אקטואלי</a>
       </div>`;
   }
@@ -2330,10 +2418,11 @@ function renderShutItem(item) {
 
 // ═══════════════════════════════════════════
 // QIBLA / MIZRACH COMPASS
-// Jerusalem: 31.7683°N, 35.2137°E
+// Pointing to the Western Wall (Kotel), Jerusalem
+// Coordinates: 31.7767°N, 35.2345°E
 // ═══════════════════════════════════════════
-const JERUSALEM_LAT = 31.7683 * Math.PI / 180;
-const JERUSALEM_LON = 35.2137 * Math.PI / 180;
+const JERUSALEM_LAT = 31.7767 * Math.PI / 180;  // Kotel / Western Wall
+const JERUSALEM_LON = 35.2345 * Math.PI / 180;
 
 let qiblaAngle      = null;
 let deviceHeading   = null;
@@ -2400,7 +2489,7 @@ function updateCompassUI() {
     const star   = document.getElementById('jerusalem-star');
     if (needle) needle.style.transform = `rotate(${needleAngle}deg)`;
     if (tail)   tail.style.transform   = `rotate(${needleAngle}deg)`;
-    if (star)   star.style.transform   = `translate(-50%,-50%) rotate(${needleAngle}deg) translateY(-95px)`;
+    if (star)   star.style.transform   = `translate(-50%,-50%) rotate(${needleAngle}deg) translateY(-100px)`;
 
     // Alignment
     const diff = Math.abs(((needleAngle+180)%360)-180);
@@ -2483,13 +2572,13 @@ async function initQibla() {
   qiblaAngle = calcBearing(lat*Math.PI/180, lon*Math.PI/180, JERUSALEM_LAT, JERUSALEM_LON);
   console.log('[Qibla] bearing to Jerusalem:', qiblaAngle.toFixed(1)+'°');
 
-  const distKm = calcDistanceKm(lat, lon, 31.7683, 35.2137);
+  const distKm = calcDistanceKm(lat, lon, 31.7767, 35.2345);
   const infoEl = document.getElementById('qibla-location-info');
   if (infoEl) infoEl.innerHTML = `
     <div style="margin-bottom:6px">📍 <strong>מיקום:</strong> ${locationName}</div>
-    <div style="margin-bottom:6px">🕍 <strong>כיוון ירושלים:</strong> ${qiblaAngle.toFixed(1)}° (${bearingToLabel(qiblaAngle)})</div>
-    <div style="margin-bottom:6px">📏 <strong>מרחק:</strong> ${Math.round(distKm)} ק"מ</div>
-    <div style="font-size:11px;color:var(--muted);margin-top:8px">לשינוי מיקום – עדכן את בחירת העיר בלוח ← זמנים</div>`;
+    <div style="margin-bottom:6px">🕍 <strong>כיוון הכותל המערבי:</strong> ${qiblaAngle.toFixed(1)}° (${bearingToLabel(qiblaAngle)})</div>
+    <div style="margin-bottom:6px">📏 <strong>מרחק מהכותל:</strong> ${Math.round(distKm)} ק"מ</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:8px">כיוון מחושב לכותל המערבי (31.7767°N, 35.2345°E) | לשינוי מיקום – עדכן בלוח ← זמנים</div>`;
 
   setQiblaStatus('');
   updateCompassUI();

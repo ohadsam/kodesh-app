@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#2a1a08"/>
+      <stop offset="100%" stop-color="#0e0905"/>
+    </radialGradient>
+    <linearGradient id="star" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffe066"/>
+      <stop offset="60%" stop-color="#c9a54a"/>
+      <stop offset="100%" stop-color="#9a7830"/>
+    </linearGradient>
+    <linearGradient id="hex" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#b8922a"/>
+      <stop offset="100%" stop-color="#7a6030"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded square background -->
+  <rect width="512" height="512" rx="110" ry="110" fill="url(#bg)"/>
+
+  <!-- Gold border ring -->
+  <rect width="512" height="512" rx="110" ry="110"
+        fill="none" stroke="#c9a54a" stroke-width="12" opacity="0.7"/>
+
+  <!-- Star of David (Magen David) -->
+  <!-- Triangle pointing UP -->
+  <polygon points="256,90 84,390 428,390"
+           fill="url(#star)" opacity="0.95"/>
+  <!-- Triangle pointing DOWN -->
+  <polygon points="256,420 84,120 428,120"
+           fill="url(#star)" opacity="0.95"/>
+  <!-- Center hexagon (darker overlap) -->
+  <polygon points="256,175 328,215 328,295 256,335 184,295 184,215"
+           fill="url(#hex)"/>
+
+  <!-- Text bar background -->
+  <rect x="50" y="390" width="412" height="72" rx="12" fill="#140c04" opacity="0.9"/>
+  <!-- Gold separator line -->
+  <line x1="50" y1="390" x2="462" y2="390" stroke="#c9a54a" stroke-width="2"/>
+
+  <!-- "לימוד יומי" text -->
+  <text x="256" y="438"
+        font-family="'Frank Ruhl Libre', 'Arial Hebrew', serif"
+        font-size="42" font-weight="700"
+        fill="#c9a54a"
+        text-anchor="middle"
+        direction="rtl">לימוד יומי</text>
+</svg>
