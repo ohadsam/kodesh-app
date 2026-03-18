@@ -446,12 +446,12 @@
 <!-- SETTINGS PANEL -->
 <div id="settings-panel">
   <div id="settings-inner">
-    <div class="flex-between" style="margin-bottom:16px">
+    <div class="flex-between" style="margin-bottom:16px;position:sticky;top:0;background:var(--surface);padding-top:4px;z-index:1">
       <div style="font-size:17px;font-weight:700;color:var(--cream)">⚙️ הגדרות</div>
       <button onclick="closeSettings()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer">✕</button>
     </div>
 
-    <!-- Cache / Refresh -->
+    <!-- Reload -->
     <div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)">
       <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600">רענון</div>
       <div style="display:flex;gap:8px">
@@ -460,55 +460,64 @@
       </div>
     </div>
 
-    <!-- Tab Visibility Config -->
-    <div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)">
+    <!-- Font size -->
+    <div class="settings-row">
+      <label>גודל גופן</label>
+      <div class="font-buttons">
+        <button class="font-btn" onclick="setFont(14)" id="fs14" style="font-size:13px">א</button>
+        <button class="font-btn active" onclick="setFont(16)" id="fs16" style="font-size:15px">א</button>
+        <button class="font-btn" onclick="setFont(19)" id="fs19" style="font-size:18px">א</button>
+        <button class="font-btn" onclick="setFont(22)" id="fs22" style="font-size:21px">א</button>
+      </div>
+    </div>
+
+    <!-- Tab Visibility -->
+    <div style="padding:14px 0;border-bottom:1px solid var(--border)">
       <div style="font-size:12px;color:var(--muted);margin-bottom:10px;font-weight:600">📑 טאבים מוצגים</div>
       <div id="tab-visibility-rows" style="display:flex;flex-direction:column;gap:8px"></div>
     </div>
-      <div class="font-buttons">
-        <button class="font-btn" onclick="setFont(14)" id="fs14">א</button>
-        <button class="font-btn active" onclick="setFont(16)" id="fs16">א</button>
-        <button class="font-btn" onclick="setFont(19)" id="fs19" style="font-size:18px">א</button>
-        <button class="font-btn" onclick="setFont(22)" id="fs22" style="font-size:20px">א</button>
+
+    <!-- Reminders -->
+    <div style="padding-top:14px">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;font-weight:600">🔔 תזכורות</div>
+      <div class="settings-row">
+        <label>הלכה יומית</label>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="time" id="rem-halacha" value="08:00" onchange="saveReminder('halacha', this.value)" />
+          <label class="toggle"><input type="checkbox" id="tog-halacha" onchange="toggleReminder('halacha', this.checked)" /><span class="toggle-slider"></span></label>
+        </div>
       </div>
-    </div>
-    <div class="settings-row">
-      <label>תזכורת הלכה יומית</label>
-      <div style="display:flex;align-items:center;gap:10px">
-        <input type="time" id="rem-halacha" value="08:00" onchange="saveReminder('halacha', this.value)" />
-        <label class="toggle"><input type="checkbox" id="tog-halacha" onchange="toggleReminder('halacha', this.checked)" /><span class="toggle-slider"></span></label>
+      <div class="settings-row">
+        <label>תהילים</label>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="time" id="rem-tehilim" value="09:00" onchange="saveReminder('tehilim', this.value)" />
+          <label class="toggle"><input type="checkbox" id="tog-tehilim" onchange="toggleReminder('tehilim', this.checked)" /><span class="toggle-slider"></span></label>
+        </div>
       </div>
-    </div>
-    <div class="settings-row">
-      <label>תזכורת תהילים</label>
-      <div style="display:flex;align-items:center;gap:10px">
-        <input type="time" id="rem-tehilim" value="09:00" onchange="saveReminder('tehilim', this.value)" />
-        <label class="toggle"><input type="checkbox" id="tog-tehilim" onchange="toggleReminder('tehilim', this.checked)" /><span class="toggle-slider"></span></label>
+      <div class="settings-row">
+        <label>לשון הרע</label>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="time" id="rem-lashon" value="12:00" onchange="saveReminder('lashon', this.value)" />
+          <label class="toggle"><input type="checkbox" id="tog-lashon" onchange="toggleReminder('lashon', this.checked)" /><span class="toggle-slider"></span></label>
+        </div>
       </div>
-    </div>
-    <div class="settings-row">
-      <label>תזכורת לשון הרע</label>
-      <div style="display:flex;align-items:center;gap:10px">
-        <input type="time" id="rem-lashon" value="12:00" onchange="saveReminder('lashon', this.value)" />
-        <label class="toggle"><input type="checkbox" id="tog-lashon" onchange="toggleReminder('lashon', this.checked)" /><span class="toggle-slider"></span></label>
+      <div class="settings-row">
+        <label>פרשת שבוע</label>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="time" id="rem-parasha" value="10:00" onchange="saveReminder('parasha', this.value)" />
+          <label class="toggle"><input type="checkbox" id="tog-parasha" onchange="toggleReminder('parasha', this.checked)" /><span class="toggle-slider"></span></label>
+        </div>
       </div>
-    </div>
-    <div class="settings-row">
-      <label>תזכורת פרשת שבוע</label>
-      <div style="display:flex;align-items:center;gap:10px">
-        <input type="time" id="rem-parasha" value="10:00" onchange="saveReminder('parasha', this.value)" />
-        <label class="toggle"><input type="checkbox" id="tog-parasha" onchange="toggleReminder('parasha', this.checked)" /><span class="toggle-slider"></span></label>
-      </div>
-    </div>
-    <div class="settings-row">
-      <label>תזכורת אגרת הרמב"ן</label>
-      <div style="display:flex;align-items:center;gap:6px">
-        <select id="rem-igeret-day" onchange="saveReminderDay('igeret', this.value)" style="background:var(--card);border:1px solid var(--border);color:var(--cream);padding:5px 8px;border-radius:8px;font-size:12px;font-family:'Heebo',sans-serif;direction:rtl">
-          <option value="0">ראשון</option><option value="1">שני</option><option value="2">שלישי</option>
-          <option value="3">רביעי</option><option value="4">חמישי</option><option value="5">שישי</option><option value="6">שבת</option>
-        </select>
-        <input type="time" id="rem-igeret" value="20:00" onchange="saveReminder('igeret', this.value)" />
-        <label class="toggle"><input type="checkbox" id="tog-igeret" onchange="toggleReminder('igeret', this.checked)" /><span class="toggle-slider"></span></label>
+      <div class="settings-row" style="border-bottom:none">
+        <label>אגרת הרמב"ן</label>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+          <select id="rem-igeret-day" onchange="saveReminderDay('igeret', this.value)" style="background:var(--card);border:1px solid var(--border);color:var(--cream);padding:5px 8px;border-radius:8px;font-size:12px;font-family:'Heebo',sans-serif;direction:rtl">
+            <option value="0">ראשון</option><option value="1">שני</option><option value="2">שלישי</option>
+            <option value="3">רביעי</option><option value="4">חמישי</option><option value="5">שישי</option><option value="6">שבת</option>
+          </select>
+          <input type="time" id="rem-igeret" value="20:00" onchange="saveReminder('igeret', this.value)" />
+          <label class="toggle"><input type="checkbox" id="tog-igeret" onchange="toggleReminder('igeret', this.checked)" /><span class="toggle-slider"></span></label>
+        </div>
       </div>
     </div>
   </div>
@@ -629,23 +638,11 @@
     <button onclick="changeDay(1)">←</button>
   </div>
 
-  <!-- Source selector -->
-  <div class="card" style="padding:12px 14px;margin-bottom:12px">
-    <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600">בחר מקור הלכה</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap" id="halacha-source-tabs">
-      <button class="aliya-tab active" onclick="setHalachaSource('kitzur', this)">קיצור שו"ע יומי 🏆</button>
-      <button class="aliya-tab" onclick="setHalachaSource('shut', this)">הלכה יומית (ספרדי)</button>
-    </div>
-    <div id="halacha-source-desc" style="font-size:11px;color:var(--muted);margin-top:8px">
-      קיצור שולחן ערוך (221 פרקים) – מדריך הלכתי יומיומי לאשכנזים של הרב שלמה גנצפריד. פרק אחד ביום.
-    </div>
-  </div>
-
   <div class="card">
     <div class="card-header">
       <div>
-        <div class="card-title"><span class="emoji">📖</span>הלכה יומית</div>
-        <div class="card-subtitle" id="halacha-source-subtitle">קיצור שולחן ערוך – הרב שלמה גנצפריד • ספריא</div>
+        <div class="card-title"><span class="emoji">📖</span>הלכה יומית – קיצור שולחן ערוך</div>
+        <div class="card-subtitle">הרב שלמה גנצפריד • ספריא</div>
       </div>
       <div id="done-halacha"></div>
     </div>
@@ -653,7 +650,7 @@
     <div class="divider"></div>
     <div style="font-size:12px;color:var(--muted);margin-bottom:6px">מקור</div>
     <div id="halacha-ref" style="font-size:13px;color:var(--gold)"></div>
-    <div class="source-link" id="halacha-source-link">
+    <div class="source-link">
       מקור: <a href="https://www.sefaria.org/Kitzur_Shulchan_Arukh" target="_blank">קיצור שולחן ערוך – ספריא</a>
     </div>
   </div>
@@ -661,9 +658,8 @@
   <div class="card" style="background:rgba(201,165,74,.04)">
     <div class="card-title" style="margin-bottom:10px"><span class="emoji">🔗</span>לימוד הלכה נוסף</div>
     <div style="display:flex;flex-direction:column;gap:8px">
-      <a href="https://ph.yhb.org.il/pninayomit/" target="_blank" style="color:var(--gold-dim);font-size:13px;text-decoration:none">🌐 פניני הלכה יומי – הרב אליעזר מלמד (ציונות דתית)</a>
-      <a href="https://www.sefaria.org/Kitzur_Shulchan_Arukh" target="_blank" style="color:var(--gold-dim);font-size:13px;text-decoration:none">🌐 קיצור שולחן ערוך (כל הספר) – ספריא</a>
-      <a href="https://www.sefaria.org/Chayei_Adam" target="_blank" style="color:var(--gold-dim);font-size:13px;text-decoration:none">🌐 חיי אדם (כל הספר) – ספריא</a>
+      <a href="https://ph.yhb.org.il/pninayomit/" target="_blank" style="color:var(--gold-dim);font-size:13px;text-decoration:none">🌐 פניני הלכה יומי – הרב אליעזר מלמד</a>
+      <a href="https://www.sefaria.org/Kitzur_Shulchan_Arukh" target="_blank" style="color:var(--gold-dim);font-size:13px;text-decoration:none">🌐 קיצור שולחן ערוך – ספריא</a>
       <a href="https://www.yeshiva.org.il/ask" target="_blank" style="color:var(--gold-dim);font-size:13px;text-decoration:none">🌐 שאל שאלת הלכה – ישיבה.אורג</a>
     </div>
   </div>
@@ -897,62 +893,53 @@
         box-shadow: inset 0 0 30px rgba(0,0,0,.5), 0 0 20px rgba(0,0,0,.3);
       "></div>
 
-      <!-- Jerusalem direction needle (points to Jerusalem) -->
-      <div id="jerusalem-needle" style="
-        position:absolute;
-        top:50%; left:50%;
-        width:4px; height:110px;
-        margin-left:-2px; margin-top:-95px;
-        transform-origin: bottom center;
-        transition: transform .15s ease-out;
-        border-radius:4px 4px 0 0;
-        background: linear-gradient(to top, transparent, var(--gold) 30%, #ffe066 85%, #fff8d0 100%);
-        box-shadow: 0 0 12px rgba(201,165,74,.8), 0 0 24px rgba(201,165,74,.3);
+      <!-- SVG compass arrows – all in one element for clean rotation -->
+      <svg id="compass-arrows" style="
+        position:absolute; inset:0; width:100%; height:100%;
+        transition: transform .12s ease-out;
         z-index:10;
-      "></div>
+      " viewBox="0 0 280 280">
+        <!-- Gold arrow pointing TO Jerusalem (upward by default) -->
+        <g id="jerusalem-arrow-g">
+          <!-- shaft -->
+          <rect x="137" y="78" width="6" height="74" rx="2" fill="url(#goldGrad)"/>
+          <!-- arrowhead -->
+          <polygon points="140,52 128,82 152,82" fill="#ffe066"
+                   filter="url(#goldGlow)"/>
+          <!-- tail wedge -->
+          <polygon points="140,152 133,168 147,168" fill="rgba(201,165,74,.4)"/>
+          <!-- "כותל" label on tip -->
+          <rect x="121" y="38" width="38" height="14" rx="7" fill="rgba(201,165,74,.9)"/>
+          <text x="140" y="49" text-anchor="middle"
+                font-family="'Heebo',sans-serif" font-size="9" font-weight="800"
+                fill="#0e0905">כותל</text>
+        </g>
+        <!-- Red north indicator (always points up = north, rotates with compass ring via compass-outer) -->
+        <defs>
+          <linearGradient id="goldGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#ffe066"/>
+            <stop offset="100%" stop-color="#9a7830"/>
+          </linearGradient>
+          <filter id="goldGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+      </svg>
 
-      <!-- Tail of needle -->
-      <div id="jerusalem-needle-tail" style="
-        position:absolute;
-        top:50%; left:50%;
-        width:4px; height:50px;
-        margin-left:-2px; margin-top:0px;
-        transform-origin: top center;
-        transition: transform .15s ease-out;
-        border-radius:0 0 3px 3px;
-        background: linear-gradient(to bottom, rgba(201,165,74,.6), rgba(100,70,20,.2));
-        z-index:10;
-      "></div>
+      <!-- Red North dot on the compass ring (rotates with ring) -->
+      <!-- (North is already marked by the bright tick on compass-outer) -->
 
       <!-- Center jewel -->
       <div style="
         position:absolute; top:50%; left:50%;
-        width:14px; height:14px;
-        border-radius:50%;
+        width:16px; height:16px; border-radius:50%;
         transform:translate(-50%,-50%);
         background: radial-gradient(circle at 35% 35%, #ffe066, var(--gold) 50%, #7a6128);
-        border:2px solid rgba(255,255,255,.2);
-        box-shadow: 0 0 8px rgba(201,165,74,.8);
+        border:2px solid rgba(255,255,255,.25);
+        box-shadow: 0 0 10px rgba(201,165,74,.9);
         z-index:20;
       "></div>
-
-      <!-- Jerusalem label on needle tip -->
-      <div id="jerusalem-star" style="
-        position:absolute; top:50%; left:50%;
-        transform-origin: center calc(100px);
-        transform: translate(-50%,-50%) translateY(-100px);
-        transition: transform .15s ease-out;
-        z-index:15; pointer-events:none;
-        text-align:center;
-      ">
-        <div style="
-          background:linear-gradient(135deg,rgba(201,165,74,.95),rgba(180,130,30,.9));
-          color:#0e0905; font-family:'Heebo',sans-serif; font-size:9px; font-weight:800;
-          padding:3px 7px; border-radius:10px;
-          box-shadow: 0 0 10px rgba(201,165,74,.9), 0 0 20px rgba(201,165,74,.4);
-          white-space:nowrap; letter-spacing:.5px;
-        ">כותל</div>
-      </div>
 
     </div>
 
@@ -1732,117 +1719,48 @@ function holidayIcon(title) {
 // ═══════════════════════════════════════════
 // HALACHA – Daily Halacha (Ashkenazi)
 // ═══════════════════════════════════════════
-let currentHalachaSource = 'kitzur';
-
-// Kitzur: 221 chapters × avg ~10 seifim each = ~2210 seifim ÷ 2 per day = ~1105 days cycle
-// We show seif pairs: day 1 → seifim 1-2 of chapter 1, day 2 → seifim 3-4, etc.
-// When chapter exhausted, move to next chapter.
-// Simple approach: global seif index, 2 seifim per day
+// ═══════════════════════════════════════════
+// HALACHA – קיצור שולחן ערוך יומי
+// 221 chapters, 2 seifim per day
+// ═══════════════════════════════════════════
 function getKitzurRef(d) {
   const start = new Date(d.getFullYear(), 0, 1);
   const dayOfYear = Math.floor((d - start) / 86400000) + 1;
-  // 221 chapters; rotate through them with 2 seifim per day
-  // Each chapter averages ~10 seifim. We track by chapter + seif pair.
-  // For simplicity: chapter cycles through 1-221, within each chapter show pair (day mod chapterLen)
-  // Since we don't know chapter length upfront, we use chapter per day (day % 221)+1, seif pair = 1+2*(within chapter day)
-  // Practical: rotate days 1-110 through each chapter (2 seifim each pass), then next chapter
   const chapterIdx = (dayOfYear - 1) % 221;
   const chapter = chapterIdx + 1;
-  const seifPairIdx = Math.floor((dayOfYear - 1) / 221) % 5; // show pairs 1-2, 3-4, 5-6, 7-8, 9-10
+  const seifPairIdx = Math.floor((dayOfYear - 1) / 221) % 5;
   const seif1 = seifPairIdx * 2 + 1;
   const seif2 = seif1 + 1;
   return { ref: `Kitzur_Shulchan_Arukh.${chapter}`, chapter, seif1, seif2 };
 }
 
-function getChayeiAdamSection(d) {
-  const start = new Date(d.getFullYear(), 0, 1);
-  const day = Math.floor((d - start) / 86400000) + 1;
-  return ((day - 1) % 67) + 1;
-}
-
-// Shut – verified Sefaria refs only
-// Format verified from sefaria.org URL structure
-const SHUT_BOOKS = [
-  { ref: 'Noda_BiYehudah_I,_Orach_Chaim',    name: 'נודע ביהודה א – אורח חיים',  chapters: 42  },
-  { ref: 'Noda_BiYehudah_II,_Orach_Chaim',   name: 'נודע ביהודה ב – אורח חיים',  chapters: 141 },
-  { ref: 'Noda_BiYehudah_I,_Yoreh_Deah',     name: 'נודע ביהודה א – יורה דעה',   chapters: 92  },
-  { ref: 'Noda_BiYehudah_II,_Yoreh_Deah',    name: 'נודע ביהודה ב – יורה דעה',   chapters: 210 },
-];
-function getShutRef(d) {
-  const start = new Date(d.getFullYear(), 0, 1);
-  const day = Math.floor((d - start) / 86400000) + 1;
-  const book = SHUT_BOOKS[day % SHUT_BOOKS.length];
-  const chapter = ((day - 1) % book.chapters) + 1;
-  return { ref: `${book.ref}.${chapter}`, name: book.name, chapter };
-}
-
-const HALACHA_SOURCES = {
-  kitzur: {
-    name: 'קיצור שולחן ערוך יומי',
-    subtitle: 'קיצור שולחן ערוך – הרב שלמה גנצפריד • ספריא',
-    link: '<a href="https://www.sefaria.org/Kitzur_Shulchan_Arukh" target="_blank">קיצור שולחן ערוך – ספריא</a>',
-    desc: 'קיצור שולחן ערוך (221 פרקים) – שני סעיפים ביום. מדריך הלכתי יומיומי לאשכנזים.',
-  },
-  shut: {
-    name: 'שו"ת הלכה יומית',
-    subtitle: 'הלכה יומית – מרן הרב עובדיה יוסף זצ"ל • halachayomit.co.il',
-    link: '<a href="https://halachayomit.co.il/he" target="_blank">halachayomit.co.il</a>',
-    desc: 'הלכה יומית מאתר halachayomit.co.il – פסקי מרן הרב עובדיה יוסף זצ"ל. תוכן אמיתי ומוסמך הנשלף ישירות מהאתר. לשו"ת אשכנזי: yeshiva.org.il',
-  },
-};
-
-function setHalachaSource(src, btn) {
-  currentHalachaSource = src;
-  document.querySelectorAll('#halacha-source-tabs .aliya-tab').forEach(t => t.classList.remove('active'));
-  btn.classList.add('active');
-  const s = HALACHA_SOURCES[src];
-  document.getElementById('halacha-source-desc').textContent = s.desc;
-  document.getElementById('halacha-source-subtitle').textContent = s.subtitle;
-  document.getElementById('halacha-source-link').innerHTML = 'מקור: ' + s.link;
-  loaded['halacha'] = false;
-  loadHalacha();
-}
-
 async function loadHalacha() {
-  const el = document.getElementById('halacha-content');
+  const el    = document.getElementById('halacha-content');
   const refEl = document.getElementById('halacha-ref');
   el.className = 'content-text loading';
   el.textContent = 'טוען הלכה יומית...';
-  const d = getTargetDate();
+  const d  = getTargetDate();
   const ds = formatDate(d);
-  console.log('[Halacha] source:', currentHalachaSource, 'date:', ds);
 
   try {
-    if (currentHalachaSource === 'kitzur') {
-      const { ref, chapter, seif1, seif2 } = getKitzurRef(d);
-      refEl.textContent = `קיצור שולחן ערוך – פרק ${chapter}, סעיפים ${seif1}–${seif2}`;
-      console.log('[Halacha] kitzur ref:', ref, 'seifim:', seif1, seif2);
-      const data = await sefariaText(ref, 400);
-      const flat = heFlat(data);
-      console.log('[Halacha] kitzur got', flat.length, 'seifim total');
-      if (!flat.length) throw new Error(`אין טקסט לפרק ${chapter}`);
-      // Show 2 seifim: seif1-1 and seif2-1 indices (0-based)
-      const idx1 = Math.min(seif1 - 1, flat.length - 1);
-      const idx2 = Math.min(seif2 - 1, flat.length - 1);
-      const toShow = idx1 === idx2 ? [flat[idx1]] : [flat[idx1], flat[idx2]].filter(Boolean);
-      el.className = 'content-text';
-      el.innerHTML = toShow.map((v, i) =>
-        `<div style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)">
-           <div style="font-size:11px;color:var(--gold);margin-bottom:6px">סעיף ${seif1 + i}</div>
-           <div>${v}</div>
-         </div>`
-      ).join('');
-
-    } else if (currentHalachaSource === 'shut') {
-      refEl.textContent = 'שו"ת הלכה יומית – נוצר בעזרת AI';
-      el.className = 'content-text loading';
-      el.textContent = 'מייצר שאלה ותשובה יומית...';
-      console.log('[Halacha] generating AI shut for date:', ds);
-      await loadAIShut(el, d);
-    }
-
+    const { ref, chapter, seif1, seif2 } = getKitzurRef(d);
+    refEl.textContent = `קיצור שולחן ערוך – פרק ${chapter}, סעיפים ${seif1}–${seif2}`;
+    console.log('[Halacha] ref:', ref, 'seifim:', seif1, seif2);
+    const data = await sefariaText(ref, 400);
+    const flat = heFlat(data);
+    if (!flat.length) throw new Error(`אין טקסט לפרק ${chapter}`);
+    const idx1   = Math.min(seif1 - 1, flat.length - 1);
+    const idx2   = Math.min(seif2 - 1, flat.length - 1);
+    const toShow = idx1 === idx2 ? [flat[idx1]] : [flat[idx1], flat[idx2]].filter(Boolean);
+    el.className = 'content-text';
+    el.innerHTML = toShow.map((v, i) =>
+      `<div style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+         <div style="font-size:11px;color:var(--gold);margin-bottom:6px">סעיף ${seif1 + i}</div>
+         <div>${v}</div>
+       </div>`
+    ).join('');
     updateDoneButton('halacha', ds);
-    console.log('[Halacha] OK');
+    console.log('[Halacha] OK –', toShow.length, 'seifim shown');
   } catch(e) {
     console.error('[Halacha] error:', e);
     el.textContent = 'שגיאה בטעינת ההלכה: ' + e.message;
@@ -2326,97 +2244,6 @@ function toggleDone(section, key) {
 }
 
 // ═══════════════════════════════════════════
-// SHUT – Daily Halacha from halachayomit.co.il RSS
-// Uses allorigins.win CORS proxy (free, reliable)
-// Source: הלכה יומית – פסקי מרן הרב עובדיה יוסף זצ"ל
-// ═══════════════════════════════════════════
-async function loadAIShut(el, d) {
-  const dateStr = formatDate(d);
-  const cacheKey = `shut_rss_${dateStr}`;
-  const cached = appState[cacheKey];
-  if (cached) {
-    console.log('[Shut] using cached for', dateStr);
-    el.className = 'content-text';
-    el.innerHTML = renderShutItem(cached);
-    return;
-  }
-
-  el.className = 'content-text loading';
-  el.textContent = 'טוען הלכה יומית מ-halachayomit.co.il...';
-
-  try {
-    const rssUrl = 'https://halachayomit.co.il/he/Rss.aspx';
-    // allorigins.win – free, open CORS proxy that returns {contents: "...xml..."}
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`;
-    console.log('[Shut] fetching via allorigins proxy...');
-    const resp = await fetch(proxyUrl);
-    console.log('[Shut] proxy status:', resp.status);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status} from proxy`);
-    const json = await resp.json();
-    const xmlText = json.contents;
-    if (!xmlText) throw new Error('empty response from proxy');
-    console.log('[Shut] got XML, length:', xmlText.length, 'preview:', xmlText.slice(0,100));
-
-    // Parse RSS XML using browser's native DOMParser
-    const parser = new DOMParser();
-    const xml = parser.parseFromString(xmlText, 'text/xml');
-    const parseErr = xml.querySelector('parsererror');
-    if (parseErr) throw new Error('XML parse error: ' + parseErr.textContent.slice(0,80));
-
-    const items = xml.querySelectorAll('item');
-    console.log('[Shut] parsed items:', items.length);
-    if (!items.length) throw new Error('no items in RSS feed');
-
-    // Pick the first (most recent) item
-    const item = items[0];
-    const getText = (tag) => item.querySelector(tag)?.textContent?.trim() || '';
-    const title    = getText('title');
-    const link     = getText('link');
-    const pubDate  = getText('pubDate');
-    const category = getText('category');
-    const author   = getText('author') || 'הרב עובדיה יוסף זצ"ל';
-    // description contains CDATA with HTML
-    const descRaw  = item.querySelector('description')?.textContent || '';
-    console.log('[Shut] item title:', title, '| pubDate:', pubDate);
-
-    const parsed = { title, html: descRaw, author, link, pubDate, category };
-    appState[cacheKey] = parsed;
-    saveState();
-    el.className = 'content-text';
-    el.innerHTML = renderShutItem(parsed);
-
-  } catch(e) {
-    console.error('[Shut] failed:', e.message);
-    el.className = 'content-text';
-    el.innerHTML = `
-      <div style="color:var(--muted);font-size:13px;margin-bottom:14px">⚠️ לא ניתן לטעון (${e.message})</div>
-      <div style="background:rgba(201,165,74,.06);border-right:3px solid var(--gold-dim);padding:12px;border-radius:0 8px 8px 0">
-        <div style="font-size:11px;color:var(--gold);margin-bottom:8px">📚 קישורים לשו"ת מוסמך:</div>
-        <a href="https://halachayomit.co.il/he" target="_blank" style="display:block;color:var(--gold-dim);font-size:13px;margin-bottom:8px;text-decoration:none">🌐 הלכה יומית – מרן הרב עובדיה יוסף</a>
-        <a href="https://www.yeshiva.org.il/ask" target="_blank" style="display:block;color:var(--gold-dim);font-size:13px;margin-bottom:8px;text-decoration:none">🌐 שאל את הרב – ישיבה.אורג</a>
-        <a href="http://www.shut-halacha.co.il/" target="_blank" style="display:block;color:var(--gold-dim);font-size:13px;text-decoration:none">🌐 שו"ת הלכה אקטואלי</a>
-      </div>`;
-  }
-}
-
-function renderShutItem(item) {
-  const dateDisplay = item.pubDate ? new Date(item.pubDate).toLocaleDateString('he-IL') : '';
-  return `
-    <div style="margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border)">
-      <div style="font-family:'Frank Ruhl Libre',serif;font-size:16px;font-weight:700;color:var(--gold);margin-bottom:4px">${item.title}</div>
-      <div style="font-size:11px;color:var(--muted)">${item.author}${item.category ? ' · ' + item.category : ''}${dateDisplay ? ' · ' + dateDisplay : ''}</div>
-    </div>
-    <div style="font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);color:var(--cream);line-height:1.9">
-      ${item.html}
-    </div>
-    <div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px">
-      <div style="font-size:11px;color:var(--muted)">📖 מקור מוסמך:</div>
-      <a href="${item.link}" target="_blank" style="color:var(--gold-dim);font-size:12px;text-decoration:none">🌐 קרא במקור – halachayomit.co.il</a>
-      <a href="https://www.yeshiva.org.il/ask" target="_blank" style="color:var(--gold-dim);font-size:12px;text-decoration:none">🌐 שו"ת אשכנזי – ישיבה.אורג</a>
-    </div>`;
-}
-
-// ═══════════════════════════════════════════
 // QIBLA / MIZRACH COMPASS
 // Pointing to the Western Wall (Kotel), Jerusalem
 // Coordinates: 31.7767°N, 35.2345°E
@@ -2482,8 +2309,14 @@ function updateCompassUI() {
     const outerEl = document.getElementById('compass-outer');
     if (outerEl) outerEl.style.transform = `rotate(${-deviceHeading}deg)`;
 
-    // Needle points to Jerusalem
+    // Needle angle: bearing relative to device heading
     const needleAngle = qiblaAngle - deviceHeading;
+
+    // Rotate the arrow SVG to point at Jerusalem
+    const arrowEl = document.getElementById('compass-arrows');
+    if (arrowEl) arrowEl.style.transform = `rotate(${needleAngle}deg)`;
+
+    // Legacy elements (may not exist)
     const needle = document.getElementById('jerusalem-needle');
     const tail   = document.getElementById('jerusalem-needle-tail');
     const star   = document.getElementById('jerusalem-star');
