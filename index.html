@@ -980,7 +980,7 @@
     <div class="card-title" style="margin-bottom:10px"><span class="emoji">📍</span>פרטי חישוב</div>
     <div id="qibla-location-info" style="font-size:13px;color:var(--muted);line-height:1.7">טוען...</div>
     <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-      <button onclick="initQibla()" style="
+      <button onclick="qiblaInitDone=false; loaded['qibla']=false; initQibla()" style="
         background:var(--surface);border:1px solid var(--border);
         color:var(--gold);padding:7px 16px;border-radius:20px;
         font-size:12px;cursor:pointer;font-family:'Heebo',sans-serif;
@@ -2405,24 +2405,43 @@ async function requestCompassPermission() {
 }
 
 async function initQibla() {
-  console.log('[Qibla] init');
-  setQiblaStatus('מאתר מיקום...');
+  console.log('[Qibla] init – requesting live GPS');
+  setQiblaStatus('📍 מאתר מיקום GPS...');
   drawCompassTicks();
   qiblaInitDone = true;
 
-  // Use saved city location
+  // Always try live GPS first for accuracy
   let lat, lon, locationName;
-  const savedCity = appState.cityKey || 'petah_tikva';
-  if (savedCity === 'gps' && appState.gpsLat) {
-    lat = appState.gpsLat; lon = appState.gpsLon;
-    locationName = `GPS (${lat.toFixed(3)}°, ${lon.toFixed(3)}°)`;
-  } else {
-    const c = CITIES[savedCity] || CITIES['petah_tikva'];
-    lat = c.lat; lon = c.lon; locationName = c.name;
+  try {
+    const pos = await new Promise((resolve, reject) => {
+      if (!navigator.geolocation) { reject(new Error('GPS לא נתמך')); return; }
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true,
+        timeout: 8000,
+        maximumAge: 30000   // accept cached position up to 30 sec old
+      });
+    });
+    lat = pos.coords.latitude;
+    lon = pos.coords.longitude;
+    locationName = `📍 מיקום נוכחי (${lat.toFixed(4)}°, ${lon.toFixed(4)}°)`;
+    console.log('[Qibla] live GPS OK: lat', lat, 'lon', lon, 'accuracy', pos.coords.accuracy, 'm');
+    setQiblaStatus('');
+  } catch(e) {
+    // GPS failed – fall back to saved city
+    console.warn('[Qibla] GPS failed:', e.message, '– falling back to saved city');
+    const savedCity = appState.cityKey || 'petah_tikva';
+    if (savedCity === 'gps' && appState.gpsLat) {
+      lat = appState.gpsLat; lon = appState.gpsLon;
+      locationName = `📍 GPS שמור (${lat.toFixed(4)}°, ${lon.toFixed(4)}°)`;
+    } else {
+      const c = CITIES[savedCity] || CITIES['petah_tikva'];
+      lat = c.lat; lon = c.lon; locationName = `🏙️ ${c.name} (ברירת מחדל)`;
+    }
+    setQiblaStatus(`⚠️ GPS לא זמין – משתמש ב${locationName}`);
   }
 
   qiblaAngle = calcBearing(lat*Math.PI/180, lon*Math.PI/180, JERUSALEM_LAT, JERUSALEM_LON);
-  console.log('[Qibla] location source:', savedCity, '| lat:', lat, 'lon:', lon, '| bearing to Kotel:', qiblaAngle.toFixed(2), '°');
+  console.log('[Qibla] lat:', lat.toFixed(5), 'lon:', lon.toFixed(5), '| bearing to Kotel:', qiblaAngle.toFixed(2), '°');
 
   const distKm = calcDistanceKm(lat, lon, 31.7767, 35.2345);
   const infoEl = document.getElementById('qibla-location-info');
@@ -2430,10 +2449,10 @@ async function initQibla() {
     <div style="margin-bottom:6px">📍 <strong>מיקום:</strong> ${locationName}</div>
     <div style="margin-bottom:6px">🕍 <strong>כיוון הכותל המערבי:</strong> ${qiblaAngle.toFixed(1)}° (${bearingToLabel(qiblaAngle)})</div>
     <div style="margin-bottom:6px">📏 <strong>מרחק מהכותל:</strong> ${Math.round(distKm)} ק"מ</div>
-    <div style="font-size:11px;color:var(--muted);margin-top:8px">כיוון מחושב לכותל המערבי (31.7767°N, 35.2345°E) | לשינוי מיקום – עדכן בלוח ← זמנים</div>`;
+    <div style="font-size:11px;color:var(--muted);margin-top:8px">מחושב לכותל המערבי: 31.7767°N, 35.2345°E</div>`;
 
-  setQiblaStatus('');
   updateCompassUI();
+  // Auto-start compass sensor
   startCompassListener();
 }
 
