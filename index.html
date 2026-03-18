@@ -608,6 +608,7 @@
       <div class="zman-item"><div class="label">שקיעה</div><div class="time" id="z-sunset">--:--</div></div>
       <div class="zman-item"><div class="label">צאת הכוכבים</div><div class="time" id="z-tzeit">--:--</div></div>
       <div class="zman-item"><div class="label">הדלקת נרות</div><div class="time" id="z-candles">--:--</div></div>
+      <div class="zman-item" id="z-havdalah-row" style="display:none"><div class="label">צאת שבת / יו"ט</div><div class="time" id="z-havdalah">--:--</div></div>
     </div>
     <div class="source-link">
       מקור: <a href="https://www.hebcal.com/zmanim" target="_blank">Hebcal Zmanim API</a>
@@ -983,12 +984,16 @@
         background:var(--surface);border:1px solid var(--border);
         color:var(--gold);padding:7px 16px;border-radius:20px;
         font-size:12px;cursor:pointer;font-family:'Heebo',sans-serif;
-      ">🔄 רענן</button>
+      ">🔄 חשב מחדש</button>
       <button onclick="requestCompassPermission()" id="compass-permission-btn" style="
         background:rgba(201,165,74,.12);border:1px solid var(--gold-dim);
         color:var(--gold);padding:7px 16px;border-radius:20px;
         font-size:12px;cursor:pointer;font-family:'Heebo',sans-serif;
-      ">🧭 הפעל מצפן</button>
+      ">🧭 הפעל חיישן כיוון</button>
+    </div>
+    <div style="margin-top:10px;font-size:11px;color:var(--muted);line-height:1.6">
+      ⓘ <strong>איך להשתמש:</strong> לחץ "הפעל חיישן כיוון" ואז סובב את הטלפון עד שהחץ הזהב מצביע ישר למעלה – אז אתה פונה לכיוון הכותל.<br>
+      📱 <strong>iOS בלבד:</strong> נדרשת אישור הרשאה בחלון שייפתח.
     </div>
   </div>
 
@@ -999,7 +1004,7 @@
     padding:10px;border-radius:10px;
     background:rgba(255,255,255,.03);
   ">
-    💡 כדי לכייל את המצפן: הזז את הטלפון בתנועת ∞ (שמונה שוכב) מספר פעמים
+    💡 לכיול המצפן: הזז את הטלפון בתנועת ∞ (שמונה שוכב) מספר פעמים
   </div>
 </div>
 
@@ -1644,20 +1649,32 @@ async function loadZmanim(ds) {
     }
     document.getElementById('z-alot').textContent       = fmtT(z.alotHaShachar);
     document.getElementById('z-sunrise').textContent    = fmtT(z.sunrise);
-    document.getElementById('z-shema-gra').textContent  = fmtT(z.sofZmanShmaGra  || z.sofZmanShmaGRA);
-    document.getElementById('z-shema-mga').textContent  = fmtT(z.sofZmanShmaMga  || z.sofZmanShmaMGA);
-    document.getElementById('z-tefila-gra').textContent = fmtT(z.sofZmanTfilaGra || z.sofZmanTfillaGRA || z.sofZmanTfillahGRA);
-    document.getElementById('z-tefila-mga').textContent = fmtT(z.sofZmanTfilaMga || z.sofZmanTfillaMGA || z.sofZmanTfillahMGA);
+    // Exact Hebcal API field names (verified from official docs):
+    // sofZmanShma = GRA, sofZmanShmaMGA = MGA
+    // sofZmanTfilla = GRA, sofZmanTfillaMGA = MGA
+    document.getElementById('z-shema-gra').textContent  = fmtT(z.sofZmanShma);
+    document.getElementById('z-shema-mga').textContent  = fmtT(z.sofZmanShmaMGA);
+    document.getElementById('z-tefila-gra').textContent = fmtT(z.sofZmanTfilla);
+    document.getElementById('z-tefila-mga').textContent = fmtT(z.sofZmanTfillaMGA);
     document.getElementById('z-noon').textContent       = fmtT(z.chatzot);
     document.getElementById('z-mincha').textContent     = fmtT(z.minchaGedola);
     document.getElementById('z-sunset').textContent     = fmtT(z.sunset);
     document.getElementById('z-tzeit').textContent      = fmtT(z.tzeit7083deg || z.tzeit85deg);
+    console.log('[Zmanim] GRA shema:', z.sofZmanShma, '| GRA tfilla:', z.sofZmanTfilla, '| all keys:', Object.keys(z).join(','));
     // candle lighting
     const evData = await fetchWithDelay(
       `https://www.hebcal.com/hebcal?v=1&cfg=json&maj=on&min=on&nx=on&start=${ds}&end=${ds}&c=on&geo=pos&latitude=${userLat.toFixed(6)}&longitude=${userLon.toFixed(6)}&elevation=${elev}&tzid=Asia/Jerusalem&i=1`, 400
     );
-    const candles = (evData?.items || []).find(e => e.category === 'candles');
+    const candles  = (evData?.items || []).find(e => e.category === 'candles');
+    const havdalah = (evData?.items || []).find(e => e.category === 'havdalah');
     document.getElementById('z-candles').textContent = candles ? fmtT(candles.date) : '--:--';
+    const havdalahRow = document.getElementById('z-havdalah-row');
+    if (havdalah && havdalahRow) {
+      document.getElementById('z-havdalah').textContent = fmtT(havdalah.date);
+      havdalahRow.style.display = '';
+    } else if (havdalahRow) {
+      havdalahRow.style.display = 'none';
+    }
     // Update date display with Hebrew date
     try {
       const conv = await fetchWithDelay(`https://www.hebcal.com/converter?cfg=json&date=${ds}&g2h=1&strict=1`, 200);
@@ -2326,15 +2343,17 @@ function updateCompassUI() {
 
     // Alignment
     const diff = Math.abs(((needleAngle+180)%360)-180);
+    console.log('[Compass] deviceHeading:', Math.round(deviceHeading), '° | qiblaAngle:', Math.round(qiblaAngle), '° | needleAngle:', Math.round(needleAngle), '° | diff from forward:', Math.round(diff), '°');
     const ind  = document.getElementById('alignment-indicator');
     if (ind) {
       if (diff < 10)      { ind.style.cssText += ';background:rgba(61,140,90,.25);color:#5cb87a;border-color:#3d8c5a'; ind.textContent='✅ פנה ירושלים! התפלל כעת'; }
-      else if (diff < 25) { ind.style.cssText += ';background:rgba(201,165,74,.2);color:var(--gold);border-color:var(--gold-dim)'; ind.textContent='↻ כמעט – כוון עוד קצת'; }
-      else                { ind.style.cssText += ';background:rgba(100,70,20,.2);color:var(--muted);border-color:var(--border)'; ind.textContent='כוון את המכשיר לכיוון החץ'; }
+      else if (diff < 25) { ind.style.cssText += ';background:rgba(201,165,74,.2);color:var(--gold);border-color:var(--gold-dim)'; ind.textContent='↻ כמעט – סובב עוד קצת'; }
+      else                { ind.style.cssText += ';background:rgba(100,70,20,.2);color:var(--muted);border-color:var(--border)'; ind.textContent='↑ סובב את הטלפון עד שהחץ מצביע למעלה'; }
     }
   } else {
     const ind = document.getElementById('alignment-indicator');
-    if (ind) { ind.textContent='🧭 הפעל מצפן לכיוון אוטומטי'; ind.style.color='var(--muted)'; }
+    if (ind) { ind.textContent='לחץ "הפעל חיישן כיוון" למטה'; ind.style.color='var(--muted)'; }
+    console.log('[Compass] no device heading yet – waiting for sensor data');
   }
 }
 
@@ -2403,7 +2422,7 @@ async function initQibla() {
   }
 
   qiblaAngle = calcBearing(lat*Math.PI/180, lon*Math.PI/180, JERUSALEM_LAT, JERUSALEM_LON);
-  console.log('[Qibla] bearing to Jerusalem:', qiblaAngle.toFixed(1)+'°');
+  console.log('[Qibla] location source:', savedCity, '| lat:', lat, 'lon:', lon, '| bearing to Kotel:', qiblaAngle.toFixed(2), '°');
 
   const distKm = calcDistanceKm(lat, lon, 31.7767, 35.2345);
   const infoEl = document.getElementById('qibla-location-info');
