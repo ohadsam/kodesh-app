@@ -695,6 +695,7 @@
     </div>
 
     <!-- Section jump buttons -->
+    <div id="siddur-top"></div>
     <div id="siddur-sections" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border)"></div>
 
     <!-- Prayer text -->
@@ -1360,6 +1361,8 @@ function showTab(name) {
   currentTab = name;
   if (name === 'logs')  { renderLogs(); return; }
   if (name === 'qibla') { if (!loaded[name]) { loaded[name]=true; initQibla(); } resumeQibla(); return; }
+  // Siddur always re-inits on tab switch to reset loading state
+  if (name === 'siddur') { siddurLoading = false; initSiddur(); return; }
   if (!loaded[name]) {
     console.log(`[showTab] "${name}" not yet loaded, calling loadTab`);
     loadTab(name);
@@ -2925,6 +2928,9 @@ async function loadSiddur() {
       <div style="font-size:11px;font-weight:700;color:${s.isAddition?'var(--gold)':'var(--gold-dim)'};
         margin-bottom:6px;padding:4px 0;border-bottom:1px solid var(--border)">${s.label}</div>
       <div id="sc-${id}" style="color:var(--muted);font-size:12px">${cached ? '⏳ מה-cache...' : 'טוען...'}</div>
+      <div style="text-align:left;margin-top:8px;padding-top:6px;border-top:1px solid var(--border)">
+        <a href="#siddur-top" style="font-size:11px;color:var(--muted);text-decoration:none">↑ חזור לניווט</a>
+      </div>
     </div>`;
   }).join('');
 
