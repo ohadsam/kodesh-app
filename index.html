@@ -2714,7 +2714,7 @@ const SIDDUR_SECTIONS = {
     { label: 'יעלה ויבוא ✨',    ref: null, staticText: YAALEH_VEYAVO, isAddition: true, condition: 'isRoshChodeshOrMoed' },
     { label: 'תחנון',            ref: 'Weekday_Siddur_Sefard_Linear,_The_Morning_Prayers,_Tachanun', isAddition: true, condition: 'noTachanun', conditionType: 'skip' },
     // הלל – מתהילים 113–118, מופיע בר"ח, חנוכה, חוה"מ
-    { label: 'הלל ✨',           ref: null, staticText: HALLEL_REFS, isHallel: true, isAddition: true, condition: 'isHallelDay' },
+    { label: 'הלל ✨',           ref: null, isHallel: true, isAddition: true, condition: 'isHallelDay' },
     // קריאת תורה – ב'/ה' ור"ח
     { label: 'קריאת התורה ✨',   ref: 'Weekday_Siddur_Sefard_Linear,_The_Morning_Prayers,_Reading_of_the_Torah', isAddition: true, condition: 'isTorahReadingDay' },
     // מוסף – ר"ח וחוה"מ
@@ -2867,9 +2867,12 @@ async function loadSiddur() {
   console.log('[Siddur] loadSiddur called, siddurLoading=', siddurLoading, 'prayer=', siddurPrayer);
   if (siddurLoading) { console.log('[Siddur] already loading, skip'); if(dbg2) dbg2.textContent += ' (כבר טוען)'; return; }
   siddurLoading = true;
+  if (dbg2) dbg2.textContent = '⏳ sections building... ' + new Date().toLocaleTimeString();
 
-  document.getElementById('siddur-title').textContent    = PRAYER_NAMES[siddurPrayer] || '';
-  document.getElementById('siddur-subtitle').textContent = NUSACH_NAMES[siddurNusach] + ' • ספריא';
+  const titleEl = document.getElementById('siddur-title');
+  const subtitleEl = document.getElementById('siddur-subtitle');
+  if (titleEl) titleEl.textContent = PRAYER_NAMES[siddurPrayer] || '';
+  if (subtitleEl) subtitleEl.textContent = NUSACH_NAMES[siddurNusach] + ' • ספריא';
 
   const allSections = SIDDUR_SECTIONS[siddurPrayer] || [];
   console.log('[Siddur] allSections count=', allSections.length, 'for prayer=', siddurPrayer);
