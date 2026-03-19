@@ -2776,6 +2776,7 @@ function setSiddurPrayer(p) {
 }
 
 function initSiddur() {
+  console.log('[Siddur] initSiddur called, siddurLoading=', siddurLoading);
   // Calendar context for additions
   const todayEvents = appState._todayEventTitles || [];
   window._siddurCal = {
@@ -2785,6 +2786,9 @@ function initSiddur() {
     isPurim:       todayEvents.some(t => /פורים|Purim/i.test(t)),
     get skipTachanun() { return this.isRoshChodesh || this.isCholHamoed || this.isChanuka || this.isPurim; },
   };
+  console.log('[Siddur] _siddurCal=', JSON.stringify(window._siddurCal));
+  // Reset loading flag to allow fresh load each time tab is opened
+  siddurLoading = false;
   // Restore saved nusach
   if (appState.siddurNusach) {
     siddurNusach = appState.siddurNusach;
@@ -2855,20 +2859,24 @@ async function _fetchSectionHtml(s, style, yaalehOccasion) {
 }
 
 async function loadSiddur() {
-  if (siddurLoading) return;
+  console.log('[Siddur] loadSiddur called, siddurLoading=', siddurLoading, 'prayer=', siddurPrayer);
+  if (siddurLoading) { console.log('[Siddur] already loading, skip'); return; }
   siddurLoading = true;
 
   document.getElementById('siddur-title').textContent    = PRAYER_NAMES[siddurPrayer] || '';
   document.getElementById('siddur-subtitle').textContent = NUSACH_NAMES[siddurNusach] + ' • ספריא';
 
   const allSections = SIDDUR_SECTIONS[siddurPrayer] || [];
+  console.log('[Siddur] allSections count=', allSections.length, 'for prayer=', siddurPrayer);
   const sections    = allSections.filter(s => shouldShowSection(s));
   const total       = sections.length;
+  console.log('[Siddur] visible sections=', total, sections.map(s=>s.label));
 
   // ── Progress bar ──────────────────────────
   const progressWrap = document.getElementById('siddur-progress-wrap');
   const progressBar  = document.getElementById('siddur-progress-bar');
   const progressLbl  = document.getElementById('siddur-progress-lbl');
+  console.log('[Siddur] progressWrap found=', !!progressWrap, 'progressBar=', !!progressBar);
   function setProgress(done, label) {
     const pct = total ? Math.round((done / total) * 100) : 0;
     if (progressBar)  progressBar.style.width = pct + '%';
