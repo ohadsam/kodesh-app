@@ -682,6 +682,17 @@
       <div id="done-siddur"></div>
     </div>
 
+    <!-- Progress bar -->
+    <div id="siddur-progress-wrap" style="display:none;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:4px">
+        <span>טוען סידור מספריא...</span>
+        <span id="siddur-progress-lbl"></span>
+      </div>
+      <div style="background:var(--border);border-radius:4px;height:4px;overflow:hidden">
+        <div id="siddur-progress-bar" style="height:100%;width:0%;background:var(--gold);border-radius:4px;transition:width .3s ease"></div>
+      </div>
+    </div>
+
     <!-- Section jump buttons -->
     <div id="siddur-sections" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border)"></div>
 
@@ -2834,80 +2845,103 @@ async function loadSiddur() {
 
   const allSections = SIDDUR_SECTIONS[siddurPrayer] || [];
   const sections    = allSections.filter(s => shouldShowSection(s));
+  const total       = sections.length;
 
-  // Build section jump buttons
+  // ── Progress bar ──────────────────────────
+  const progressWrap = document.getElementById('siddur-progress-wrap');
+  const progressBar  = document.getElementById('siddur-progress-bar');
+  const progressLbl  = document.getElementById('siddur-progress-lbl');
+  function setProgress(done, label) {
+    const pct = total ? Math.round((done / total) * 100) : 0;
+    if (progressBar)  progressBar.style.width = pct + '%';
+    if (progressLbl)  progressLbl.textContent = label || '';
+    if (progressWrap) progressWrap.style.display = done >= total ? 'none' : 'block';
+  }
+  setProgress(0, 'מכין...');
+
+  // ── Section jump buttons ──────────────────
   const secNav = document.getElementById('siddur-sections');
   if (secNav) {
-    secNav.innerHTML = sections.map(s =>
-      `<button onclick="document.getElementById('ss-${s.label.replace(/\s/g,'_')}')?.scrollIntoView({behavior:'smooth'})"
+    secNav.innerHTML = sections.map(s => {
+      const id = s.label.replace(/\s/g,'_');
+      return `<button onclick="document.getElementById('ss-${id}')?.scrollIntoView({behavior:'smooth'})"
         style="font-size:10px;padding:3px 8px;border-radius:12px;border:1px solid var(--border);
         background:${s.isAddition?'rgba(201,165,74,.15)':'var(--surface)'};
         color:${s.isAddition?'var(--gold)':'var(--muted)'};cursor:pointer;font-family:'Heebo',sans-serif">
-        ${s.label}
-      </button>`
-    ).join('');
+        ${s.label}</button>`;
+    }).join('');
   }
 
-  // Show loading skeletons
+  // ── Skeleton placeholders ─────────────────
   const el = document.getElementById('siddur-content');
-  el.innerHTML = sections.map(s => `
-    <div id="ss-${s.label.replace(/\s/g,'_')}" style="margin-bottom:20px">
+  el.innerHTML = sections.map(s => {
+    const id = s.label.replace(/\s/g,'_');
+    const cached = !s.staticText && !s.isHallel && _getCache(s.ref);
+    return `<div id="ss-${id}" style="margin-bottom:20px">
       <div style="font-size:11px;font-weight:700;color:${s.isAddition?'var(--gold)':'var(--gold-dim)'};
         margin-bottom:6px;padding:4px 0;border-bottom:1px solid var(--border)">${s.label}</div>
-      <div id="sc-${s.label.replace(/\s/g,'_')}" style="color:var(--muted);font-size:12px">
-        ${_getCache(s.ref) ? '✓' : 'טוען...'}
-      </div>
-    </div>`
-  ).join('');
+      <div id="sc-${id}" style="color:var(--muted);font-size:12px">${cached ? '⏳ מה-cache...' : 'טוען...'}</div>
+    </div>`;
+  }).join('');
 
   const cal = window._siddurCal || {};
   const yaalehOccasion = cal.isRoshChodesh ? 'רֹאשׁ הַחֹדֶשׁ' : cal.isCholHamoed ? 'חֹל הַמּוֹעֵד' : '';
 
-  // Load sections sequentially; prefetch next section while rendering current
-  let prefetchPromise = null;
+  // ── Prefetch map: ref → Promise<html> ─────
+  // Start fetching section i+1 while rendering section i
+  const prefetchMap = new Map();
 
-  for (let i = 0; i < sections.length; i++) {
-    const s = sections[i];
-    const contentEl = document.getElementById('sc-' + s.label.replace(/\s/g,'_'));
-    if (!contentEl) continue;
-
-    const style = `font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);line-height:1.9;`
-                + `color:${s.isAddition ? 'var(--gold)' : 'var(--cream)'}`;
-
-    try {
-      // If we already prefetched this section, await its result directly
-      let html;
-      if (prefetchPromise && i > 0) {
-        html = await prefetchPromise;
-        prefetchPromise = null;
-      } else {
-        html = await _fetchSectionHtml(s, style, yaalehOccasion);
-      }
-
-      // Render current section
-      contentEl.innerHTML = html;
-
-      // Kick off prefetch for next section immediately (fire & forget into prefetchPromise)
-      if (i + 1 < sections.length) {
-        const next = sections[i + 1];
-        const nextStyle = `font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);line-height:1.9;`
-                        + `color:${next.isAddition ? 'var(--gold)' : 'var(--cream)'}`;
-        prefetchPromise = _fetchSectionHtml(next, nextStyle, yaalehOccasion).catch(e => {
-          console.warn('[Siddur] prefetch failed:', next.label, e.message);
-          return null;
-        });
-      }
-
-    } catch(e) {
-      contentEl.textContent = '⚠️ ' + e.message;
-      console.warn('[Siddur] failed:', s.label, e.message);
-      prefetchPromise = null;
-    }
+  function startPrefetch(idx) {
+    if (idx >= sections.length) return;
+    const s = sections[idx];
+    if (s.staticText || s.isHallel) return; // instant, no need
+    if (_getCache(s.ref) || prefetchMap.has(s.ref)) return;
+    const style = _sectionStyle(s);
+    prefetchMap.set(s.ref, _fetchSectionHtml(s, style, yaalehOccasion).catch(() => null));
   }
 
+  // Kick off first 2 sections immediately
+  startPrefetch(0);
+  startPrefetch(1);
+
+  for (let i = 0; i < sections.length; i++) {
+    const s       = sections[i];
+    const id      = s.label.replace(/\s/g,'_');
+    const contentEl = document.getElementById('sc-' + id);
+    if (!contentEl) { setProgress(i+1, ''); continue; }
+
+    setProgress(i, s.label);
+    const style = _sectionStyle(s);
+
+    try {
+      let html;
+      if (!s.staticText && !s.isHallel && prefetchMap.has(s.ref)) {
+        html = await prefetchMap.get(s.ref);
+        prefetchMap.delete(s.ref);
+      }
+      if (!html) {
+        html = await _fetchSectionHtml(s, style, yaalehOccasion);
+      }
+      contentEl.innerHTML = html || '<span style="color:var(--muted)">(אין טקסט)</span>';
+    } catch(e) {
+      contentEl.innerHTML = `<span style="color:var(--muted)">⚠️ ${e.message}</span>`;
+      console.warn('[Siddur] failed:', s.label, e.message);
+    }
+
+    // Prefetch 2 ahead
+    startPrefetch(i + 2);
+    setProgress(i + 1, i + 1 < sections.length ? sections[i+1].label : '');
+  }
+
+  setProgress(total, '');
   updateDoneButton('siddur', siddurPrayer);
   siddurLoading = false;
-  console.log('[Siddur] done loading', siddurPrayer, '| cache size:', Object.keys(_siddurCache).length);
+  console.log('[Siddur] done:', siddurPrayer, '| cache:', Object.keys(_siddurCache).length);
+}
+
+function _sectionStyle(s) {
+  return `font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);line-height:1.9;` +
+         `color:${s.isAddition ? 'var(--gold)' : 'var(--cream)'}`;
 }
 
 function storeTodayEventsForSiddur(items) {
