@@ -544,6 +544,7 @@
   <button class="tab" onclick="showTab('parasha')" id="t-parasha"><span class="icon">📜</span>פרשה</button>
   <button class="tab" onclick="showTab('lashon')" id="t-lashon"><span class="icon">🗣</span>לשה"ר</button>
   <button class="tab" onclick="showTab('igeret')" id="t-igeret"><span class="icon">✉️</span>אגרת</button>
+  <button class="tab" onclick="showTab('tefilot')" id="t-tefilot"><span class="icon">🤲</span>תפילות</button>
   <button class="tab" onclick="showTab('qibla')" id="t-qibla"><span class="icon">🧭</span>מצפן</button>
   <button class="tab" onclick="showTab('logs')" id="t-logs"><span class="icon">🐛</span>לוגים</button>
 </div>
@@ -841,6 +842,40 @@
   </div>
 </div>
 
+<!-- ─── PAGE: TEFILOT ────────────────────── -->
+<div class="page" id="page-tefilot">
+  <!-- Prayer selector -->
+  <div class="card" style="padding:12px 14px;margin-bottom:12px">
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;font-weight:600">בחר תפילה</div>
+    <div style="display:flex;flex-direction:column;gap:8px" id="tefila-buttons">
+      <button class="aliya-tab active" onclick="showTefila('motzash')" id="tf-motzash">
+        תפילה למוצאי שבת – ר' לוי יצחק מברדיטשוב
+      </button>
+      <button class="aliya-tab" onclick="showTefila('simcha')" id="tf-simcha">
+        תפילה לשמחה – ר' נתן מברסלב
+      </button>
+      <button class="aliya-tab" onclick="showTefila('shla')" id="tf-shla">
+        תפילת השל"ה הקדוש
+      </button>
+      <button class="aliya-tab" onclick="showTefila('man')" id="tf-man">
+        פרשת המן עם תרגום אונקלוס
+      </button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title"><span class="emoji">🤲</span><span id="tefila-title">תפילה</span></div>
+        <div class="card-subtitle" id="tefila-source"></div>
+      </div>
+      <div id="done-tefilot"></div>
+    </div>
+    <div id="tefila-content" class="content-text igeret-text" style="min-height:200px">
+      לחץ על תפילה מהרשימה למעלה
+    </div>
+  </div>
+</div>
+
 <!-- ─── PAGE: QIBLA ────────────────────────── -->
 <div class="page" id="page-qibla">
 
@@ -1037,6 +1072,7 @@
   <button class="bnav-btn" onclick="showTab('parasha')" id="bn-parasha"><span class="bicon">📜</span>פרשה</button>
   <button class="bnav-btn" onclick="showTab('lashon')" id="bn-lashon"><span class="bicon">🗣</span>לשה"ר</button>
   <button class="bnav-btn" onclick="showTab('igeret')" id="bn-igeret"><span class="bicon">✉️</span>אגרת</button>
+  <button class="bnav-btn" onclick="showTab('tefilot')" id="bn-tefilot"><span class="bicon">🤲</span>תפילות</button>
   <button class="bnav-btn" onclick="showTab('qibla')" id="bn-qibla"><span class="bicon">🧭</span>מצפן</button>
   <button class="bnav-btn" onclick="showTab('logs')" id="bn-logs"><span class="bicon">🐛</span>לוגים</button>
 </div>
@@ -1246,6 +1282,7 @@ function loadTab(name) {
   if (name === 'parasha')   loadParasha();
   if (name === 'lashon')    loadLashon();
   if (name === 'igeret')    loadIgeret();
+  if (name === 'tefilot')   initTefilot();
   if (name === 'daf')       loadDafYomi();
   if (name === 'mishna')    loadMishnaYomi();
   if (name === '929')       loadTanach929();
@@ -2176,7 +2213,113 @@ async function loadTanach929() {
 }
 
 // ═══════════════════════════════════════════
-// TAB VISIBILITY CONFIG
+// TEFILOT – Static prayer texts
+// ═══════════════════════════════════════════
+const TEFILOT = {
+  motzash: {
+    title: 'תפילה למוצאי שבת',
+    source: 'ר\' לוי יצחק מברדיטשוב (קדושת לוי)',
+    text: [
+      'רִבּוֹנוֹ שֶׁל עוֹלָם, אֲנִי רוֹצֶה לְהַגִּיד לְפָנֶיךָ שִׁירָה, אֲבָל אֵינִי יוֹדֵע אֵיזוֹ שִׁירָה לוֹמַר.',
+      'אִם אוֹמַר שִׁירַת הַיָּם – אֵינִי בִּדְרָגָה שֶׁל מֹשֶׁה רַבֵּינוּ.',
+      'אִם אוֹמַר שִׁירַת דְּבוֹרָה – אֵינִי בִּדְרָגָה שֶׁל דְּבוֹרָה הַנְּבִיאָה.',
+      'אִם אוֹמַר שִׁירַת חַנָּה – אֵינִי בִּדְרָגָה שֶׁל חַנָּה.',
+      'אִם אוֹמַר שִׁירַת דָּוִד הַמֶּלֶךְ – אֵינִי בִּדְרָגָה שֶׁל דָּוִד הַמֶּלֶךְ.',
+      'אֲבָל אַתָּה, רִבּוֹנוֹ שֶׁל עוֹלָם, אַתָּה הוּא שֶׁשָּׂמַחְתָּ בְּשִׁירוֹתֵיהֶם.',
+      'וְגַם בְּשִׁירָתִי אַתָּה שָׂמֵחַ, אִם אֲנִי אוֹמֵר לְפָנֶיךָ שִׁירָה בְּלֵב שָׁלֵם.',
+      'לָכֵן אֲנִי אוֹמֵר לְפָנֶיךָ: שִׁירָה חֲדָשָׁה, שִׁירַת הַגְּאֻלָּה.',
+      'יְהִי רָצוֹן מִלְּפָנֶיךָ, ה\' אֱלֹקֵינוּ וֵאלֹקֵי אֲבוֹתֵינוּ, שֶׁתָּחוּס וְתָחֹן עָלֵינוּ, וְתַצִּילֵנוּ מִכָּל צָרָה וּמִכָּל מַדְוֶה.',
+      'וְתִזְכֵּנוּ לְקַבֵּל פְּנֵי שְׁכִינָתֶךָ בְּשִׂמְחָה וּבְטוֹב לֵבָב.',
+      'וְיִהְיֶה הַשָּׁבוּעַ הַזֶּה עָלֵינוּ וְעַל כָּל יִשְׂרָאֵל לְטוֹבָה, לִבְרָכָה, לְחַיִּים, לְשָׁלוֹם וּלְכָל טוֹב. אָמֵן.',
+    ]
+  },
+  simcha: {
+    title: 'תפילה לשמחה',
+    source: 'ר\' נתן מברסלב (ליקוטי תפילות)',
+    text: [
+      'רִבּוֹנוֹ שֶׁל עוֹלָם, מָלֵא רַחֲמִים, חֲמֹל עָלַי וְעַזְּרֵנִי שֶׁאֶהְיֶה בְּשִׂמְחָה תָּמִיד.',
+      'כִּי יוֹדֵעַ אֲנִי שֶׁזֹּאת מִצְוָה גְּדוֹלָה לִהְיוֹת בְּשִׂמְחָה תָּמִיד, וְכֵן צִוִּיתָנוּ עַל יְדֵי מֹשֶׁה עַבְדֶּךָ וְנְבִיאֶיךָ הָאֱמֶת.',
+      'וְאַף עַל פִּי כֵן אֲנִי רָחוֹק מִשִּׂמְחָה מְאֹד מְאֹד, כִּי רַבּוּ עַוֹנוֹתַי מְאֹד וְחֵטְאַי כָּבְדוּ מְנְשֹׂוֹא.',
+      'עַל כֵּן אֲנִי מַפִּיל תְּחִנָּתִי לְפָנֶיךָ – עֲזֹר לִי וְחַזְּקֵנִי וְאַמְּצֵנִי לִמְצֹא תָּמִיד נְקֻדּוֹת טוֹבוֹת בְּתוֹכִי.',
+      'וַאֲפִילוּ אִם אֵינִי יוֹדֵעַ שׁוּם נְקֻדָּה טוֹבָה בְּעַצְמִי – זַכֵּנִי שֶׁאַחֲפֹּשׂ וַאֲחַפֵּשׂ עַד שֶׁאֶמְצָא בְּתוֹכִי אֵיזֶה נְקֻדָּה טוֹבָה.',
+      'וְאֶשְׂמַח בְּאוֹתָהּ נְקֻדָּה טוֹבָה, וּמִשִּׂמְחָה זוֹ אֶתְחַזֵּק לַעֲבוֹדָתֶךָ.',
+      'כִּי אַתָּה יוֹדֵעַ אֱמֶת שֶׁהַשִּׂמְחָה הִיא עִיקַּר גָּדוֹל בַּעֲבוֹדָתֶךָ.',
+      'וּבִשְׂמָחָה יְתֵרָה אֶזְכֶּה לְהִתְקָרֵב אֵלֶיךָ וּלְהִדָּבֵק בְּדַרְכֶיךָ וּלְקַיֵּם מִצְווֹתֶיךָ בְּלֵב שָׁלֵם.',
+      'וּתְמַלֵּא מְבוּקָשַׁי לְטוֹבָה, וְתַעֲנֵה אוֹתִי בְּעֵת צָרָה, וְתַצִּילֵנִי מִכָּל מִינֵי מְנִיעוֹת וְעִיכּוּבִים.',
+      'וְזַכֵּנִי תָּמִיד לִשְׂמֹחַ בְּשִׂמְחָה שֶׁל מִצְוָה, שִׂמְחָה אֲמִתִּית, שִׂמְחַת הַנֶּצַח. אָמֵן.',
+    ]
+  },
+  shla: {
+    title: 'תפילת השל"ה הקדוש',
+    source: 'ר\' ישעיהו הורוויץ (שני לוחות הברית) – תפילה לבנים',
+    text: [
+      'יְהִי רָצוֹן מִלְּפָנֶיךָ, ה\' אֱלֹקַי וֵאלֹקֵי אֲבוֹתַי, שֶׁתְּחוֹנֵן אוֹתִי וְאֶת אִשְׁתִּי וְאֶת כָּל זַרְעִי וְצֶאֱצָאֵינוּ לִהְיוֹת בָּנִים וּבָנוֹת כְּשֵׁרִים, עוֹסְקִים בְּתוֹרָה וּמִצְווֹת כָּל יְמֵיהֶם.',
+      'וְאַל יִכָּשְׁלוּ בְּשׁוּם עֵת וּבְשׁוּם זְמַן, לֹא בְּעוֹלָם הַזֶּה וְלֹא בְּעוֹלָם הַבָּא.',
+      'וִיהִי פַּרְנָסָתָם מְצוּיָה בְּהֶרְוָחָה מִיָּדֶךָ הַמְּלֵאָה הָרְחָבָה הַקְּדוֹשָׁה וְהַטְּהוֹרָה, בְּנַחַת וּבְלֹא צַעַר וּבְלֹא עָמָל וּבְלֹא בִּזָּיוֹן, בְּכָבוֹד וּבְנַחַת בְּטַהֲרָה וּבִקְדֻשָּׁה.',
+      'וְכֵן כָּל זַרְעֲנוּ וְזֶרַע זַרְעֲנוּ יִהְיוּ אַנְשֵׁי שֵׁם, עוֹסְקִים בְּתוֹרָה וּמְקַיְּמֵי מִצְווֹת, כְּמוֹ שֶׁנֶּאֱמַר: וְאֲנִי זֹאת בְּרִיתִי אוֹתָם אָמַר ה\' רוּחִי אֲשֶׁר עָלֶיךָ וּדְבָרַי אֲשֶׁר שַׂמְתִּי בְּפִיךָ לֹא יָמוּשׁוּ מִפִּיךָ וּמִפִּי זַרְעֲךָ וּמִפִּי זֶרַע זַרְעֲךָ אָמַר ה\' מֵעַתָּה וְעַד עוֹלָם.',
+      'בָּרוּךְ ה\' לְעוֹלָם אָמֵן וְאָמֵן.',
+    ]
+  },
+  man: {
+    title: 'פרשת המן',
+    source: 'שמות ט"ז, ד\'–ל"ו | עם תרגום אונקלוס',
+    text: [
+      '【שמות ט"ז, ד\'】',
+      'וַיֹּאמֶר ה\' אֶל מֹשֶׁה הִנְנִי מַמְטִיר לָכֶם לֶחֶם מִן הַשָּׁמָיִם וְיָצָא הָעָם וְלָקְטוּ דְּבַר יוֹם בְּיוֹמוֹ לְמַעַן אֲנַסֶּנּוּ הֲיֵלֵךְ בְּתוֹרָתִי אִם לֹא׃',
+      '【תרגום אונקלוס】 וַאֲמַר יְיָ לְמֹשֶׁה הָא אֲנָא מְחֵית לְכוֹן לַחֲמָא מִן שְׁמַיָּא וְיִפּוּק עַמָּא וְיִלְקְטוּן פִּתְגַּם יוֹם בְּיוֹמֵיהּ בְּדִיל דַּאֲנַסִינּוּן הַיְלְכוּן בְּאוֹרַיְתִי אִם לָא׃',
+      '',
+      '【שמות ט"ז, יא\'–טו\'】',
+      'וַיְדַבֵּר ה\' אֶל מֹשֶׁה לֵּאמֹר׃ שָׁמַעְתִּי אֶת תְּלוּנֹּת בְּנֵי יִשְׂרָאֵל דַּבֵּר אֲלֵהֶם לֵאמֹר בֵּין הָעַרְבַּיִם תֹּאכְלוּ בָשָׂר וּבַבֹּקֶר תִּשְׂבְּעוּ לָחֶם וִידַעְתֶּם כִּי אֲנִי ה\' אֱלֹקֵיכֶם׃',
+      'וַיְהִי בָעֶרֶב וַתַּעַל הַשְּׂלָו וַתְּכַס אֶת הַמַּחֲנֶה וּבַבֹּקֶר הָיְתָה שִׁכְבַת הַטַּל סָבִיב לַמַּחֲנֶה׃',
+      'וַתַּעַל שִׁכְבַת הַטָּל וְהִנֵּה עַל פְּנֵי הַמִּדְבָּר דַּק מְחֻסְפָּס דַּק כַּכְּפֹר עַל הָאָרֶץ׃',
+      'וַיִּרְאוּ בְנֵי יִשְׂרָאֵל וַיֹּאמְרוּ אִישׁ אֶל אָחִיו מָן הוּא כִּי לֹא יָדְעוּ מַה הוּא וַיֹּאמֶר מֹשֶׁה אֲלֵהֶם הוּא הַלֶּחֶם אֲשֶׁר נָתַן ה\' לָכֶם לְאָכְלָה׃',
+      '【תרגום אונקלוס】 הוּא לַחְמָא דִּי יְהַב יְיָ לְכוֹן לְמֵיכַל׃',
+      '',
+      '【שמות ט"ז, לא\'–לו\'】',
+      'וַיִּקְרְאוּ בֵית יִשְׂרָאֵל אֶת שְׁמוֹ מָן וְהוּא כְּזֶרַע גַּד לָבָן וְטַעְמוֹ כְּצַפִּיחִת בִּדְבָשׁ׃',
+      'וַיֹּאמֶר מֹשֶׁה זֶה הַדָּבָר אֲשֶׁר צִוָּה ה\' מְלֹא הָעֹמֶר מִמֶּנּוּ לְמִשְׁמֶרֶת לְדֹרֹתֵיכֶם לְמַעַן יִרְאוּ אֶת הַלֶּחֶם אֲשֶׁר הֶאֱכַלְתִּי אֶתְכֶם בַּמִּדְבָּר בְּהוֹצִיאִי אֶתְכֶם מֵאֶרֶץ מִצְרָיִם׃',
+      'וּבְנֵי יִשְׂרָאֵל אָכְלוּ אֶת הַמָּן אַרְבָּעִים שָׁנָה עַד בֹּאָם אֶל אֶרֶץ נוֹשָׁבֶת אֶת הַמָּן אָכְלוּ עַד בֹּאָם אֶל קְצֵה אֶרֶץ כְּנָעַן׃',
+    ]
+  }
+};
+
+let currentTefila = 'motzash';
+
+function initTefilot() {
+  showTefila('motzash');
+}
+
+function showTefila(key) {
+  currentTefila = key;
+  const tf = TEFILOT[key];
+  if (!tf) return;
+
+  // Update buttons
+  Object.keys(TEFILOT).forEach(k => {
+    const btn = document.getElementById(`tf-${k}`);
+    if (btn) btn.classList.toggle('active', k === key);
+  });
+
+  document.getElementById('tefila-title').textContent  = tf.title;
+  document.getElementById('tefila-source').textContent = tf.source;
+
+  const el = document.getElementById('tefila-content');
+  el.innerHTML = tf.text.map(line => {
+    if (!line) return '<div style="height:12px"></div>';
+    // Headers in 【】
+    if (line.startsWith('【')) {
+      return `<div style="font-size:12px;color:var(--gold);font-weight:700;margin:14px 0 6px;letter-spacing:.5px">${line}</div>`;
+    }
+    // Targum lines
+    if (line.includes('תרגום') || line.includes('יְיָ') || line.includes('מְחֵית')) {
+      return `<div style="margin-bottom:8px;color:var(--muted);font-size:calc(var(--font-size) - 1px);line-height:1.8;padding-right:12px;border-right:2px solid var(--border)">${line}</div>`;
+    }
+    return `<div style="margin-bottom:10px;line-height:1.9">${line}</div>`;
+  }).join('');
+
+  updateDoneButton('tefilot', key);
+  console.log('[Tefilot] loaded:', key, tf.title);
+}
 // ═══════════════════════════════════════════
 const ALL_TABS = [
   { id: 'calendar', label: '📅 לוח שנה עברי',   fixed: true  }, // always visible
@@ -2188,6 +2331,7 @@ const ALL_TABS = [
   { id: 'parasha',  label: '📜 פרשת השבוע'                    },
   { id: 'lashon',   label: '🗣 הלכות לשון הרע'                },
   { id: 'igeret',   label: '✉️ אגרת הרמב"ן'                   },
+  { id: 'tefilot',  label: '🤲 תפילות'                         },
   { id: 'qibla',    label: '🧭 מצפן תפילה'                    },
   { id: 'logs',     label: '🐛 לוגי מערכת'                    },
 ];
@@ -2369,64 +2513,93 @@ function updateCompassUI() {
 function startCompassListener() {
   if (compassListener) {
     window.removeEventListener('deviceorientationabsolute', compassListener, true);
-    window.removeEventListener('deviceorientation', compassListener, true);
+    window.removeEventListener('deviceorientation',         compassListener, true);
+    if (window._aoSensor) { try { window._aoSensor.stop(); } catch(e){} }
   }
 
+  // ── Try Generic Sensor API (AbsoluteOrientationSensor) – best on Android ──
+  if (typeof AbsoluteOrientationSensor !== 'undefined') {
+    try {
+      const sensor = new AbsoluteOrientationSensor({ frequency: 10, referenceFrame: 'device' });
+      sensor.addEventListener('reading', () => {
+        // quaternion [x,y,z,w] → heading
+        const [x, y, z, w] = sensor.quaternion;
+        // Project onto horizontal plane → yaw angle = compass heading
+        const heading = Math.atan2(2*(w*z + x*y), 1 - 2*(y*y + z*z)) * 180/Math.PI;
+        const h = (360 - heading + 360) % 360;
+        console.log('[Compass] AbsoluteOrientationSensor → heading:', h.toFixed(1));
+        deviceHeading = h;
+        deviceBeta = null; // sensor API doesn't give us tilt separately
+        updateCompassUI();
+      });
+      sensor.addEventListener('error', e => {
+        console.warn('[Compass] AbsoluteOrientationSensor error:', e.error.message, '– falling back');
+        window._aoSensor = null;
+        _startDeviceOrientationFallback();
+      });
+      sensor.start();
+      window._aoSensor = sensor;
+      console.log('[Compass] AbsoluteOrientationSensor started');
+      setQiblaStatus('🧭 מצפן פעיל (חיישן מדויק)');
+      return;
+    } catch(e) {
+      console.warn('[Compass] AbsoluteOrientationSensor not available:', e.message);
+    }
+  }
+
+  // ── Fallback: deviceorientation events ──
+  _startDeviceOrientationFallback();
+}
+
+function _startDeviceOrientationFallback() {
   compassListener = (e) => {
     if (e.alpha === null || e.alpha === undefined) return;
-
     let h = null;
+    deviceBeta = e.beta;
 
-    // ── iOS: webkitCompassHeading is already tilt-compensated ──
-    if (e.webkitCompassHeading !== undefined && e.webkitCompassHeading !== null) {
+    // iOS: webkitCompassHeading is tilt-compensated by the OS
+    if (typeof e.webkitCompassHeading === 'number') {
       h = e.webkitCompassHeading;
-      console.log('[Compass] iOS webkitCompassHeading:', h.toFixed(1));
-    }
+      console.log('[Compass] iOS webkit:', h.toFixed(1), '°');
 
-    // ── Android: compute tilt-compensated heading from alpha/beta/gamma ──
-    // DeviceOrientation axes (portrait mode):
-    //   alpha = rotation around Z (compass bearing, but needs tilt correction)
-    //   beta  = tilt front-back (-180..180, 0=flat, 90=upright portrait)
-    //   gamma = tilt left-right (-90..90)
-    else {
-      const alpha = e.alpha * Math.PI / 180;  // Z rotation
-      const beta  = e.beta  * Math.PI / 180;  // X tilt (front-back)
-      const gamma = e.gamma * Math.PI / 180;  // Y tilt (left-right)
+    } else if (e.absolute === true) {
+      // Android Chrome deviceorientationabsolute
+      // alpha=yaw around Z (screen-up), beta=pitch, gamma=roll
+      // When phone is portrait (beta≈90°), alpha is NOT the compass heading.
+      // Correct formula for portrait-held phone:
+      //   compassHeading = -(alpha + gamma) when beta≈90
+      // General tilt-compensated formula (works for any orientation):
+      const a = e.alpha * Math.PI / 180;
+      const b = e.beta  * Math.PI / 180;
+      const g = e.gamma * Math.PI / 180;
+      // Rotation matrix approach: compute where magnetic north vector points
+      // after applying device rotation, then project to horizontal plane
+      const cosB = Math.cos(b), sinB = Math.sin(b);
+      const cosG = Math.cos(g), sinG = Math.sin(g);
+      const cosA = Math.cos(a), sinA = Math.sin(a);
+      // X component of north in device frame projected to ground
+      const Nx = cosA * cosG + sinA * sinB * sinG;
+      const Ny = sinA * cosG - cosA * sinB * sinG;
+      h = (Math.atan2(-Ny, Nx) * 180 / Math.PI + 360) % 360;
+      console.log('[Compass] absolute deviceorientation → heading:', h.toFixed(1),
+        '| beta:', e.beta?.toFixed(1), 'gamma:', e.gamma?.toFixed(1));
 
-      // Tilt-compensated compass heading formula
-      // Converts device orientation into a north-referenced bearing
-      // regardless of how the phone is tilted/oriented
-      const x = Math.cos(alpha) * Math.sin(beta) * Math.sin(gamma)
-              - Math.sin(alpha) * Math.cos(gamma);
-      const y = Math.sin(alpha) * Math.sin(beta) * Math.sin(gamma)
-              + Math.cos(alpha) * Math.cos(gamma);
-
-      let heading = Math.atan2(x, y) * 180 / Math.PI;
-      heading = (heading + 360) % 360;
-
-      // For absolute orientation event, alpha is already magnetic-north referenced
-      // For regular deviceorientation, alpha may be arbitrary reference
-      if (!e.absolute) {
-        // Fallback: use raw alpha conversion (less accurate but something)
-        heading = (360 - e.alpha) % 360;
-      }
-
-      h = heading;
-      console.log('[Compass] Android tilt-compensated: alpha=', e.alpha?.toFixed(1),
-        'beta=', e.beta?.toFixed(1), 'gamma=', e.gamma?.toFixed(1),
-        '→ heading=', h.toFixed(1), 'absolute=', e.absolute);
+    } else {
+      // Non-absolute: alpha reference is arbitrary, can't trust it for compass
+      // Log but don't use – wait for absolute event
+      console.log('[Compass] non-absolute event ignored (alpha:', e.alpha?.toFixed(1), ')');
+      return;
     }
 
     if (h !== null && !isNaN(h)) {
       deviceHeading = h;
-      deviceBeta = e.beta;   // save tilt angle for warning
       updateCompassUI();
     }
   };
 
   window.addEventListener('deviceorientationabsolute', compassListener, true);
   window.addEventListener('deviceorientation',         compassListener, true);
-  console.log('[Qibla] compass listener started (tilt-compensated mode)');
+  console.log('[Compass] deviceorientation fallback started');
   setQiblaStatus('🧭 מצפן פעיל');
 }
 
