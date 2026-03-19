@@ -681,6 +681,7 @@
       </div>
       <div id="done-siddur"></div>
     </div>
+    <div id="siddur-debug" style="font-size:10px;color:var(--muted);margin-bottom:6px"></div>
 
     <!-- Progress bar -->
     <div id="siddur-progress-wrap" style="display:none;margin-bottom:10px">
@@ -2644,7 +2645,7 @@ function renderTabVisibilityRows() {
   if (!container) return;
   const vis = getTabVisibility();
   container.innerHTML = ALL_TABS.map(tab => {
-    const checked = tab.fixed || vis[tab.id] !== false;
+    const checked = tab.fixed || (tab.id in vis ? vis[tab.id] : !tab.defaultHidden);
     const disabled = tab.fixed ? 'disabled' : '';
     return `<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0">
       <label style="font-size:13px;color:${tab.fixed ? 'var(--muted)' : 'var(--cream)'}">${tab.label}</label>
@@ -2776,6 +2777,8 @@ function setSiddurPrayer(p) {
 }
 
 function initSiddur() {
+  const dbg = document.getElementById('siddur-debug');
+  if (dbg) dbg.textContent = '🔄 initSiddur נקרא... ' + new Date().toLocaleTimeString();
   console.log('[Siddur] initSiddur called, siddurLoading=', siddurLoading);
   // Calendar context for additions
   const todayEvents = appState._todayEventTitles || [];
@@ -2859,8 +2862,10 @@ async function _fetchSectionHtml(s, style, yaalehOccasion) {
 }
 
 async function loadSiddur() {
+  const dbg2 = document.getElementById('siddur-debug');
+  if (dbg2) dbg2.textContent = '⏳ loadSiddur נקרא... ' + new Date().toLocaleTimeString();
   console.log('[Siddur] loadSiddur called, siddurLoading=', siddurLoading, 'prayer=', siddurPrayer);
-  if (siddurLoading) { console.log('[Siddur] already loading, skip'); return; }
+  if (siddurLoading) { console.log('[Siddur] already loading, skip'); if(dbg2) dbg2.textContent += ' (כבר טוען)'; return; }
   siddurLoading = true;
 
   document.getElementById('siddur-title').textContent    = PRAYER_NAMES[siddurPrayer] || '';
