@@ -2706,49 +2706,47 @@ const SIDDUR_SECTIONS = {
     { label: 'קרבנות',           ref: 'Weekday_Siddur_Sefard_Linear,_The_Morning_Prayers,_Korbanos_(Sacrificial_Offerings)' },
     { label: 'הודו',             ref: 'Weekday_Siddur_Sefard_Linear,_The_Morning_Prayers,_Hodu' },
     { label: 'ברוך שאמר',        ref: "Weekday_Siddur_Sefard_Linear,_The_Morning_Prayers,_Baruch_She'amar" },
-    { label: 'מזמור לתודה',      ref: 'Weekday_Siddur_Sefard_Linear,_The_Morning_Prayers,_Mizmor_Lesodah' },
     { label: 'אשרי',             ref: 'Weekday_Siddur_Sefard_Linear,_The_Morning_Prayers,_Ashrei' },
     { label: 'שירת הים',         ref: 'Weekday_Siddur_Sefard_Linear,_The_Morning_Prayers,_Shiras_Hayam' },
     { label: 'ישתבח',            ref: 'Weekday_Siddur_Sefard_Linear,_The_Morning_Prayers,_Yishtabach' },
     { label: 'ברכות קריאת שמע',  ref: 'Weekday_Siddur_Sefard_Linear,_The_Morning_Prayers,_The_Blessings_of_Shema' },
     { label: 'קריאת שמע',        ref: 'Weekday_Siddur_Sefard_Linear,_The_Morning_Prayers,_Recitation_of_Shema' },
     { label: 'שמונה עשרה',       ref: 'Weekday_Siddur_Sefard_Linear,_The_Morning_Prayers,_Shemoneh_Esrei' },
-    // יעלה ויבוא – static, מופיע בר"ח וחוה"מ בתוך שמו"ע
     { label: 'יעלה ויבוא ✨',    ref: null, staticText: YAALEH_VEYAVO, isAddition: true, condition: 'isRoshChodeshOrMoed' },
-    { label: 'תחנון',            ref: 'Weekday_Siddur_Sefard_Linear,_The_Morning_Prayers,_Tachanun', isAddition: true, condition: 'noTachanun', conditionType: 'skip' },
-    // הלל – מתהילים 113–118, מופיע בר"ח, חנוכה, חוה"מ
+    { label: 'תחנון',            ref: 'Weekday_Siddur_Sefard_Linear,_The_Morning_Prayers,_Tachanun', condition: 'noTachanun', conditionType: 'skip' },
+    { label: 'אבינו מלכנו ✨',   ref: 'Weekday_Siddur_Sefard_Linear,_The_Morning_Prayers,_Avinu_Malkeinu', isAddition: true, condition: 'isAvinuMalkeinu' },
     { label: 'הלל ✨',           ref: null, isHallel: true, isAddition: true, condition: 'isHallelDay' },
-    // קריאת תורה – ב'/ה' ור"ח
     { label: 'קריאת התורה ✨',   ref: 'Weekday_Siddur_Sefard_Linear,_The_Morning_Prayers,_Reading_of_the_Torah', isAddition: true, condition: 'isTorahReadingDay' },
-    // מוסף – ר"ח וחוה"מ
     { label: 'מוסף ר"ח ✨',      ref: 'Weekday_Siddur_Sefard_Linear,_Musaf_for_Rosh_Chodesh', isAddition: true, condition: 'isRoshChodesh' },
-    { label: "מוסף חוה\"מ ✨",    ref: "Weekday_Siddur_Sefard_Linear,_Musaf_for_Chol_Hamo'ed", isAddition: true, condition: 'isCholHamoed' },
+    { label: 'מוסף חוה"מ ✨',     ref: "Weekday_Siddur_Sefard_Linear,_Musaf_for_Chol_Hamo'ed", isAddition: true, condition: 'isCholHamoed' },
     { label: 'אשרי / ובא לציון', ref: "Weekday_Siddur_Sefard_Linear,_The_Morning_Prayers,_Ashrei_U'va_L'Tzion" },
     { label: 'עלינו',            ref: 'Weekday_Siddur_Sefard_Linear,_The_Morning_Prayers,_Aleinu' },
     { label: 'קדיש יתום',        ref: "Weekday_Siddur_Sefard_Linear,_The_Morning_Prayers,_Mourner's_Kaddish" },
   ],
   mincha: [
-    { label: 'אשרי',             ref: 'Weekday_Siddur_Sefard_Linear,_The_Afternoon_Prayers,_Ashrei' },
+    { label: 'אשרי',             ref: 'Weekday_Siddur_Sefard_Linear,_Mincha,_Ashrei' },
     { label: 'קריאת התורה ✨',   ref: 'Weekday_Siddur_Sefard_Linear,_The_Morning_Prayers,_Reading_of_the_Torah', isAddition: true, condition: 'isTorahReadingDay' },
-    { label: 'שמונה עשרה',       ref: 'Weekday_Siddur_Sefard_Linear,_The_Afternoon_Prayers,_Shemoneh_Esrei' },
+    { label: 'שמונה עשרה',       ref: 'Weekday_Siddur_Sefard_Linear,_Mincha,_Shemoneh_Esrei' },
     { label: 'יעלה ויבוא ✨',    ref: null, staticText: YAALEH_VEYAVO, isAddition: true, condition: 'isRoshChodeshOrMoed' },
-    { label: 'תחנון',            ref: 'Weekday_Siddur_Sefard_Linear,_The_Afternoon_Prayers,_Tachanun', isAddition: true, condition: 'noTachanun', conditionType: 'skip' },
-    { label: 'עלינו',            ref: 'Weekday_Siddur_Sefard_Linear,_The_Afternoon_Prayers,_Aleinu' },
-    { label: 'קדיש יתום',        ref: "Weekday_Siddur_Sefard_Linear,_The_Afternoon_Prayers,_Mourner's_Kaddish" },
+    { label: 'תחנון',            ref: 'Weekday_Siddur_Sefard_Linear,_Mincha,_Tachanun', condition: 'noTachanun', conditionType: 'skip' },
+    { label: 'אבינו מלכנו ✨',   ref: 'Weekday_Siddur_Sefard_Linear,_The_Morning_Prayers,_Avinu_Malkeinu', isAddition: true, condition: 'isAvinuMalkeinu' },
+    { label: 'עלינו',            ref: 'Weekday_Siddur_Sefard_Linear,_Mincha,_Aleinu' },
+    { label: 'קדיש יתום',        ref: "Weekday_Siddur_Sefard_Linear,_Mincha,_Mourner's_Kaddish" },
   ],
   arvit: [
-    { label: 'ברכות קריאת שמע',  ref: 'Weekday_Siddur_Sefard_Linear,_The_Evening_Prayers,_The_Blessings_of_Shema' },
-    { label: 'קריאת שמע',        ref: 'Weekday_Siddur_Sefard_Linear,_The_Evening_Prayers,_Recitation_of_Shema' },
-    { label: 'שמונה עשרה',       ref: 'Weekday_Siddur_Sefard_Linear,_The_Evening_Prayers,_Shemoneh_Esrei' },
+    { label: 'ברכות קריאת שמע',  ref: 'Weekday_Siddur_Sefard_Linear,_Maariv,_Berachos_Preceding_Shema' },
+    { label: 'קריאת שמע',        ref: 'Weekday_Siddur_Sefard_Linear,_Maariv,_Shema' },
+    { label: 'שמונה עשרה',       ref: 'Weekday_Siddur_Sefard_Linear,_Maariv,_Shemoneh_Esrei' },
     { label: 'יעלה ויבוא ✨',    ref: null, staticText: YAALEH_VEYAVO, isAddition: true, condition: 'isRoshChodeshOrMoed' },
-    { label: 'עלינו',            ref: 'Weekday_Siddur_Sefard_Linear,_The_Evening_Prayers,_Aleinu' },
-    { label: 'קדיש יתום',        ref: "Weekday_Siddur_Sefard_Linear,_The_Evening_Prayers,_Mourner's_Kaddish" },
+    { label: 'עלינו',            ref: 'Weekday_Siddur_Sefard_Linear,_Maariv,_Aleinu' },
+    { label: 'קדיש יתום',        ref: "Weekday_Siddur_Sefard_Linear,_Maariv,_Mourner's_Kaddish" },
   ],
   birkat: [
-    { label: 'שיר המעלות',       ref: 'Weekday_Siddur_Sefard_Linear,_Grace_After_Meals,_Shir_Hamaalot' },
-    { label: 'ברכת המזון',       ref: 'Weekday_Siddur_Sefard_Linear,_Grace_After_Meals,_Birkas_Hamazon' },
-    { label: 'על הנסים – חנוכה ✨', ref: 'Weekday_Siddur_Sefard_Linear,_Grace_After_Meals,_Al_Hanissim_for_Chanukah', isAddition: true, condition: 'isChanuka' },
-    { label: 'על הנסים – פורים ✨', ref: 'Weekday_Siddur_Sefard_Linear,_Grace_After_Meals,_Al_Hanissim_for_Purim',   isAddition: true, condition: 'isPurim'  },
+    { label: 'שיר המעלות',       ref: 'Weekday_Siddur_Sefard_Linear,_Birkas_Hamazon,_Shir_Hamaalot' },
+    { label: 'ברכת המזון',       ref: 'Weekday_Siddur_Sefard_Linear,_Birkas_Hamazon,_Birkas_Hamazon_Text' },
+    { label: 'יעלה ויבוא ✨',    ref: null, staticText: YAALEH_VEYAVO, isAddition: true, condition: 'isRoshChodeshOrMoed' },
+    { label: 'על הנסים – חנוכה ✨', ref: 'Weekday_Siddur_Sefard_Linear,_Birkas_Hamazon,_Al_Hanissim_for_Chanukah', isAddition: true, condition: 'isChanuka' },
+    { label: 'על הנסים – פורים ✨', ref: 'Weekday_Siddur_Sefard_Linear,_Birkas_Hamazon,_Al_Hanissim_for_Purim',   isAddition: true, condition: 'isPurim' },
   ],
 };
 
@@ -2760,6 +2758,8 @@ const SIDDUR_CONDITIONS = {
   isRoshChodeshOrMoed: () => (window._siddurCal||{}).isRoshChodesh || (window._siddurCal||{}).isCholHamoed,
   isHallelDay:         () => (window._siddurCal||{}).isRoshChodesh || (window._siddurCal||{}).isChanuka || (window._siddurCal||{}).isCholHamoed,
   isTorahReadingDay:   () => { const d = new Date().getDay(); return d===1||d===4||(window._siddurCal||{}).isRoshChodesh; },
+  // אבינו מלכנו: עשרת ימי תשובה + תענית ציבור (מזוהה ע"י שאין תחנון אבל יש יום חול)
+  isAvinuMalkeinu:     () => (window._siddurCal||{}).isAvinuMalkeinu,
   isChanuka:           () => (window._siddurCal||{}).isChanuka,
   isPurim:             () => (window._siddurCal||{}).isPurim,
 };
@@ -2794,10 +2794,11 @@ function initSiddur() {
   // Calendar context for additions
   const todayEvents = appState._todayEventTitles || [];
   window._siddurCal = {
-    isRoshChodesh: todayEvents.some(t => /ראש חודש|Rosh Chodesh/i.test(t)),
-    isCholHamoed:  todayEvents.some(t => /חול המועד|Chol HaMoed/i.test(t)),
-    isChanuka:     todayEvents.some(t => /חנוכה|Chanukah/i.test(t)),
-    isPurim:       todayEvents.some(t => /פורים|Purim/i.test(t)),
+    isRoshChodesh:    todayEvents.some(t => /ראש חודש|Rosh Chodesh/i.test(t)),
+    isCholHamoed:     todayEvents.some(t => /חול המועד|Chol HaMoed/i.test(t)),
+    isChanuka:        todayEvents.some(t => /חנוכה|Chanukah/i.test(t)),
+    isPurim:          todayEvents.some(t => /פורים|Purim/i.test(t)),
+    isAvinuMalkeinu:  todayEvents.some(t => /תשובה|Aseret Yemei|Yom Kippur|תענית|Ta.anit|Fast/i.test(t)),
     get skipTachanun() { return this.isRoshChodesh || this.isCholHamoed || this.isChanuka || this.isPurim; },
   };
   console.log('[Siddur] _siddurCal=', JSON.stringify(window._siddurCal));
@@ -2866,9 +2867,25 @@ async function _fetchSectionHtml(s, style, yaalehOccasion) {
   const flat = heFlat(data).map(cleanSefariaHtml).filter(Boolean);
   if (!flat.length) return '<span style="color:var(--muted)">(אין טקסט זמין)</span>';
 
-  const html = `<div style="${style}">${flat.map(v => `<div style="margin-bottom:6px">${v}</div>`).join('')}</div>`;
+  // Group into paragraphs: consecutive non-empty lines → one paragraph
+  // This avoids 2-3 word lines and gives natural reading flow
+  const paragraphs = [];
+  let current = [];
+  for (const v of flat) {
+    const clean = v.replace(/<[^>]+>/g,'').trim();
+    if (!clean) {
+      if (current.length) { paragraphs.push(current.join(' ')); current = []; }
+    } else {
+      current.push(v);
+    }
+  }
+  if (current.length) paragraphs.push(current.join(' '));
+
+  const html = `<div style="${style}">${
+    paragraphs.map(p => `<p style="margin:0 0 12px 0;line-height:1.9">${p}</p>`).join('')
+  }</div>`;
   _putCache(s.ref, html);
-  console.log('[Siddur] fetched & cached:', s.label, flat.length, 'lines');
+  console.log('[Siddur] fetched & cached:', s.label, paragraphs.length, 'paragraphs');
   return html;
 }
 
@@ -2924,7 +2941,7 @@ async function loadSiddur() {
   el.innerHTML = sections.map(s => {
     const id = s.label.replace(/\s/g,'_');
     const cached = !s.staticText && !s.isHallel && _getCache(s.ref);
-    return `<div id="ss-${id}" style="margin-bottom:20px">
+    return `<div id="ss-${id}" style="margin-bottom:4px">
       <div style="font-size:11px;font-weight:700;color:${s.isAddition?'var(--gold)':'var(--gold-dim)'};
         margin-bottom:6px;padding:4px 0;border-bottom:1px solid var(--border)">${s.label}</div>
       <div id="sc-${id}" style="color:var(--muted);font-size:12px">${cached ? '⏳ מה-cache...' : 'טוען...'}</div>
