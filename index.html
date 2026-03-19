@@ -2776,6 +2776,14 @@ function setSiddurPrayer(p) {
   loadSiddur();
 }
 
+function shouldShowSection(s) {
+  if (!s.condition) return true;
+  const fn = SIDDUR_CONDITIONS[s.condition];
+  if (!fn) return true;
+  const result = fn();
+  return s.conditionType === 'skip' ? !result : result;
+}
+
 function initSiddur() {
   const dbg = document.getElementById('siddur-debug');
   if (dbg) dbg.textContent = '🔄 initSiddur נקרא... ' + new Date().toLocaleTimeString();
