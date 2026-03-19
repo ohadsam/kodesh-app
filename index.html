@@ -1317,8 +1317,24 @@ async function sefariaText(ref, delay = 350) {
 // Helper: flatten data.he from sefariaText result
 function heFlat(data) {
   const t = data?.he || [];
-  const flat = Array.isArray(t[0]) ? t.flat() : t;
+  const flat = Array.isArray(t[0]) ? t.flat(Infinity) : t;
   return flat.filter(Boolean);
+}
+
+// Clean Sefaria HTML: keep <b>/<i> for bold/italic, strip the rest
+// Also decode common HTML entities that Sefaria uses
+function cleanSefariaHtml(str) {
+  if (!str) return '';
+  return str
+    // Decode common entities
+    .replace(/&thinsp;/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    // Keep bold/italic but strip other tags
+    .replace(/<(?!\/?(?:b|i|strong|em))[^>]+>/gi, '')
+    .trim();
 }
 
 // ═══════════════════════════════════════════
@@ -2810,7 +2826,7 @@ async function _fetchSectionHtml(s, style, yaalehOccasion) {
       let psHtml = _getCache(psRef);
       if (!psHtml) {
         const pData = await sefariaText(psRef, 100);
-        const flat  = heFlat(pData);
+        const flat  = heFlat(pData).map(cleanSefariaHtml).filter(Boolean);
         const psNum = psRef.split('.')[1];
         psHtml = `<div style="font-size:11px;font-weight:700;color:var(--gold-dim);margin:12px 0 4px">תהילים פרק ${psNum}</div>`
                + flat.map(v => `<div style="margin-bottom:3px">${v}</div>`).join('');
@@ -2829,10 +2845,10 @@ async function _fetchSectionHtml(s, style, yaalehOccasion) {
   }
 
   const data = await sefariaText(s.ref, 0);
-  const flat = heFlat(data);
+  const flat = heFlat(data).map(cleanSefariaHtml).filter(Boolean);
   if (!flat.length) return '<span style="color:var(--muted)">(אין טקסט זמין)</span>';
 
-  const html = `<div style="${style}">${flat.map(v => `<div style="margin-bottom:4px">${v}</div>`).join('')}</div>`;
+  const html = `<div style="${style}">${flat.map(v => `<div style="margin-bottom:6px">${v}</div>`).join('')}</div>`;
   _putCache(s.ref, html);
   console.log('[Siddur] fetched & cached:', s.label, flat.length, 'lines');
   return html;
