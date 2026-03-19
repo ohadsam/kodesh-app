@@ -2861,6 +2861,7 @@ async function loadSiddur() {
   }
   if (progressWrap) progressWrap.style.display = 'block';
   setProgress(0, sections[0]?.label || 'מכין...');
+  try {
 
   // ── Section jump buttons ──────────────────
   const secNav = document.getElementById('siddur-sections');
@@ -2938,8 +2939,20 @@ async function loadSiddur() {
 
   setProgress(total, '');
   updateDoneButton('siddur', siddurPrayer);
-  siddurLoading = false;
-  console.log('[Siddur] done:', siddurPrayer, '| cache:', Object.keys(_siddurCache).length);
+  } catch(outerErr) {
+    console.error('[Siddur] fatal error:', outerErr);
+    const el2 = document.getElementById('siddur-content');
+    if (el2) el2.innerHTML = `<div style="color:var(--muted);padding:20px;text-align:center">
+      ⚠️ שגיאה בטעינת הסידור<br>
+      <small style="font-size:11px">${outerErr.message}</small><br><br>
+      <button onclick="loaded['siddur']=false;initSiddur()" 
+        style="padding:8px 16px;border-radius:8px;border:1px solid var(--gold);background:transparent;color:var(--gold);cursor:pointer">
+        נסה שוב
+      </button></div>`;
+  } finally {
+    siddurLoading = false;
+    console.log('[Siddur] done:', siddurPrayer, '| cache:', Object.keys(_siddurCache).length);
+  }
 }
 
 function _sectionStyle(s) {
