@@ -1294,7 +1294,9 @@ function extractHeText(data) {
 // ─── Sefaria v2 fetch – the ONLY function that calls Sefaria texts ───
 async function sefariaText(ref, delay = 350) {
   await new Promise(r => setTimeout(r, delay));
-  const url = `https://www.sefaria.org/api/texts/${encodeURIComponent(ref)}?lang=he&commentary=0&context=0`;
+  // encodeURI preserves commas (needed for siddur refs like "Weekday_Siddur...,_Section")
+  // encodeURIComponent would break them by encoding commas as %2C
+  const url = `https://www.sefaria.org/api/texts/${encodeURI(ref)}?lang=he&commentary=0&context=0`;
   console.log(`[Sefaria] GET ${url}`);
   const resp = await fetch(url);
   console.log(`[Sefaria] ${resp.status} for "${ref}"`);
@@ -2855,9 +2857,10 @@ async function loadSiddur() {
     const pct = total ? Math.round((done / total) * 100) : 0;
     if (progressBar)  progressBar.style.width = pct + '%';
     if (progressLbl)  progressLbl.textContent = label || '';
-    if (progressWrap) progressWrap.style.display = done >= total ? 'none' : 'block';
+    if (progressWrap) progressWrap.style.display = (done >= total) ? 'none' : 'block';
   }
-  setProgress(0, 'מכין...');
+  if (progressWrap) progressWrap.style.display = 'block';
+  setProgress(0, sections[0]?.label || 'מכין...');
 
   // ── Section jump buttons ──────────────────
   const secNav = document.getElementById('siddur-sections');
