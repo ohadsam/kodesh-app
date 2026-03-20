@@ -355,11 +355,17 @@
       backdrop-filter: blur(14px);
       border-top: 1px solid var(--border);
       display: flex;
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
       padding-bottom: env(safe-area-inset-bottom, 0);
     }
+    #bottom-nav::-webkit-scrollbar { display: none; }
     .bnav-btn {
-      flex: 1; border: none; background: none; cursor: pointer;
-      padding: 10px 4px;
+      flex: 0 0 auto; border: none; background: none; cursor: pointer;
+      padding: 10px 10px;
+      min-width: 56px;
       display: flex; flex-direction: column; align-items: center; gap: 3px;
       color: var(--muted); font-size: 10px; font-family: 'Heebo', sans-serif;
       transition: color .2s;
@@ -528,9 +534,21 @@
         <label>סוף זמן ק"ש</label>
         <label class="toggle"><input type="checkbox" id="tog-shema-auto" onchange="toggleZmanimReminder('shema', this.checked)" /><span class="toggle-slider"></span></label>
       </div>
-      <div class="settings-row" style="border-bottom:none">
+      <div class="settings-row">
         <label>סוף זמן תפילה</label>
         <label class="toggle"><input type="checkbox" id="tog-tefila-auto" onchange="toggleZmanimReminder('tefila', this.checked)" /><span class="toggle-slider"></span></label>
+      </div>
+      <div class="settings-row">
+        <label>חצות היום</label>
+        <label class="toggle"><input type="checkbox" id="tog-noon-auto" onchange="toggleZmanimReminder('noon', this.checked)" /><span class="toggle-slider"></span></label>
+      </div>
+      <div class="settings-row">
+        <label>שקיעה</label>
+        <label class="toggle"><input type="checkbox" id="tog-sunset-auto" onchange="toggleZmanimReminder('sunset', this.checked)" /><span class="toggle-slider"></span></label>
+      </div>
+      <div class="settings-row" style="border-bottom:none">
+        <label>צאת הכוכבים</label>
+        <label class="toggle"><input type="checkbox" id="tog-tzeit-auto" onchange="toggleZmanimReminder('tzeit', this.checked)" /><span class="toggle-slider"></span></label>
       </div>
     </div>
   </div>
@@ -3057,13 +3075,10 @@ async function loadSiddur() {
   el.innerHTML = sections.map(s => {
     const id = s.label.replace(/\s/g,'_');
     const cached = !s.staticText && !s.isHallel && _getCache(s.ref);
-    return `<div id="ss-${id}" style="margin-bottom:0">
-      <div style="font-size:11px;font-weight:700;color:${s.isAddition?'var(--gold)':'var(--gold-dim)'};
-        margin-bottom:6px;padding:4px 0;border-bottom:1px solid var(--border)">${s.label}</div>
+    return `<div id="ss-${id}" style="margin-bottom:2px;padding-bottom:4px;border-bottom:1px solid var(--border)">
+      <div style="font-size:10px;font-weight:700;color:${s.isAddition?'var(--gold)':'var(--gold-dim)'};
+        margin-bottom:3px;padding-top:6px">${s.label}</div>
       <div id="sc-${id}" style="color:var(--muted);font-size:12px">${cached ? '⏳ מה-cache...' : 'טוען...'}</div>
-      <div style="text-align:left;margin-top:8px;padding-top:6px;border-top:1px solid var(--border)">
-        <a href="#siddur-top" style="font-size:11px;color:var(--muted);text-decoration:none">↑ חזור לניווט</a>
-      </div>
     </div>`;
   }).join('');
 
@@ -3213,21 +3228,47 @@ function _doScheduleZmanimReminders() {
     }
   }
 
-  // sof zman tefila: use the later of GRA and MGA
+  // sof zman tefila
   if (rem.tefila) {
     const times = [z.sofZmanTfilla, z.sofZmanTfillaMGA].filter(Boolean).map(t => new Date(t).getTime());
     const latest = Math.max(...times);
     const fireAt = latest - ADVANCE_MS;
     if (fireAt > now) {
       const delay = fireAt - now;
-      console.log('[ZmanimRem] tefila reminder in', Math.round(delay/60000), 'min');
-      setTimeout(() => {
-        new Notification('⏰ לימוד יומי', {
-          body: 'עוד 15 דקות לסוף זמן תפילה!',
-          icon: 'icons/icon-192.png',
-          tag: 'tefila-reminder',
-        });
-      }, delay);
+      setTimeout(() => new Notification('⏰ לימוד יומי', {
+        body: 'עוד 15 דקות לסוף זמן תפילה!',
+        icon: 'icons/icon-192.png', tag: 'tefila-reminder',
+      }), delay);
+    }
+  }
+
+  // חצות היום
+  if (rem.noon && z.chatzot) {
+    const fireAt = new Date(z.chatzot).getTime() - ADVANCE_MS;
+    if (fireAt > now) setTimeout(() => new Notification('⏰ לימוד יומי', {
+      body: 'עוד 15 דקות לחצות היום!',
+      icon: 'icons/icon-192.png', tag: 'noon-reminder',
+    }), fireAt - now);
+  }
+
+  // שקיעה
+  if (rem.sunset && z.sunset) {
+    const fireAt = new Date(z.sunset).getTime() - ADVANCE_MS;
+    if (fireAt > now) setTimeout(() => new Notification('⏰ לימוד יומי', {
+      body: 'עוד 15 דקות לשקיעת החמה!',
+      icon: 'icons/icon-192.png', tag: 'sunset-reminder',
+    }), fireAt - now);
+  }
+
+  // צאת הכוכבים
+  if (rem.tzeit) {
+    const tzeitTime = z.tzeit7083deg || z.tzeit85deg;
+    if (tzeitTime) {
+      const fireAt = new Date(tzeitTime).getTime() - ADVANCE_MS;
+      if (fireAt > now) setTimeout(() => new Notification('⏰ לימוד יומי', {
+        body: 'עוד 15 דקות לצאת הכוכבים!',
+        icon: 'icons/icon-192.png', tag: 'tzeit-reminder',
+      }), fireAt - now);
     }
   }
 }
@@ -3378,10 +3419,11 @@ function startCompassListener() {
       h = e.webkitCompassHeading;
 
     } else if (e.absolute === true && typeof e.alpha === 'number') {
-      // Android – alpha is clockwise from north when phone is flat
-      // Simple conversion: heading = 360 - alpha
-      h = (360 - e.alpha) % 360;
-      console.log('[Compass] alpha→heading:', e.alpha.toFixed(1), '→', h.toFixed(1));
+      // Android – alpha IS the compass bearing when phone is flat (horizontal)
+      // alpha=0 means top of phone points north; increases clockwise
+      // heading = alpha directly (no tilt compensation needed for horizontal use)
+      h = e.alpha % 360;
+      console.log('[Compass] horizontal alpha→heading:', h.toFixed(1));
     } else {
       return;
     }
