@@ -552,6 +552,13 @@
       </div>
     </div>
   </div>
+
+  <!-- Version & Copyright -->
+  <div style="text-align:center;padding:18px 0 8px;border-top:1px solid var(--border);margin-top:8px">
+    <div style="font-size:13px;font-weight:600;color:var(--gold-dim);margin-bottom:4px">📖 לימוד יומי</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 2.5</div>
+    <div style="font-size:11px;color:var(--muted)">© כל הזכויות שמורות לאוהד סמט</div>
+  </div>
 </div>
 
 <!-- TOP BAR -->
@@ -631,6 +638,7 @@
     </div>
     <div class="zmanim-grid" id="zmanim-grid">
       <div class="zman-item"><div class="label">עולה השחר</div><div class="time" id="z-alot">--:--</div></div>
+      <div class="zman-item"><div class="label">משיכיר</div><div class="time" id="z-misheyakir">--:--</div></div>
       <div class="zman-item"><div class="label">הנץ החמה</div><div class="time" id="z-sunrise">--:--</div></div>
       <div class="zman-item zman-highlight"><div class="label">סוף ק"ש גר"א</div><div class="time" id="z-shema-gra">--:--</div></div>
       <div class="zman-item zman-highlight"><div class="label">סוף ק"ש מג"א</div><div class="time" id="z-shema-mga">--:--</div></div>
@@ -638,6 +646,8 @@
       <div class="zman-item zman-highlight"><div class="label">סוף תפילה מג"א</div><div class="time" id="z-tefila-mga">--:--</div></div>
       <div class="zman-item"><div class="label">חצות היום</div><div class="time" id="z-noon">--:--</div></div>
       <div class="zman-item"><div class="label">מנחה גדולה</div><div class="time" id="z-mincha">--:--</div></div>
+      <div class="zman-item"><div class="label">מנחה קטנה</div><div class="time" id="z-mincha-ketana">--:--</div></div>
+      <div class="zman-item"><div class="label">פלג המנחה</div><div class="time" id="z-plag">--:--</div></div>
       <div class="zman-item"><div class="label">שקיעה</div><div class="time" id="z-sunset">--:--</div></div>
       <div class="zman-item"><div class="label">צאת הכוכבים</div><div class="time" id="z-tzeit">--:--</div></div>
       <div class="zman-item"><div class="label">הדלקת נרות</div><div class="time" id="z-candles">--:--</div></div>
@@ -1873,8 +1883,9 @@ async function loadZmanim(ds) {
       if (!iso) return '--:--';
       return new Date(iso).toLocaleTimeString('he-IL', {hour:'2-digit',minute:'2-digit',hour12:false});
     }
-    document.getElementById('z-alot').textContent       = fmtT(z.alotHaShachar);
-    document.getElementById('z-sunrise').textContent    = fmtT(z.sunrise);
+    document.getElementById('z-alot').textContent        = fmtT(z.alotHaShachar);
+    document.getElementById('z-misheyakir').textContent  = fmtT(z.misheyakir);
+    document.getElementById('z-sunrise').textContent     = fmtT(z.sunrise);
     // Exact Hebcal API field names (verified from official docs):
     // sofZmanShma = GRA, sofZmanShmaMGA = MGA
     // sofZmanTfilla = GRA, sofZmanTfillaMGA = MGA
@@ -1883,17 +1894,21 @@ async function loadZmanim(ds) {
     document.getElementById('z-tefila-gra').textContent = fmtT(z.sofZmanTfilla);
     document.getElementById('z-tefila-mga').textContent = fmtT(z.sofZmanTfillaMGA);
     document.getElementById('z-noon').textContent       = fmtT(z.chatzot);
-    document.getElementById('z-mincha').textContent     = fmtT(z.minchaGedola);
+    document.getElementById('z-mincha').textContent         = fmtT(z.minchaGedola);
+    document.getElementById('z-mincha-ketana').textContent   = fmtT(z.minchaKetana);
+    document.getElementById('z-plag').textContent            = fmtT(z.plagHaMincha);
     document.getElementById('z-sunset').textContent     = fmtT(z.sunset);
-    document.getElementById('z-tzeit').textContent      = fmtT(z.tzeit7083deg || z.tzeit85deg);
+    // צאת הכוכבים: 42 דקות אחרי שקיעה (מינהג ישראל) = tzeit42min
+    // fallback: 7.083° (גאונים) ואז 8.5°
+    document.getElementById('z-tzeit').textContent      = fmtT(z.tzeit42min || z.tzeit7083deg || z.tzeit85deg);
     console.log('[Zmanim] GRA shema:', z.sofZmanShma, '| GRA tfilla:', z.sofZmanTfilla, '| all keys:', Object.keys(z).join(','));
     // Cache for auto-reminders
-    appState._lastZmanim = z;
+    appState._lastZmanim = z;  // includes tzeit42min, tzeit7083deg, tzeit85deg, sunset, chatzot
     saveState();
     scheduleZmanimRemindersForToday();
     // candle lighting
     const evData = await fetchWithDelay(
-      `https://www.hebcal.com/hebcal?v=1&cfg=json&maj=on&min=on&nx=on&start=${ds}&end=${ds}&c=on&geo=pos&latitude=${userLat.toFixed(6)}&longitude=${userLon.toFixed(6)}&elevation=${elev}&tzid=Asia/Jerusalem&i=1`, 400
+      `https://www.hebcal.com/hebcal?v=1&cfg=json&maj=on&min=on&nx=on&start=${ds}&end=${ds}&c=on&geo=pos&latitude=${userLat.toFixed(6)}&longitude=${userLon.toFixed(6)}&elevation=${elev}&tzid=Asia/Jerusalem&i=1&b=18&m=42`, 400
     );
     const candles  = (evData?.items || []).find(e => e.category === 'candles');
     const havdalah = (evData?.items || []).find(e => e.category === 'havdalah');
@@ -3262,7 +3277,7 @@ function _doScheduleZmanimReminders() {
 
   // צאת הכוכבים
   if (rem.tzeit) {
-    const tzeitTime = z.tzeit7083deg || z.tzeit85deg;
+    const tzeitTime = z.tzeit42min || z.tzeit7083deg || z.tzeit85deg;
     if (tzeitTime) {
       const fireAt = new Date(tzeitTime).getTime() - ADVANCE_MS;
       if (fireAt > now) setTimeout(() => new Notification('⏰ לימוד יומי', {
@@ -3298,8 +3313,8 @@ function toggleDone(section, key) {
 // Pointing to the Western Wall (Kotel), Jerusalem
 // Coordinates: 31.7767°N, 35.2345°E
 // ═══════════════════════════════════════════
-const JERUSALEM_LAT = 31.7767 * Math.PI / 180;  // Kotel / Western Wall
-const JERUSALEM_LON = 35.2345 * Math.PI / 180;
+const JERUSALEM_LAT = 31.77668 * Math.PI / 180;  // Kotel exact: 31°46'36.04″N
+const JERUSALEM_LON = 35.23444 * Math.PI / 180;  // Kotel exact: 35°14'4″E
 
 let qiblaAngle      = null;
 let deviceHeading   = null;
@@ -3404,26 +3419,40 @@ function startCompassListener() {
   }
   if (window._aoSensor) { try { window._aoSensor.stop(); } catch(e){} window._aoSensor = null; }
 
-  // ── Simple horizontal-only compass ──
-  // Uses alpha directly = azimuth of device top relative to magnetic north
-  // Works correctly when phone is held flat (horizontal)
-  // iOS: webkitCompassHeading is already correct
-  // Android: alpha from deviceorientationabsolute is the azimuth
-
   compassListener = (e) => {
     let h = null;
     deviceBeta = e.beta;
 
+    // ── iOS: webkitCompassHeading is tilt-compensated by the OS ──
     if (typeof e.webkitCompassHeading === 'number' && e.webkitCompassHeading >= 0) {
-      // iOS – OS provides tilt-compensated heading directly
       h = e.webkitCompassHeading;
+      console.log('[Compass] iOS webkit:', h.toFixed(1));
 
+    // ── Android: deviceorientationabsolute with correct tilt-compensation ──
     } else if (e.absolute === true && typeof e.alpha === 'number') {
-      // Android – alpha IS the compass bearing when phone is flat (horizontal)
-      // alpha=0 means top of phone points north; increases clockwise
-      // heading = alpha directly (no tilt compensation needed for horizontal use)
-      h = e.alpha % 360;
-      console.log('[Compass] horizontal alpha→heading:', h.toFixed(1));
+      // DeviceOrientation coordinate system:
+      //   alpha: rotation around Z (screen normal), 0=north, CW positive
+      //   beta:  rotation around X (left-right axis), -180..180
+      //          0=flat face-up, 90=upright portrait, 180/-180=flat face-down
+      //   gamma: rotation around Y (top-bottom axis), -90..90
+      //          0=flat, positive=right side up
+
+      const a = e.alpha * Math.PI / 180;
+      const b = e.beta  * Math.PI / 180;
+      const g = e.gamma * Math.PI / 180;
+
+      // Compute the direction of magnetic north in the device frame,
+      // then project onto the horizontal plane to get compass heading.
+      // This is the standard W3C tilt-compensated formula:
+      //   Bx = cos(alpha)*cos(gamma) + sin(alpha)*sin(beta)*sin(gamma)
+      //   By = sin(alpha)*cos(gamma) - cos(alpha)*sin(beta)*sin(gamma)
+      //   heading = atan2(-By, Bx) converted to 0-360
+      const Bx =  Math.cos(a) * Math.cos(g) + Math.sin(a) * Math.sin(b) * Math.sin(g);
+      const By =  Math.sin(a) * Math.cos(g) - Math.cos(a) * Math.sin(b) * Math.sin(g);
+
+      h = (Math.atan2(-By, Bx) * 180 / Math.PI + 360) % 360;
+      console.log('[Compass] tilt-comp: α', e.alpha.toFixed(1),
+        'β', (e.beta||0).toFixed(1), 'γ', (e.gamma||0).toFixed(1), '→', h.toFixed(1));
     } else {
       return;
     }
@@ -3433,12 +3462,11 @@ function startCompassListener() {
 
   window.addEventListener('deviceorientationabsolute', compassListener, true);
   window.addEventListener('deviceorientation',         compassListener, true);
-  setQiblaStatus('🧭 מצפן פעיל – החזק את הטלפון שטוח');
-  console.log('[Compass] horizontal-only listener started');
+  setQiblaStatus('🧭 מצפן פעיל');
+  console.log('[Compass] tilt-compensated listener started');
 }
 
 function _startDeviceOrientationFallback() {
-  // alias – not used anymore but kept for compatibility
   startCompassListener();
 }
 
