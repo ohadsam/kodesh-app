@@ -644,6 +644,15 @@
 
 <!-- ─── PAGE: SIDDUR ──────────────────────── -->
 <div class="page" id="page-siddur">
+  <!-- Floating back-to-nav button -->
+  <button id="siddur-float-btn" onclick="document.getElementById('siddur-top').scrollIntoView({behavior:'smooth'})"
+    style="display:none;position:fixed;bottom:76px;left:12px;z-index:999;
+    width:38px;height:38px;border-radius:50%;border:1px solid var(--gold-dim);
+    background:rgba(20,20,40,0.92);color:var(--gold);font-size:16px;cursor:pointer;
+    box-shadow:0 2px 8px rgba(0,0,0,.5);backdrop-filter:blur(4px);
+    display:flex;align-items:center;justify-content:center" title="חזור לניווט">
+    ☰
+  </button>
 
   <!-- Nusach selector -->
   <div class="card" style="padding:12px 14px;margin-bottom:10px">
@@ -1328,16 +1337,45 @@ function heFlat(data) {
 function cleanSefariaHtml(str) {
   if (!str) return '';
   return str
-    // Decode common entities
-    .replace(/&thinsp;/g, ' ')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    // Keep bold/italic but strip other tags
-    .replace(/<(?!\/?(?:b|i|strong|em))[^>]+>/gi, '')
+    .replace(/&thinsp;/g, '\u2009').replace(/&nbsp;/g, '\u00a0')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&mdash;/g, '\u2014').replace(/&ndash;/g, '\u2013')
+    .replace(/<small[^>]*>(.*?)<\/small>/gi, '<span style="font-size:0.8em;color:var(--gold-dim)">$1</span>')
+    .replace(/<br\s*\/?>/gi, '\u2028')
+    .replace(/<(?!\/?(?:b|i|strong|em|span)\b)[^>]+>/gi, '')
     .trim();
 }
+
+function buildParagraphs(flat) {
+  const paragraphs = [];
+  let current = [];
+  for (const v of flat) {
+    const plain = v.replace(/<[^>]+>/g,'').trim();
+    if (v.includes('\u2028')) {
+      v.split('\u2028').forEach((p, pi, arr) => {
+        const t = p.trim();
+        if (t) current.push(t);
+        if (pi < arr.length - 1 && current.length) {
+          paragraphs.push(current.join(' ')); current = [];
+        }
+      });
+      continue;
+    }
+    if (!plain) {
+      if (current.length) { paragraphs.push(current.join(' ')); current = []; }
+      continue;
+    }
+    if (v.includes('gold-dim')) {
+      if (current.length) { paragraphs.push(current.join(' ')); current = []; }
+      paragraphs.push(v);
+      continue;
+    }
+    current.push(v);
+  }
+  if (current.length) paragraphs.push(current.join(' '));
+  return paragraphs;
+}
+
 
 // ═══════════════════════════════════════════
 // TABS
@@ -2798,7 +2836,7 @@ const SIDDUR_CONDITIONS = {
   isCholHamoed:        () => (window._siddurCal||{}).isCholHamoed,
   isRoshChodeshOrMoed: () => (window._siddurCal||{}).isRoshChodesh || (window._siddurCal||{}).isCholHamoed,
   isHallelDay:         () => (window._siddurCal||{}).isRoshChodesh || (window._siddurCal||{}).isChanuka || (window._siddurCal||{}).isCholHamoed,
-  isTorahReadingDay:   () => { const d = new Date().getDay(); return d===1||d===4||(window._siddurCal||{}).isRoshChodesh; },
+  isTorahReadingDay:   () => (window._siddurCal||{}).isTorahReading || (window._siddurCal||{}).isRoshChodesh,
   isAvinuMalkeinu:     () => (window._siddurCal||{}).isAvinuMalkeinu,
   isOmer:              () => (window._siddurCal||{}).isOmer,
   isChanuka:           () => (window._siddurCal||{}).isChanuka,
@@ -2834,18 +2872,36 @@ function initSiddur() {
   console.log('[Siddur] initSiddur called, siddurLoading=', siddurLoading);
   // Calendar context for additions
   const todayEvents = appState._todayEventTitles || [];
+  const dow = new Date().getDay(); // 0=Sun,1=Mon,...,6=Sat
   window._siddurCal = {
+    // ── ימים מיוחדים מ-Hebcal events ──
     isRoshChodesh:    todayEvents.some(t => /ראש חודש|Rosh Chodesh/i.test(t)),
     isCholHamoed:     todayEvents.some(t => /חול המועד|Chol HaMoed/i.test(t)),
     isChanuka:        todayEvents.some(t => /חנוכה|Chanukah/i.test(t)),
     isPurim:          todayEvents.some(t => /פורים|Purim/i.test(t)),
-    isAvinuMalkeinu:  todayEvents.some(t => /תשובה|Aseret Yemei|Yom Kippur|תענית|Ta.anit|Fast/i.test(t)),
     isOmer:           todayEvents.some(t => /עומר|Omer/i.test(t)),
-    get skipTachanun() { return this.isRoshChodesh || this.isCholHamoed || this.isChanuka || this.isPurim; },
+    // אבינו מלכנו: י' ימי תשובה, תעניות ציבור
+    isAvinuMalkeinu:  todayEvents.some(t => /תשובה|Aseret Yemei|Yom Kippur|תענית|Ta.anit|Fast|ניסן/i.test(t)),
+    // ── ימי שבוע ──
+    isTorahReading:   dow === 1 || dow === 4, // ב' וה'
+    isSunday:         dow === 0,
+    isShabbat:        dow === 6,
+    // ── computed ──
+    get skipTachanun() {
+      return this.isRoshChodesh || this.isCholHamoed || this.isChanuka ||
+             this.isPurim || this.isSunday || this.isShabbat ||
+             todayEvents.some(t => /יום טוב|Yom Tov|Holiday/i.test(t));
+    },
   };
+  console.log('[Siddur] cal:', JSON.stringify({
+    rc: window._siddurCal.isRoshChodesh, moed: window._siddurCal.isCholHamoed,
+    chanuka: window._siddurCal.isChanuka, purim: window._siddurCal.isPurim,
+    omer: window._siddurCal.isOmer, dow, skipTachanun: window._siddurCal.skipTachanun
+  }));
   console.log('[Siddur] _siddurCal=', JSON.stringify(window._siddurCal));
   // Reset loading flag to allow fresh load each time tab is opened
   siddurLoading = false;
+  initSiddurFloatBtn();
   // Restore saved nusach
   if (appState.siddurNusach) {
     siddurNusach = appState.siddurNusach;
@@ -2909,22 +2965,9 @@ async function _fetchSectionHtml(s, style, yaalehOccasion) {
   const flat = heFlat(data).map(cleanSefariaHtml).filter(Boolean);
   if (!flat.length) return '<span style="color:var(--muted)">(אין טקסט זמין)</span>';
 
-  // Group into paragraphs: consecutive non-empty lines → one paragraph
-  // This avoids 2-3 word lines and gives natural reading flow
-  const paragraphs = [];
-  let current = [];
-  for (const v of flat) {
-    const clean = v.replace(/<[^>]+>/g,'').trim();
-    if (!clean) {
-      if (current.length) { paragraphs.push(current.join(' ')); current = []; }
-    } else {
-      current.push(v);
-    }
-  }
-  if (current.length) paragraphs.push(current.join(' '));
-
+  const paragraphs = buildParagraphs(flat);
   const html = `<div style="${style}">${
-    paragraphs.map(p => `<p style="margin:0 0 12px 0;line-height:1.9">${p}</p>`).join('')
+    paragraphs.map(p => `<p style="margin:0 0 8px 0;line-height:1.85">${p}</p>`).join('')
   }</div>`;
   _putCache(s.ref, html);
   console.log('[Siddur] fetched & cached:', s.label, paragraphs.length, 'paragraphs');
@@ -2983,7 +3026,7 @@ async function loadSiddur() {
   el.innerHTML = sections.map(s => {
     const id = s.label.replace(/\s/g,'_');
     const cached = !s.staticText && !s.isHallel && _getCache(s.ref);
-    return `<div id="ss-${id}" style="margin-bottom:4px">
+    return `<div id="ss-${id}" style="margin-bottom:0">
       <div style="font-size:11px;font-weight:700;color:${s.isAddition?'var(--gold)':'var(--gold-dim)'};
         margin-bottom:6px;padding:4px 0;border-bottom:1px solid var(--border)">${s.label}</div>
       <div id="sc-${id}" style="color:var(--muted);font-size:12px">${cached ? '⏳ מה-cache...' : 'טוען...'}</div>
@@ -3063,6 +3106,22 @@ async function loadSiddur() {
 function _sectionStyle(s) {
   return `font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);line-height:1.9;` +
          `color:${s.isAddition ? 'var(--gold)' : 'var(--cream)'}`;
+}
+
+// Show/hide floating nav button based on scroll position
+function initSiddurFloatBtn() {
+  const btn = document.getElementById('siddur-float-btn');
+  const page = document.getElementById('page-siddur');
+  if (!btn || !page) return;
+  btn.style.display = 'flex';
+  // Show after scrolling past 150px
+  page.addEventListener('scroll', () => {
+    btn.style.opacity = page.scrollTop > 150 ? '1' : '0';
+    btn.style.pointerEvents = page.scrollTop > 150 ? 'auto' : 'none';
+  }, { passive: true });
+  btn.style.opacity = '0';
+  btn.style.transition = 'opacity 0.2s';
+  btn.style.pointerEvents = 'none';
 }
 
 function storeTodayEventsForSiddur(items) {
