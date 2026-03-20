@@ -646,11 +646,12 @@
 <div class="page" id="page-siddur">
   <!-- Floating back-to-nav button -->
   <button id="siddur-float-btn" onclick="document.getElementById('siddur-top').scrollIntoView({behavior:'smooth'})"
-    style="display:none;position:fixed;bottom:76px;left:12px;z-index:999;
-    width:38px;height:38px;border-radius:50%;border:1px solid var(--gold-dim);
-    background:rgba(20,20,40,0.92);color:var(--gold);font-size:16px;cursor:pointer;
-    box-shadow:0 2px 8px rgba(0,0,0,.5);backdrop-filter:blur(4px);
-    display:flex;align-items:center;justify-content:center" title="חזור לניווט">
+    style="position:fixed;bottom:76px;left:12px;z-index:9999;
+    width:40px;height:40px;border-radius:50%;border:1px solid var(--gold-dim);
+    background:rgba(20,20,40,0.95);color:var(--gold);font-size:18px;cursor:pointer;
+    box-shadow:0 2px 10px rgba(0,0,0,.6);backdrop-filter:blur(4px);
+    display:flex;align-items:center;justify-content:center;
+    opacity:0;transition:opacity 0.25s;pointer-events:none" title="חזור לניווט">
     ☰
   </button>
 
@@ -1130,6 +1131,9 @@
   ">
     💡 לכיול המצפן: הזז את הטלפון בתנועת ∞ (שמונה שוכב) מספר פעמים
   </div>
+  <div style="text-align:center;color:var(--muted);font-size:11px;padding:12px 0 4px">
+    גרסה 2.4 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
+  </div>
 </div>
 
 <!-- ─── PAGE: LOGS ────────────────────────── -->
@@ -1347,32 +1351,59 @@ function cleanSefariaHtml(str) {
 }
 
 function buildParagraphs(flat) {
+  // Keywords that force a paragraph break BEFORE them
+  const BREAK_BEFORE = [
+    /^בָּרוּךְ אַתָּה/,       // ברכה
+    /^לְשֵׁם יִחוּד/,         // לשם יחוד
+    /^יְהִי רָצוֹן/,          // יהי רצון
+    /^אָמֵן/,                 // אמן (אחרי ברכה)
+    /^וִיהִי/,                // ויהי
+    /^הֲרֵינִי/,              // הריני מוכן
+    /^אֱלֹהַי/,              // אלוהי
+    /^רִבּוֹנוֹ/,             // ריבונו
+    /^מַה יָּקָר/,            // מה יקר (לאחר ברכת טלית)
+    /^יִרְוְיֻן/,
+    /^כִּי עִמְּ/,
+    /^מְשֹׁךְ/,
+    /^עֹֽטֶה/,
+  ];
+
   const paragraphs = [];
   let current = [];
+
+  const flush = () => {
+    if (current.length) { paragraphs.push(current.join(' ')); current = []; }
+  };
+
   for (const v of flat) {
     const plain = v.replace(/<[^>]+>/g,'').trim();
-    if (v.includes('\u2028')) {
-      v.split('\u2028').forEach((p, pi, arr) => {
+
+    // Explicit <br> marker
+    if (v.includes(' ')) {
+      v.split(' ').forEach((p, pi, arr) => {
         const t = p.trim();
         if (t) current.push(t);
-        if (pi < arr.length - 1 && current.length) {
-          paragraphs.push(current.join(' ')); current = [];
-        }
+        if (pi < arr.length - 1) flush();
       });
       continue;
     }
-    if (!plain) {
-      if (current.length) { paragraphs.push(current.join(' ')); current = []; }
-      continue;
-    }
-    if (v.includes('gold-dim')) {
-      if (current.length) { paragraphs.push(current.join(' ')); current = []; }
-      paragraphs.push(v);
-      continue;
-    }
+
+    // Empty verse
+    if (!plain) { flush(); continue; }
+
+    // <small> sub-label
+    if (v.includes('gold-dim')) { flush(); paragraphs.push(v); continue; }
+
+    // Check if this line starts a new section
+    const isBreakPoint = BREAK_BEFORE.some(r => r.test(plain));
+    if (isBreakPoint) flush();
+
     current.push(v);
+
+    // After a complete bracha (ends with :) → flush
+    if (plain.endsWith(':') || plain.endsWith('׃')) flush();
   }
-  if (current.length) paragraphs.push(current.join(' '));
+  flush();
   return paragraphs;
 }
 
@@ -3111,17 +3142,25 @@ function _sectionStyle(s) {
 // Show/hide floating nav button based on scroll position
 function initSiddurFloatBtn() {
   const btn = document.getElementById('siddur-float-btn');
+  if (!btn) return;
+  // Listen on both page div and window (PWA may scroll either)
   const page = document.getElementById('page-siddur');
-  if (!btn || !page) return;
-  btn.style.display = 'flex';
-  // Show after scrolling past 150px
-  page.addEventListener('scroll', () => {
-    btn.style.opacity = page.scrollTop > 150 ? '1' : '0';
-    btn.style.pointerEvents = page.scrollTop > 150 ? 'auto' : 'none';
-  }, { passive: true });
-  btn.style.opacity = '0';
-  btn.style.transition = 'opacity 0.2s';
-  btn.style.pointerEvents = 'none';
+  const topAnchor = document.getElementById('siddur-top');
+
+  function updateBtn() {
+    if (!page || !page.classList.contains('active')) return;
+    // How far has siddur-top scrolled above viewport?
+    const anchorY = topAnchor ? topAnchor.getBoundingClientRect().top : -999;
+    const scrolled = anchorY < -80 || (page.scrollTop || 0) > 150;
+    btn.style.opacity = scrolled ? '1' : '0';
+    btn.style.pointerEvents = scrolled ? 'auto' : 'none';
+  }
+
+  page.addEventListener('scroll', updateBtn, { passive: true });
+  window.addEventListener('scroll', updateBtn, { passive: true });
+  document.addEventListener('scroll', updateBtn, { passive: true });
+  // Also update when content changes
+  btn._update = updateBtn;
 }
 
 function storeTodayEventsForSiddur(items) {
@@ -3320,75 +3359,45 @@ function startCompassListener() {
   if (compassListener) {
     window.removeEventListener('deviceorientationabsolute', compassListener, true);
     window.removeEventListener('deviceorientation',         compassListener, true);
+    compassListener = null;
   }
   if (window._aoSensor) { try { window._aoSensor.stop(); } catch(e){} window._aoSensor = null; }
 
-  // ── Best: AbsoluteOrientationSensor (Android Chrome 69+) ──
-  if (typeof AbsoluteOrientationSensor !== 'undefined') {
-    try {
-      const sensor = new AbsoluteOrientationSensor({ frequency: 10 });
-      sensor.addEventListener('reading', () => {
-        const [x, y, z, w] = sensor.quaternion;
-        // Extract yaw (heading) from quaternion
-        // This gives the angle between device X-axis and geographic East
-        const sinY = 2*(w*z + x*y);
-        const cosY = 1 - 2*(y*y + z*z);
-        let h = Math.atan2(sinY, cosY) * 180 / Math.PI;
-        h = ((-h) + 360) % 360;
-        deviceHeading = h;
-        deviceBeta = null;
-        console.log('[Compass] AOS quaternion → heading:', h.toFixed(1), '°');
-        updateCompassUI();
-      });
-      sensor.addEventListener('error', e => {
-        console.warn('[Compass] AOS error:', e.error?.message, '– falling back');
-        window._aoSensor = null;
-        _startDeviceOrientationFallback();
-      });
-      sensor.start();
-      window._aoSensor = sensor;
-      console.log('[Compass] AbsoluteOrientationSensor started');
-      setQiblaStatus('🧭 מצפן פעיל');
-      return;
-    } catch(e) {
-      console.warn('[Compass] AOS unavailable:', e.message);
-    }
-  }
-  _startDeviceOrientationFallback();
-}
+  // ── Simple horizontal-only compass ──
+  // Uses alpha directly = azimuth of device top relative to magnetic north
+  // Works correctly when phone is held flat (horizontal)
+  // iOS: webkitCompassHeading is already correct
+  // Android: alpha from deviceorientationabsolute is the azimuth
 
-function _startDeviceOrientationFallback() {
   compassListener = (e) => {
     let h = null;
     deviceBeta = e.beta;
 
-    // iOS: webkitCompassHeading – already tilt-compensated by OS
     if (typeof e.webkitCompassHeading === 'number' && e.webkitCompassHeading >= 0) {
+      // iOS – OS provides tilt-compensated heading directly
       h = e.webkitCompassHeading;
-      console.log('[Compass] iOS webkit:', h.toFixed(1), '°');
 
-    } else if (e.absolute === true && e.alpha !== null) {
-      // Android: tilt-compensated heading from alpha/beta/gamma
-      // alpha=azimuth around Z, beta=tilt around X, gamma=tilt around Y
-      const a = e.alpha * Math.PI / 180;
-      const b = e.beta  * Math.PI / 180;
-      const g = e.gamma * Math.PI / 180;
-      // Project magnetic north vector through device rotation matrix
-      const Nx = Math.cos(a)*Math.cos(g) + Math.sin(a)*Math.sin(b)*Math.sin(g);
-      const Ny = Math.sin(a)*Math.cos(g) - Math.cos(a)*Math.sin(b)*Math.sin(g);
-      h = (Math.atan2(-Ny, Nx) * 180/Math.PI + 360) % 360;
-      console.log('[Compass] abs orient: α', e.alpha.toFixed(1), 'β', e.beta?.toFixed(1), 'γ', e.gamma?.toFixed(1), '→', h.toFixed(1), '°');
+    } else if (e.absolute === true && typeof e.alpha === 'number') {
+      // Android – alpha is clockwise from north when phone is flat
+      // Simple conversion: heading = 360 - alpha
+      h = (360 - e.alpha) % 360;
+      console.log('[Compass] alpha→heading:', e.alpha.toFixed(1), '→', h.toFixed(1));
     } else {
-      return; // Non-absolute – no reliable north reference
+      return;
     }
 
-    if (h !== null && !isNaN(h)) { deviceHeading = h; updateCompassUI(); }
+    if (!isNaN(h)) { deviceHeading = h; updateCompassUI(); }
   };
 
   window.addEventListener('deviceorientationabsolute', compassListener, true);
   window.addEventListener('deviceorientation',         compassListener, true);
-  console.log('[Compass] deviceorientation fallback started');
-  setQiblaStatus('🧭 מצפן פעיל');
+  setQiblaStatus('🧭 מצפן פעיל – החזק את הטלפון שטוח');
+  console.log('[Compass] horizontal-only listener started');
+}
+
+function _startDeviceOrientationFallback() {
+  // alias – not used anymore but kept for compatibility
+  startCompassListener();
 }
 
 function stopCompassListener() {
