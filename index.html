@@ -1391,10 +1391,31 @@ function cleanSefariaHtml(str) {
     .replace(/&thinsp;/g, '\u2009').replace(/&nbsp;/g, '\u00a0')
     .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
     .replace(/&mdash;/g, '\u2014').replace(/&ndash;/g, '\u2013')
-    .replace(/<small[^>]*>(.*?)<\/small>/gi, '<span style="font-size:0.8em;color:var(--gold-dim)">$1</span>')
+    // <small> → paragraph break marker + label on its own line
+    // \u2029 = paragraph separator used to signal "new section header"
+    .replace(/<small[^>]*>(.*?)<\/small>/gi, '\u2029$1\u2029')
     .replace(/<br\s*\/?>/gi, '\u2028')
-    .replace(/<(?!\/?(?:b|i|strong|em|span)\b)[^>]+>/gi, '')
+    .replace(/<(?!\/?(?:b|i|strong|em)\b)[^>]+>/gi, '')
     .trim();
+}
+
+// Split a cleaned verse that may contain \u2029 section markers
+function splitVerseOnHeaders(v) {
+  if (!v.includes('\u2029')) return [v];
+  const parts = v.split('\u2029');
+  const result = [];
+  for (let i = 0; i < parts.length; i++) {
+    const p = parts[i].trim();
+    if (!p) continue;
+    // Even indices after split are either pre-header text or post-header text
+    // Odd indices (between \u2029 pairs) are the header labels
+    if (i % 2 === 1) {
+      result.push('__HEADER__' + p);
+    } else if (p) {
+      result.push(p);
+    }
+  }
+  return result;
 }
 
 function buildParagraphs(flat) {
@@ -1438,8 +1459,12 @@ function buildParagraphs(flat) {
     // Empty verse
     if (!plain) { flush(); continue; }
 
-    // <small> sub-label
-    if (v.includes('gold-dim')) { flush(); paragraphs.push(v); continue; }
+    // Section header (from <small> tag, split out by splitVerseOnHeaders)
+    if (v.startsWith('__HEADER__')) {
+      flush();
+      paragraphs.push('__HEADER__' + v.slice(10));
+      continue;
+    }
 
     // Check if this line starts a new section
     const isBreakPoint = BREAK_BEFORE.some(r => r.test(plain));
@@ -2225,60 +2250,58 @@ async function loadAliyaText(ref) {
 }
 
 async function loadRashiForRef(torahRef) {
-  // Sefaria: fetch the Torah text with commentary=1
-  // Extract only Rashi comments from the response
-  console.log('[Rashi] loading commentary for:', torahRef);
+  console.log('[Rashi] loading for:', torahRef);
   try {
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise(r => setTimeout(r, 600));
     const url = `https://www.sefaria.org/api/texts/${encodeURI(torahRef)}?lang=he&commentary=1&context=0`;
     const resp = await fetch(url);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
 
-    // Commentary is in data.commentary array
-    const allComm = data?.commentary || [];
-    const rashiComm = allComm.filter(c =>
-      (c.collectiveTitle?.en === 'Rashi') ||
-      (c.ref || '').startsWith('Rashi on') ||
-      (c.he_title || '').includes('רש"י')
-    );
-    console.log('[Rashi]', rashiComm.length, 'Rashi entries from', allComm.length, 'total');
+    const comms = data?.commentary || [];
+    console.log('[Rashi] total commentary items:', comms.length);
 
-    // Build a map: "chapter:verse" -> combined Rashi text
-    const byVerse = {};
-    rashiComm.forEach(c => {
+    const rashiItems = comms.filter(c =>
+      c.collectiveTitle?.en === 'Rashi' || (c.ref || '').startsWith('Rashi on')
+    );
+    console.log('[Rashi] Rashi items:', rashiItems.length);
+
+    if (!rashiItems.length) {
+      console.warn('[Rashi] no Rashi found');
+      rashiVerses = []; rashiLoaded = true; return;
+    }
+
+    // Build map ch:verse → texts
+    const verseMap = new Map();
+    rashiItems.forEach(c => {
       const m = (c.ref || '').match(/(\d+):(\d+)/);
       if (!m) return;
-      const key = m[1] + ':' + m[2];
-      const txt = Array.isArray(c.he) ? c.he.flat().filter(Boolean).join(' ')
-                                      : (c.he || '');
-      if (!byVerse[key]) byVerse[key] = [];
-      byVerse[key].push(txt.replace(/<(?!\/?(?:b|i|strong)\b)[^>]+>/gi,'').trim());
+      const key = `${parseInt(m[1])}:${parseInt(m[2])}`;
+      let txt = Array.isArray(c.he) ? c.he.flat().filter(Boolean).join(' ') : (c.he || '');
+      txt = txt.replace(/<(?!\/?(?:b|i|strong)\b)[^>]+>/gi, '').trim();
+      if (!verseMap.has(key)) verseMap.set(key, []);
+      if (txt) verseMap.get(key).push(txt);
     });
 
-    // Assign Rashi to verses sequentially
-    // Each entry in byVerse corresponds to one Torah verse that has Rashi
-    const sorted = Object.entries(byVerse).sort((a,b) => {
+    const sorted = [...verseMap.entries()].sort((a,b) => {
       const [ac,av] = a[0].split(':').map(Number);
       const [bc,bv] = b[0].split(':').map(Number);
       return ac !== bc ? ac-bc : av-bv;
     });
 
     rashiVerses = new Array(parashaVerses.length).fill('');
-    sorted.forEach(([key, comments], i) => {
-      if (i < rashiVerses.length) rashiVerses[i] = comments.join('<br><br>');
+    sorted.forEach(([,comments], i) => {
+      if (i < rashiVerses.length) rashiVerses[i] = comments.join('<br>');
     });
 
     rashiLoaded = true;
-    const withRashi = rashiVerses.filter(Boolean).length;
-    console.log('[Rashi] mapped', withRashi, 'Rashi verses for', parashaVerses.length, 'Torah verses');
+    console.log('[Rashi] ✅', rashiVerses.filter(Boolean).length, 'verses with Rashi');
     if (parashaView === 'rashi') renderParasha();
   } catch(e) {
     console.warn('[Rashi] failed:', e.message);
-    rashiVerses = [];
+    rashiVerses = []; rashiLoaded = true;
   }
 }
-
 
 async function showAliya(index, btn) {
   document.querySelectorAll('#aliya-tabs .aliya-tab').forEach(t => t.classList.remove('active'));
@@ -2991,9 +3014,10 @@ function setSiddurNusach(n) {
   document.querySelectorAll('#nusach-buttons .aliya-tab').forEach(b => b.classList.remove('active'));
   document.getElementById('sn-'+n)?.classList.add('active');
   appState.siddurNusach = n; saveState();
-  // Clear siddur cache so nusach change fetches fresh content
+  // Clear entire cache on nusach change
   Object.keys(_siddurCache).forEach(k => delete _siddurCache[k]);
-  console.log('[Siddur] nusach changed to', n, '– cache cleared');
+  console.log('[Siddur] nusach changed to', n, '– cache cleared, reloading');
+  siddurLoading = false;
   loadSiddur();
 }
 
@@ -3006,10 +3030,12 @@ function setSiddurPrayer(p) {
 
 function shouldShowSection(s) {
   if (!s.condition) return true;
+  // If calendar not initialized yet, hide all additions (isAddition=true)
+  if (!window._siddurCal && s.isAddition) return false;
   const fn = SIDDUR_CONDITIONS[s.condition];
   if (!fn) return true;
   const result = fn();
-  return s.conditionType === 'skip' ? !result : result;
+  return s.conditionType === 'skip' ? !result : !!result;
 }
 
 function initSiddur() {
@@ -3120,16 +3146,22 @@ async function _fetchSectionHtml(s, style, yaalehOccasion) {
   const book    = NUSACH_BOOK[siddurNusach] || 'Weekday_Siddur_Sefard_Linear';
   const adjRef  = s.ref ? s.ref.replace(/^Weekday_Siddur_Sefard_Linear/, book) : s.ref;
   const data = await sefariaText(adjRef, 0);
-  const flat = heFlat(data).map(cleanSefariaHtml).filter(Boolean);
+  const flat = heFlat(data)
+    .map(cleanSefariaHtml)
+    .filter(Boolean)
+    .flatMap(v => splitVerseOnHeaders(v));
   if (!flat.length) return '<span style="color:var(--muted)">(אין טקסט זמין)</span>';
 
   const paragraphs = buildParagraphs(flat);
   const html = `<div style="${style}">${
     paragraphs.map(p => {
-      const isHeader = p.includes('gold-dim') && p.replace(/<[^>]+>/g,'').length < 40;
-      return isHeader
-        ? `<p style="margin:12px 0 3px 0;font-size:11px;font-weight:700;color:var(--gold-dim)">${p.replace(/<[^>]+>/g,'')}</p>`
-        : `<p style="margin:0 0 8px 0;line-height:1.85">${p}</p>`;
+      if (p.startsWith('__HEADER__')) {
+        const label = p.slice(10);
+        return `<p style="margin:14px 0 2px 0;font-size:10px;font-weight:700;` +
+               `color:var(--gold-dim);letter-spacing:.5px;border-bottom:1px solid var(--border);` +
+               `padding-bottom:2px">${label}</p>`;
+      }
+      return `<p style="margin:0 0 8px 0;line-height:1.85">${p}</p>`;
     }).join('')
   }</div>`;
   _putCache(s.ref, html);
