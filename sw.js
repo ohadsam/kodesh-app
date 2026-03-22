@@ -1,4 +1,4 @@
-const APP_VERSION = '2.7';
+const APP_VERSION = '2.8';
 const CACHE = `kodesh-v${APP_VERSION}`;
 const STATIC = [
   './',
@@ -13,14 +13,14 @@ self.addEventListener('install', e => {
 });
 
 self.addEventListener('activate', e => {
-  // Delete ALL old caches when version changes
   e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => {
-        console.log('[SW] Deleting old cache:', k);
-        return caches.delete(k);
-      }))
-    ).then(() => self.clients.claim())
+    caches.keys().then(keys => {
+      console.log('[SW] v' + APP_VERSION + ' activating, found caches:', keys);
+      return Promise.all(keys.map(k => {
+        console.log('[SW] Deleting cache:', k);
+        return caches.delete(k);  // Delete ALL caches including sefaria API cache
+      }));
+    }).then(() => self.clients.claim())
   );
 });
 

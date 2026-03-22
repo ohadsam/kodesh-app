@@ -557,7 +557,7 @@
     <!-- Version & Copyright - INSIDE settings-inner -->
     <div style="text-align:center;padding:18px 0 8px;border-top:1px solid var(--border);margin-top:8px">
       <div style="font-size:13px;font-weight:600;color:var(--gold-dim);margin-bottom:4px">📖 לימוד יומי</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 2.7</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 2.8</div>
       <div style="font-size:11px;color:var(--muted)">© כל הזכויות שמורות לאוהד סמט</div>
     </div>
   </div>
@@ -1163,7 +1163,7 @@
     💡 לכיול המצפן: הזז את הטלפון בתנועת ∞ (שמונה שוכב) מספר פעמים
   </div>
   <div style="text-align:center;color:var(--muted);font-size:11px;padding:12px 0 4px">
-    גרסה 2.7 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
+    גרסה 2.8 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
   </div>
 </div>
 
@@ -1277,7 +1277,7 @@ let currentAliya = 'all';
 let rashiLoaded = false;
 let rashiVisible = false;
 
-const APP_VERSION  = '2.7';
+const APP_VERSION  = '2.8';
 const STORAGE_KEY  = 'kodesh_app_v1';
 const SIDDUR_CACHE_KEY = 'siddur_cache_v';
 
@@ -1285,12 +1285,18 @@ const SIDDUR_CACHE_KEY = 'siddur_cache_v';
 (function() {
   const savedVer = localStorage.getItem('app_version');
   if (savedVer !== APP_VERSION) {
-    console.log('[Cache] New version', APP_VERSION, '– clearing siddur cache from', savedVer);
-    // Clear all siddur-related localStorage
-    Object.keys(localStorage).forEach(k => {
-      if (k.startsWith('siddur_') || k.startsWith(SIDDUR_CACHE_KEY)) localStorage.removeItem(k);
-    });
+    console.log('[Cache] New version', APP_VERSION, '← was', savedVer, '– clearing ALL caches');
+    // Clear ALL localStorage keys related to app
+    const keysToRemove = Object.keys(localStorage).filter(k =>
+      k.startsWith('siddur_') || k.startsWith('kodesh_')
+    );
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+    // Also clear service worker caches
+    if ('caches' in window) {
+      caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+    }
     localStorage.setItem('app_version', APP_VERSION);
+    console.log('[Cache] Cleared', keysToRemove.length, 'localStorage keys');
   }
 })();
 
@@ -2259,70 +2265,53 @@ async function loadAliyaText(ref) {
 }
 
 async function loadRashiForRef(torahRef) {
-  // torahRef format: "Genesis 1:1-6:8" (range)
-  // Sefaria commentary API needs per-chapter: "Genesis.1", "Genesis.2" etc.
-  console.log('[Rashi] loading for range:', torahRef);
-  try {
-    // Parse range: "Book Ch1:V1-Ch2:V2"
-    const m = torahRef.match(/^(\S+)\s+(\d+):(\d+)-(\d+):(\d+)$/);
-    if (!m) { console.warn('[Rashi] cannot parse ref:', torahRef); return; }
-    const [, book, startCh, , endCh] = m;
-    const startChN = parseInt(startCh), endChN = parseInt(endCh);
+  // torahRef format: "Genesis 1:1-6:8"
+  // Use dedicated Rashi book: "Rashi on Genesis 1" per chapter
+  console.log('[Rashi] loading for:', torahRef);
+  const m = torahRef.match(/^(\S+)\s+(\d+):(\d+)-(\d+):(\d+)$/);
+  if (!m) { console.warn('[Rashi] bad ref:', torahRef); return; }
+  const [, book, startCh,, endCh] = m;
+  const startChN = parseInt(startCh), endChN = parseInt(endCh);
+  const rashiBook = 'Rashi on ' + book;
 
-    // Collect all commentary items across chapters
-    const allRashiItems = [];
-    for (let ch = startChN; ch <= endChN; ch++) {
-      await new Promise(r => setTimeout(r, 300));
-      const chRef  = `${book}.${ch}`;
-      const url    = `https://www.sefaria.org/api/texts/${encodeURI(chRef)}?lang=he&commentary=1&context=0`;
-      const resp   = await fetch(url);
-      if (!resp.ok) { console.warn('[Rashi] ch', ch, 'HTTP', resp.status); continue; }
-      const data   = await resp.json();
-      const comms  = (data?.commentary || []).filter(c =>
-        c.collectiveTitle?.en === 'Rashi' || (c.ref || '').startsWith('Rashi on')
-      );
-      allRashiItems.push(...comms);
-      console.log('[Rashi] ch', ch, '-', comms.length, 'entries');
+  const allItems = [];
+  for (let ch = startChN; ch <= endChN; ch++) {
+    try {
+      await new Promise(r => setTimeout(r, 250));
+      // Fetch specific Rashi chapter directly
+      const ref = rashiBook + ' ' + ch;
+      const url = `https://www.sefaria.org/api/texts/${encodeURI(ref)}?lang=he&commentary=0&context=0`;
+      const resp = await fetch(url);
+      if (!resp.ok) { console.warn('[Rashi] ch', ch, resp.status); continue; }
+      const data = await resp.json();
+      // data.he = array of arrays: [verse][comment]
+      const heArr = data?.he || [];
+      heArr.forEach((verseComments, vIdx) => {
+        if (!verseComments) return;
+        const comments = Array.isArray(verseComments) ? verseComments : [verseComments];
+        const txt = comments.flat().filter(Boolean)
+          .map(c => c.replace(/<(?!\/?(b|i|strong)\b)[^>]+>/gi,'').trim())
+          .join('<br>');
+        if (txt) allItems.push({ ch, verse: vIdx + 1, txt });
+      });
+      console.log('[Rashi] ch', ch, '-', heArr.length, 'verses');
+    } catch(e) {
+      console.warn('[Rashi] ch', ch, 'error:', e.message);
     }
-
-    if (!allRashiItems.length) {
-      console.warn('[Rashi] no Rashi found for', torahRef);
-      rashiVerses = []; rashiLoaded = true; return;
-    }
-
-    // Build map ch:verse → rashi text
-    const verseMap = new Map();
-    allRashiItems.forEach(c => {
-      const vm = (c.ref || '').match(/(\d+):(\d+)/);
-      if (!vm) return;
-      const key = `${parseInt(vm[1])}:${parseInt(vm[2])}`;
-      let txt = Array.isArray(c.he) ? c.he.flat().filter(Boolean).join(' ') : (c.he || '');
-      txt = txt.replace(/<(?!\/?(?:b|i|strong)\b)[^>]+>/gi, '').trim();
-      if (!verseMap.has(key)) verseMap.set(key, []);
-      if (txt) verseMap.get(key).push(txt);
-    });
-
-    // Sort by chapter:verse
-    const sorted = [...verseMap.entries()].sort((a,b) => {
-      const [ac,av] = a[0].split(':').map(Number);
-      const [bc,bv] = b[0].split(':').map(Number);
-      return ac !== bc ? ac-bc : av-bv;
-    });
-
-    // Map to parashaVerses indices
-    rashiVerses = new Array(parashaVerses.length).fill('');
-    sorted.forEach(([, comments], i) => {
-      if (i < rashiVerses.length) rashiVerses[i] = comments.join('<br>');
-    });
-
-    rashiLoaded = true;
-    console.log('[Rashi] ✅', rashiVerses.filter(Boolean).length, '/', parashaVerses.length, 'verses with Rashi');
-    if (parashaView === 'rashi') renderParasha();
-  } catch(e) {
-    console.warn('[Rashi] failed:', e.message);
-    rashiVerses = []; rashiLoaded = true;
   }
+
+  // Map to parashaVerses sequentially
+  rashiVerses = new Array(parashaVerses.length).fill('');
+  allItems.forEach((item, i) => {
+    if (i < rashiVerses.length) rashiVerses[i] = item.txt;
+  });
+
+  rashiLoaded = true;
+  const cnt = rashiVerses.filter(Boolean).length;
+  console.log('[Rashi] ✅', cnt, '/', parashaVerses.length, 'verses have Rashi');
+  if (parashaView === 'rashi') renderParasha();
 }
+
 
 async function showAliya(index, btn) {
   document.querySelectorAll('#aliya-tabs .aliya-tab').forEach(t => t.classList.remove('active'));
