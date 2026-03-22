@@ -557,7 +557,7 @@
     <!-- Version & Copyright - INSIDE settings-inner -->
     <div style="text-align:center;padding:18px 0 8px;border-top:1px solid var(--border);margin-top:8px">
       <div style="font-size:13px;font-weight:600;color:var(--gold-dim);margin-bottom:4px">📖 לימוד יומי</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 2.6</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 2.7</div>
       <div style="font-size:11px;color:var(--muted)">© כל הזכויות שמורות לאוהד סמט</div>
     </div>
   </div>
@@ -1163,7 +1163,7 @@
     💡 לכיול המצפן: הזז את הטלפון בתנועת ∞ (שמונה שוכב) מספר פעמים
   </div>
   <div style="text-align:center;color:var(--muted);font-size:11px;padding:12px 0 4px">
-    גרסה 2.6 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
+    גרסה 2.7 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
   </div>
 </div>
 
@@ -1277,7 +1277,7 @@ let currentAliya = 'all';
 let rashiLoaded = false;
 let rashiVisible = false;
 
-const APP_VERSION  = '2.6';
+const APP_VERSION  = '2.7';
 const STORAGE_KEY  = 'kodesh_app_v1';
 const SIDDUR_CACHE_KEY = 'siddur_cache_v';
 
@@ -1393,25 +1393,25 @@ function cleanSefariaHtml(str) {
     .replace(/&mdash;/g, '\u2014').replace(/&ndash;/g, '\u2013')
     // <small> → paragraph break marker + label on its own line
     // \u2029 = paragraph separator used to signal "new section header"
-    .replace(/<small[^>]*>(.*?)<\/small>/gi, '\u2029$1\u2029')
-    .replace(/<br\s*\/?>/gi, '\u2028')
+    .replace(/<small[^>]*>(.*?)<\/small>/gi, '|||HEADER|||$1|||HEADER|||')
+    .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<(?!\/?(?:b|i|strong|em)\b)[^>]+>/gi, '')
     .trim();
 }
 
 // Split a cleaned verse that may contain \u2029 section markers
 function splitVerseOnHeaders(v) {
-  if (!v.includes('\u2029')) return [v];
-  const parts = v.split('\u2029');
+  const SEP = '|||HEADER|||';
+  if (!v.includes(SEP)) return [v];
+  const parts = v.split(SEP);
   const result = [];
   for (let i = 0; i < parts.length; i++) {
     const p = parts[i].trim();
     if (!p) continue;
-    // Even indices after split are either pre-header text or post-header text
-    // Odd indices (between \u2029 pairs) are the header labels
+    // Odd positions are header labels (between sentinel pairs)
     if (i % 2 === 1) {
       result.push('__HEADER__' + p);
-    } else if (p) {
+    } else {
       result.push(p);
     }
   }
@@ -1447,8 +1447,8 @@ function buildParagraphs(flat) {
     const plain = v.replace(/<[^>]+>/g,'').trim();
 
     // Explicit <br> marker
-    if (v.includes(' ')) {
-      v.split(' ').forEach((p, pi, arr) => {
+    if (v.includes('\n')) {
+      v.split('\n').forEach((p, pi, arr) => {
         const t = p.trim();
         if (t) current.push(t);
         if (pi < arr.length - 1) flush();
@@ -2009,6 +2009,10 @@ async function loadEvents(ds) {
           <div class="event-sub">${e.title}${e.date ? ' · '+e.date : ''}</div>
         </div>
       </div>`).join('');
+
+    // Save events for siddur conditional logic
+    storeTodayEventsForSiddur(items);
+    console.log('[Events] saved', items.length, 'events for siddur');
   } catch(e) {
     list.innerHTML = '<div style="color:var(--muted);font-size:13px">לא ניתן לטעון</div>';
   }
@@ -2105,6 +2109,11 @@ function renderParasha() {
       `<div style="margin-bottom:8px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span><span class="content-text" style="font-size:var(--font-size)">${v}</span></div>`
     ).join('');
   } else {
+    // Show loading message if Rashi not yet loaded
+    if (!rashiLoaded) {
+      el.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center">⏳ טוען פירוש רש"י...</div>';
+      return;
+    }
     // interleaved: verse → rashi comment
     el.innerHTML = parashaVerses.map((v,i) => {
       const r = rashiVerses[i];
@@ -2250,52 +2259,64 @@ async function loadAliyaText(ref) {
 }
 
 async function loadRashiForRef(torahRef) {
-  console.log('[Rashi] loading for:', torahRef);
+  // torahRef format: "Genesis 1:1-6:8" (range)
+  // Sefaria commentary API needs per-chapter: "Genesis.1", "Genesis.2" etc.
+  console.log('[Rashi] loading for range:', torahRef);
   try {
-    await new Promise(r => setTimeout(r, 600));
-    const url = `https://www.sefaria.org/api/texts/${encodeURI(torahRef)}?lang=he&commentary=1&context=0`;
-    const resp = await fetch(url);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const data = await resp.json();
+    // Parse range: "Book Ch1:V1-Ch2:V2"
+    const m = torahRef.match(/^(\S+)\s+(\d+):(\d+)-(\d+):(\d+)$/);
+    if (!m) { console.warn('[Rashi] cannot parse ref:', torahRef); return; }
+    const [, book, startCh, , endCh] = m;
+    const startChN = parseInt(startCh), endChN = parseInt(endCh);
 
-    const comms = data?.commentary || [];
-    console.log('[Rashi] total commentary items:', comms.length);
+    // Collect all commentary items across chapters
+    const allRashiItems = [];
+    for (let ch = startChN; ch <= endChN; ch++) {
+      await new Promise(r => setTimeout(r, 300));
+      const chRef  = `${book}.${ch}`;
+      const url    = `https://www.sefaria.org/api/texts/${encodeURI(chRef)}?lang=he&commentary=1&context=0`;
+      const resp   = await fetch(url);
+      if (!resp.ok) { console.warn('[Rashi] ch', ch, 'HTTP', resp.status); continue; }
+      const data   = await resp.json();
+      const comms  = (data?.commentary || []).filter(c =>
+        c.collectiveTitle?.en === 'Rashi' || (c.ref || '').startsWith('Rashi on')
+      );
+      allRashiItems.push(...comms);
+      console.log('[Rashi] ch', ch, '-', comms.length, 'entries');
+    }
 
-    const rashiItems = comms.filter(c =>
-      c.collectiveTitle?.en === 'Rashi' || (c.ref || '').startsWith('Rashi on')
-    );
-    console.log('[Rashi] Rashi items:', rashiItems.length);
-
-    if (!rashiItems.length) {
-      console.warn('[Rashi] no Rashi found');
+    if (!allRashiItems.length) {
+      console.warn('[Rashi] no Rashi found for', torahRef);
       rashiVerses = []; rashiLoaded = true; return;
     }
 
-    // Build map ch:verse → texts
+    // Build map ch:verse → rashi text
     const verseMap = new Map();
-    rashiItems.forEach(c => {
-      const m = (c.ref || '').match(/(\d+):(\d+)/);
-      if (!m) return;
-      const key = `${parseInt(m[1])}:${parseInt(m[2])}`;
+    allRashiItems.forEach(c => {
+      const vm = (c.ref || '').match(/(\d+):(\d+)/);
+      if (!vm) return;
+      const key = `${parseInt(vm[1])}:${parseInt(vm[2])}`;
       let txt = Array.isArray(c.he) ? c.he.flat().filter(Boolean).join(' ') : (c.he || '');
       txt = txt.replace(/<(?!\/?(?:b|i|strong)\b)[^>]+>/gi, '').trim();
       if (!verseMap.has(key)) verseMap.set(key, []);
       if (txt) verseMap.get(key).push(txt);
     });
 
+    // Sort by chapter:verse
     const sorted = [...verseMap.entries()].sort((a,b) => {
       const [ac,av] = a[0].split(':').map(Number);
       const [bc,bv] = b[0].split(':').map(Number);
       return ac !== bc ? ac-bc : av-bv;
     });
 
+    // Map to parashaVerses indices
     rashiVerses = new Array(parashaVerses.length).fill('');
-    sorted.forEach(([,comments], i) => {
+    sorted.forEach(([, comments], i) => {
       if (i < rashiVerses.length) rashiVerses[i] = comments.join('<br>');
     });
 
     rashiLoaded = true;
-    console.log('[Rashi] ✅', rashiVerses.filter(Boolean).length, 'verses with Rashi');
+    console.log('[Rashi] ✅', rashiVerses.filter(Boolean).length, '/', parashaVerses.length, 'verses with Rashi');
     if (parashaView === 'rashi') renderParasha();
   } catch(e) {
     console.warn('[Rashi] failed:', e.message);
@@ -3586,10 +3607,18 @@ function startCompassListener() {
       // Standard conversion: compass_heading = (360 - alpha) % 360
       // This is correct for portrait mode (standard phone use)
       // For landscape, we need to add/subtract screen orientation offset
-      const screenAngle = (window.screen?.orientation?.angle || window.orientation || 0);
+      // Android deviceorientationabsolute:
+      // alpha = device rotation CCW from north (0=north, 90=west, 180=south, 270=east)
+      // To get compass bearing (CW from north): heading = (360 - alpha) % 360
+      // Screen orientation correction:
+      //   portrait (0°): no extra offset  
+      //   landscape right (90°): add 90
+      //   upside down (180°): add 180
+      //   landscape left (270°): add 270
+      const screenAngle = (window.screen?.orientation?.angle ?? window.orientation ?? 0);
       h = (360 - e.alpha + screenAngle + 360) % 360;
       console.log('[Compass] α=', e.alpha.toFixed(1),
-        'screenAngle=', screenAngle, '→ h=', h.toFixed(1));
+        'screen=', screenAngle, '→', h.toFixed(1));
     } else {
       return;
     }
