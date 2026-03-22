@@ -293,8 +293,10 @@
       width: 100%;
       max-height: 90dvh;
       overflow-y: auto;
+      overflow-x: hidden;
       padding: 20px 20px 50px;
       animation: slideUp .3s ease;
+      box-sizing: border-box;
     }
     @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
     .settings-row {
@@ -556,7 +558,7 @@
   <!-- Version & Copyright -->
   <div style="text-align:center;padding:18px 0 8px;border-top:1px solid var(--border);margin-top:8px">
     <div style="font-size:13px;font-weight:600;color:var(--gold-dim);margin-bottom:4px">📖 לימוד יומי</div>
-    <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 2.5</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 2.6</div>
     <div style="font-size:11px;color:var(--muted)">© כל הזכויות שמורות לאוהד סמט</div>
   </div>
 </div>
@@ -702,6 +704,7 @@
       <button class="aliya-tab" onclick="setSiddurPrayer('mincha')" id="sp-mincha">מנחה</button>
       <button class="aliya-tab" onclick="setSiddurPrayer('arvit')" id="sp-arvit">ערבית</button>
       <button class="aliya-tab" onclick="setSiddurPrayer('birkat')" id="sp-birkat">ברכת המזון</button>
+      <button class="aliya-tab" onclick="setSiddurPrayer('layla')" id="sp-layla">ק"ש על המיטה</button>
     </div>
   </div>
 
@@ -1160,7 +1163,7 @@
     💡 לכיול המצפן: הזז את הטלפון בתנועת ∞ (שמונה שוכב) מספר פעמים
   </div>
   <div style="text-align:center;color:var(--muted);font-size:11px;padding:12px 0 4px">
-    גרסה 2.4 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
+    גרסה 2.6 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
   </div>
 </div>
 
@@ -1274,7 +1277,23 @@ let currentAliya = 'all';
 let rashiLoaded = false;
 let rashiVisible = false;
 
-const STORAGE_KEY = 'kodesh_app_v1';
+const APP_VERSION  = '2.6';
+const STORAGE_KEY  = 'kodesh_app_v1';
+const SIDDUR_CACHE_KEY = 'siddur_cache_v';
+
+// Invalidate siddur localStorage cache if version changed
+(function() {
+  const savedVer = localStorage.getItem('app_version');
+  if (savedVer !== APP_VERSION) {
+    console.log('[Cache] New version', APP_VERSION, '– clearing siddur cache from', savedVer);
+    // Clear all siddur-related localStorage
+    Object.keys(localStorage).forEach(k => {
+      if (k.startsWith('siddur_') || k.startsWith(SIDDUR_CACHE_KEY)) localStorage.removeItem(k);
+    });
+    localStorage.setItem('app_version', APP_VERSION);
+  }
+})();
+
 let appState = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
 
 function saveState() {
@@ -1898,9 +1917,10 @@ async function loadZmanim(ds) {
     document.getElementById('z-mincha-ketana').textContent   = fmtT(z.minchaKetana);
     document.getElementById('z-plag').textContent            = fmtT(z.plagHaMincha);
     document.getElementById('z-sunset').textContent     = fmtT(z.sunset);
-    // צאת הכוכבים: 42 דקות אחרי שקיעה (מינהג ישראל) = tzeit42min
-    // fallback: 7.083° (גאונים) ואז 8.5°
-    document.getElementById('z-tzeit').textContent      = fmtT(z.tzeit42min || z.tzeit7083deg || z.tzeit85deg);
+    // צאת הכוכבים: Hebcal field tzeit7083deg = 7.083° ≈ 18 דקות (3 כוכבים בינוניים, כישיבה.org)
+    // כשאין tzeit7083deg נחשב ידנית: שקיעה + 18 דקות
+    const tzeitVal = z.tzeit7083deg || (z.sunset ? new Date(new Date(z.sunset).getTime() + 18*60000).toISOString() : null) || z.tzeit85deg;
+    document.getElementById('z-tzeit').textContent = fmtT(tzeitVal);
     console.log('[Zmanim] GRA shema:', z.sofZmanShma, '| GRA tfilla:', z.sofZmanTfilla, '| all keys:', Object.keys(z).join(','));
     // Cache for auto-reminders
     appState._lastZmanim = z;  // includes tzeit42min, tzeit7083deg, tzeit85deg, sunset, chatzot
@@ -2016,9 +2036,9 @@ async function loadHalacha() {
     const toShow = idx1 === idx2 ? [flat[idx1]] : [flat[idx1], flat[idx2]].filter(Boolean);
     el.className = 'content-text';
     el.innerHTML = toShow.map((v, i) =>
-      `<div style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)">
-         <div style="font-size:11px;color:var(--gold);margin-bottom:6px">סעיף ${seif1 + i}</div>
-         <div>${v}</div>
+      `<div style="margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid var(--border)">
+         <div style="font-size:10px;color:var(--gold);margin-bottom:3px">סעיף ${seif1 + i}</div>
+         <div style="line-height:1.8">${v}</div>
        </div>`
     ).join('');
     updateDoneButton('halacha', ds);
@@ -2198,7 +2218,7 @@ async function loadAliyaText(ref) {
 }
 
 async function loadRashiForRef(torahRef) {
-  const rashiRef = 'Rashi on ' + torahRef;
+  const rashiRef = 'Rashi on ' + torahRef.replace(/\s/g,'_');
   console.log('[Rashi] loading:', rashiRef);
   try {
     const data = await sefariaText(rashiRef, 500);
@@ -2245,7 +2265,7 @@ async function loadLashon() {
   const CC1 = 'Chafetz_Chaim,_Part_One,_The_Prohibition_Against_Lashon_Hara,_Principle_';
   const CC2 = 'Chafetz_Chaim,_Part_Two,_The_Prohibition_Against_Rechilut,_Principle_';
   const LASHON_SCHEDULE = [
-    { ref: 'Chafetz_Chaim,_Introduction.1', label: 'הקדמה לחפץ חיים' },
+    { ref: 'Chafetz_Chaim,_Introduction', label: 'הקדמה לחפץ חיים' },
     { ref: CC1+'1',  label: 'חלק א – כלל א (איסור לשון הרע)' },
     { ref: CC1+'2',  label: 'חלק א – כלל ב' },
     { ref: CC1+'3',  label: 'חלק א – כלל ג' },
@@ -2775,7 +2795,7 @@ let siddurSections = [];   // currently loaded sections
 let siddurLoading  = false;
 
 const NUSACH_NAMES = { ashkenaz: 'נוסח אשכנז', sfard: 'נוסח ספרד', mizrach: 'עדות המזרח', teiman: 'נוסח תימני' };
-const PRAYER_NAMES = { shacharit: 'שחרית', mincha: 'מנחה', arvit: 'ערבית', birkat: 'ברכת המזון' };
+const PRAYER_NAMES = { shacharit: 'שחרית', mincha: 'מנחה', arvit: 'ערבית', birkat: 'ברכת המזון', layla: 'קריאת שמע על המיטה' };
 
 // Section map: prayer → list of {label, ref, isAddition, condition}
 // Refs from Weekday_Siddur_Sefard_Linear (works for ספרד/ספרד-אשכנז)
@@ -2798,6 +2818,13 @@ const YAALEH_VEYAVO = `יַעֲלֶה וְיָבֹא וְיַגִּיעַ, וְ�
 כִּי אֵלֶיךָ עֵינֵינוּ, כִּי אֵל מֶלֶךְ חַנּוּן וְרַחוּם אָתָּה.`;
 
 // קדיש יתום – static (Sefaria "Cannot pad schema node" for Mincha/Maariv refs)
+// רצה – תוספת שבת בברכת המזון
+const RATZE_SHABBAT = `רְצֵה וְהַחֲלִיצֵנוּ יְיָ אֱלֹהֵינוּ בְּמִצְווֹתֶיךָ וּבְמִצְוַת יוֹם הַשְּׁבִיעִי הַשַּׁבָּת הַגָּדוֹל וְהַקָּדוֹשׁ הַזֶּה.
+כִּי יוֹם זֶה גָּדוֹל וְקָדוֹשׁ הוּא לְפָנֶיךָ לִשְׁבָּת בּוֹ וְלָנוּחַ בּוֹ בְּאַהֲבָה כְּמִצְוַת רְצוֹנֶךָ.
+וּבִרְצוֹנְךָ הָנִיחַ לָנוּ יְיָ אֱלֹהֵינוּ שֶׁלֹּא תְהֵא צָרָה וְיָגוֹן וַאֲנָחָה בְּיוֹם מְנוּחָתֵנוּ.
+וְהַרְאֵנוּ יְיָ אֱלֹהֵינוּ בְּנֶחָמַת צִיּוֹן עִירֶךָ וּבְבִנְיַן יְרוּשָׁלַיִם עִיר קָדְשֶׁךָ,
+כִּי אַתָּה הוּא בַּעַל הַיְשׁוּעוֹת וּבַעַל הַנֶּחָמוֹת.`;
+
 const KADDISH_YATOM = `יִתְגַּדַּל וְיִתְקַדַּשׁ שְׁמֵהּ רַבָּא. אָמֵן.
 בְּעָלְמָא דִּי בְרָא כִרְעוּתֵהּ, וְיַמְלִיךְ מַלְכוּתֵהּ, וְיַצְמַח פֻּרְקָנֵהּ, וִיקָרֵב מְשִׁיחֵהּ.
 בְּחַיֵּיכוֹן וּבְיוֹמֵיכוֹן וּבְחַיֵּי דְכָל בֵּית יִשְׂרָאֵל, בַּעֲגָלָא וּבִזְמַן קָרִיב. וְאִמְרוּ אָמֵן.
@@ -2885,11 +2912,19 @@ const SIDDUR_SECTIONS = {
 
   // ─── ברכת המזון ───────────────────────────────────────────
   birkat: [
-    { label: 'שיר המעלות',         ref: 'Weekday_Siddur_Sefard_Linear,_Birkas_Hamazon,_Shir_Hamaalot' },
-    { label: 'ברכת המזון',         ref: 'Weekday_Siddur_Sefard_Linear,_Birkas_Hamazon,_Birkas_Hamazon' },
-    { label: 'יעלה ויבוא ✨',      ref: null, staticText: YAALEH_VEYAVO, isAddition: true, condition: 'isRoshChodeshOrMoed' },
-    { label: 'על הנסים – חנוכה ✨', ref: 'Weekday_Siddur_Sefard_Linear,_Birkas_Hamazon,_Al_Hanissim_for_Chanukah', isAddition: true, condition: 'isChanuka' },
-    { label: 'על הנסים – פורים ✨', ref: 'Weekday_Siddur_Sefard_Linear,_Birkas_Hamazon,_Al_Hanissim_for_Purim', isAddition: true, condition: 'isPurim' },
+    { label: 'שיר המעלות',              ref: 'Weekday_Siddur_Sefard_Linear,_Birkas_Hamazon,_Shir_Hamaalot' },
+    { label: 'ברכת המזון',              ref: 'Weekday_Siddur_Sefard_Linear,_Birkas_Hamazon,_Birkas_Hamazon' },
+    // ── תוספות לפי מועד ──
+    { label: 'יעלה ויבוא ✨',           ref: null, staticText: YAALEH_VEYAVO, isAddition: true, condition: 'isRoshChodeshOrMoed' },
+    { label: 'על הנסים – חנוכה ✨',     ref: 'Weekday_Siddur_Sefard_Linear,_Birkas_Hamazon,_Al_Hanissim_for_Chanukah', isAddition: true, condition: 'isChanuka' },
+    { label: 'על הנסים – פורים ✨',     ref: 'Weekday_Siddur_Sefard_Linear,_Birkas_Hamazon,_Al_Hanissim_for_Purim', isAddition: true, condition: 'isPurim' },
+    { label: 'רצה (שבת) ✨',            ref: null, staticText: RATZE_SHABBAT, isAddition: true, condition: 'isShabbat' },
+    { label: 'יעלה ויבוא (יו"ט) ✨',   ref: null, staticText: YAALEH_VEYAVO, isAddition: true, condition: 'isYomTov' },
+  ],
+
+  // ─── קריאת שמע על המיטה ──────────────────────────────────────
+  layla: [
+    { label: 'קריאת שמע על המיטה', ref: 'Weekday_Siddur_Sefard_Linear,_Prayer_Before_Retiring_at_Night' },
   ],
 };
 
@@ -2905,6 +2940,8 @@ const SIDDUR_CONDITIONS = {
   isOmer:              () => (window._siddurCal||{}).isOmer,
   isChanuka:           () => (window._siddurCal||{}).isChanuka,
   isPurim:             () => (window._siddurCal||{}).isPurim,
+  isShabbat:           () => (window._siddurCal||{}).isShabbat,
+  isYomTov:            () => (window._siddurCal||{}).isYomTov,
 };
 
 function setSiddurNusach(n) {
@@ -2912,6 +2949,9 @@ function setSiddurNusach(n) {
   document.querySelectorAll('#nusach-buttons .aliya-tab').forEach(b => b.classList.remove('active'));
   document.getElementById('sn-'+n)?.classList.add('active');
   appState.siddurNusach = n; saveState();
+  // Clear siddur cache so nusach change fetches fresh content
+  Object.keys(_siddurCache).forEach(k => delete _siddurCache[k]);
+  console.log('[Siddur] nusach changed to', n, '– cache cleared');
   loadSiddur();
 }
 
@@ -2951,6 +2991,7 @@ function initSiddur() {
     isSunday:         dow === 0,
     isShabbat:        dow === 6,
     // ── computed ──
+    isYomTov: todayEvents.some(t => /יום טוב|Yom Tov|Rosh Hashana|Yom Kippur|Sukkot|Pesach|Shavuot|שמחת|פסח|שבועות|ראש השנה|יום כיפור/i.test(t)),
     get skipTachanun() {
       return this.isRoshChodesh || this.isCholHamoed || this.isChanuka ||
              this.isPurim || this.isSunday || this.isShabbat ||
@@ -3277,7 +3318,7 @@ function _doScheduleZmanimReminders() {
 
   // צאת הכוכבים
   if (rem.tzeit) {
-    const tzeitTime = z.tzeit42min || z.tzeit7083deg || z.tzeit85deg;
+    const tzeitTime = z.tzeit7083deg || (z.sunset ? new Date(new Date(z.sunset).getTime() + 18*60000).toISOString() : null) || z.tzeit85deg;
     if (tzeitTime) {
       const fireAt = new Date(tzeitTime).getTime() - ADVANCE_MS;
       if (fireAt > now) setTimeout(() => new Notification('⏰ לימוד יומי', {
@@ -3450,9 +3491,17 @@ function startCompassListener() {
       const Bx =  Math.cos(a) * Math.cos(g) + Math.sin(a) * Math.sin(b) * Math.sin(g);
       const By =  Math.sin(a) * Math.cos(g) - Math.cos(a) * Math.sin(b) * Math.sin(g);
 
-      h = (Math.atan2(-By, Bx) * 180 / Math.PI + 360) % 360;
+      // Raw heading from tilt-compensated formula
+      let rawH = (Math.atan2(-By, Bx) * 180 / Math.PI + 360) % 360;
+      // In portrait mode (beta≈90), rotate -90° to correct for device orientation
+      // In landscape (beta≈0), no correction needed
+      const beta = Math.abs(e.beta || 0);
+      // Interpolate correction: 0° at flat, -90° at portrait (beta=90)
+      const correction = -90 * Math.min(beta / 90, 1);
+      h = (rawH + correction + 360) % 360;
       console.log('[Compass] tilt-comp: α', e.alpha.toFixed(1),
-        'β', (e.beta||0).toFixed(1), 'γ', (e.gamma||0).toFixed(1), '→', h.toFixed(1));
+        'β', (e.beta||0).toFixed(1), 'γ', (e.gamma||0).toFixed(1),
+        'raw→', rawH.toFixed(1), 'corr→', h.toFixed(1));
     } else {
       return;
     }
