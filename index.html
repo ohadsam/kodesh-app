@@ -560,7 +560,7 @@
     <!-- Version & Copyright - INSIDE settings-inner -->
     <div style="text-align:center;padding:18px 0 8px;border-top:1px solid var(--border);margin-top:8px">
       <div style="font-size:13px;font-weight:600;color:var(--gold-dim);margin-bottom:4px">📖 לימוד יומי</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 3.6</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 3.8</div>
       <div style="font-size:11px;color:var(--muted)">© כל הזכויות שמורות לאוהד סמט</div>
     </div>
   </div>
@@ -1165,7 +1165,7 @@
     💡 לכיול המצפן: הזז את הטלפון בתנועת ∞ (שמונה שוכב) מספר פעמים
   </div>
   <div style="text-align:center;color:var(--muted);font-size:11px;padding:12px 0 4px">
-    גרסה 3.6 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
+    גרסה 3.8 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
   </div>
 </div>
 
@@ -1279,7 +1279,7 @@ let currentAliya = 'all';
 let rashiLoaded = false;
 let rashiVisible = false;
 
-const APP_VERSION  = '3.6';
+const APP_VERSION  = '3.8';
 const STORAGE_KEY  = 'kodesh_app_v1';
 const SIDDUR_CACHE_KEY = 'siddur_cache_v';
 
@@ -1389,8 +1389,13 @@ async function sefariaText(ref, delay = 350) {
 
 // Helper: flatten data.he from sefariaText result
 function heFlat(data) {
-  const t = data?.he || [];
-  const flat = Array.isArray(t[0]) ? t.flat(Infinity) : t;
+  let t = data?.he;
+  if (!t && data?.versions?.length) {
+    const heVer = data.versions.find(v => v.actualLanguage === 'he' || v.language === 'he') || data.versions[0];
+    t = heVer?.text;
+  }
+  if (!t) return [];
+  const flat = Array.isArray(t) ? t.flat(Infinity) : [t];
   return flat.filter(Boolean);
 }
 
@@ -2278,14 +2283,17 @@ let _rashiLoading = false;
 async function loadRashiForRef(torahRef) {
   if (_rashiLoading) { console.log('[Rashi] already loading, skip'); return; }
   _rashiLoading = true;
-  // torahRef: e.g. "Leviticus 6:1-8:36"
-  // Fetch Rashi via inline commentary per Torah CHAPTER
-  // (verse-level Rashi on ch 6 v1 may not exist, so we use commentary=1 per chapter)
-  console.log('[Rashi] loading for:', torahRef);
-  const m = torahRef.match(/^(\S+)\s+(\d+):(\d+)-(\d+):(\d+)$/);
-  if (!m) { console.warn('[Rashi] bad ref:', torahRef); return; }
-  const [, book, startChS,, endChS] = m;
-  const startCh = parseInt(startChS), endCh = parseInt(endChS);
+
+  const m = torahRef.match(/^([^0-9]+)\s+(\d+):(\d+)(?:-(\d+):(\d+)|-(\d+))?$/);
+  if (!m) { console.warn('[Rashi] bad ref:', torahRef); _rashiLoading = false; return; }
+
+  const book   = m[1].trim();
+  const startCh = parseInt(m[2]);
+  const startV  = parseInt(m[3]);
+  const endCh   = m[4] ? parseInt(m[4]) : startCh;
+  const endV    = m[5] ? parseInt(m[5]) : (m[6] ? parseInt(m[6]) : startV);
+
+  console.log('[Rashi] loading for:', torahRef, '| book:', book, 'ch', startCh+':'+startV, '–', endCh+':'+endV);
 
   const verseMap = new Map();
 
@@ -2298,7 +2306,6 @@ async function loadRashiForRef(torahRef) {
       if (!resp.ok) { console.warn('[Rashi] ch', ch, resp.status); continue; }
       const data = await resp.json();
 
-      // Extract only Rashi from commentary
       const rashiItems = (data?.commentary || []).filter(c =>
         c.collectiveTitle?.en === 'Rashi' || (c.ref||'').startsWith('Rashi on')
       );
@@ -2307,29 +2314,36 @@ async function loadRashiForRef(torahRef) {
       rashiItems.forEach(c => {
         const vm = (c.ref||'').match(/(\d+):(\d+)/);
         if (!vm) return;
-        const key = `${parseInt(vm[1])}:${parseInt(vm[2])}`;
+        const cCh = parseInt(vm[1]);
+        const cV  = parseInt(vm[2]);
+        // Only include verses within our range
+        if (cCh < startCh || cCh > endCh) return;
+        if (cCh === startCh && cV < startV) return;
+        if (cCh === endCh   && cV > endV)   return;
+        const key = `${cCh}:${cV}`;
         let txt = Array.isArray(c.he) ? c.he.flat().filter(Boolean).join(' ') : (c.he||'');
-        // Keep <b> for dibur hamatchil, strip all other tags
         txt = txt.replace(/<(?!\/?(?:b|i|strong)\b)[^>]+>/gi,'').trim();
-        if (!verseMap.has(key)) verseMap.set(key,[]);
+        if (!verseMap.has(key)) verseMap.set(key, []);
         if (txt) verseMap.get(key).push(txt);
       });
-    } catch(e) {
-      console.warn('[Rashi] ch', ch, e.message);
-    }
+    } catch(e) { console.warn('[Rashi] ch', ch, e.message); }
   }
 
-  // Sort by chapter:verse and assign to verse indices
-  const sorted = [...verseMap.entries()].sort((a,b) => {
-    const [ac,av] = a[0].split(':').map(Number);
-    const [bc,bv] = b[0].split(':').map(Number);
-    return ac !== bc ? ac-bc : av-bv;
-  });
-
+  // Map Rashi to verse indices by iterating the range in order
   rashiVerses = new Array(parashaVerses.length).fill('');
-  sorted.forEach(([,comments], i) => {
-    if (i < rashiVerses.length) rashiVerses[i] = comments.join('<br>');
-  });
+  let idx = 0;
+  for (let ch = startCh; ch <= endCh; ch++) {
+    const firstV = (ch === startCh) ? startV : 1;
+    const lastV  = (ch === endCh)   ? endV   : 999;
+    for (let v = firstV; v <= lastV; v++) {
+      if (idx >= parashaVerses.length) break;
+      const key = `${ch}:${v}`;
+      if (verseMap.has(key)) {
+        rashiVerses[idx] = verseMap.get(key).join('<br><br>');
+      }
+      idx++;
+    }
+  }
 
   rashiLoaded = true;
   _rashiLoading = false;
@@ -2337,6 +2351,7 @@ async function loadRashiForRef(torahRef) {
   console.log('[Rashi] ✅', cnt, '/', parashaVerses.length, 'verses with Rashi');
   if (parashaView === 'rashi') renderParasha();
 }
+
 async function showAliya(index, btn) {
   document.querySelectorAll('#aliya-tabs .aliya-tab').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
@@ -3172,7 +3187,16 @@ function initSiddur() {
   console.log('[Siddur] initSiddur called, siddurLoading=', siddurLoading);
   // Calendar context for additions
   const todayEvents = appState._todayEventTitles || [];
-  const dow = new Date().getDay(); // 0=Sun,1=Mon,...,6=Sat
+  const now = new Date();
+  let dow = now.getDay(); // 0=Sun,1=Mon,...,6=Sat
+
+  // הלכתי: אחרי השקיעה נכנסנו ליום הבא
+  if (appState._lastZmanim && appState._lastZmanim.sunset) {
+    const sunsetTime = new Date(appState._lastZmanim.sunset);
+    if (now > sunsetTime) dow = (dow + 1) % 7;
+  } else if (now.getHours() >= 18) {
+    dow = (dow + 1) % 7;
+  }
   window._siddurCal = {
     // ── ימים מיוחדים מ-Hebcal events ──
     isRoshChodesh:    todayEvents.some(t => /ראש חודש|Rosh Chodesh/i.test(t)),
@@ -3704,61 +3728,45 @@ function startCompassListener() {
     let h = null;
     deviceBeta = e.beta;
 
-    // ── iOS: webkitCompassHeading is tilt-compensated by the OS ──
     if (typeof e.webkitCompassHeading === 'number' && e.webkitCompassHeading >= 0) {
-      h = e.webkitCompassHeading;
-      console.log('[Compass] iOS webkit:', h.toFixed(1));
+      // iOS: tilt-compensated by OS. Add ~5° magnetic declination correction for Israel
+      h = (e.webkitCompassHeading + 5) % 360;
+      console.log('[Compass] iOS webkit+decl:', h.toFixed(1));
 
-    // ── Android: deviceorientationabsolute with correct tilt-compensation ──
-    } else if (e.absolute === true && typeof e.alpha === 'number') {
-      // DeviceOrientation coordinate system:
-      //   alpha: rotation around Z (screen normal), 0=north, CW positive
-      //   beta:  rotation around X (left-right axis), -180..180
-      //          0=flat face-up, 90=upright portrait, 180/-180=flat face-down
-      //   gamma: rotation around Y (top-bottom axis), -90..90
-      //          0=flat, positive=right side up
+    } else if (e.absolute === true && e.alpha !== null) {
+      // Android: full tilt-compensation (W3C standard)
+      // Works correctly in any hold angle (portrait, landscape, tilted)
+      const alpha = e.alpha * Math.PI / 180;
+      const beta  = e.beta  * Math.PI / 180;
+      const gamma = e.gamma * Math.PI / 180;
 
-      const a = e.alpha * Math.PI / 180;
-      const b = e.beta  * Math.PI / 180;
-      const g = e.gamma * Math.PI / 180;
+      const cA = Math.cos(alpha), sA = Math.sin(alpha);
+      const cB = Math.cos(beta),  sB = Math.sin(beta);
+      const cG = Math.cos(gamma), sG = Math.sin(gamma);
 
-      // Compute the direction of magnetic north in the device frame,
-      // then project onto the horizontal plane to get compass heading.
-      // This is the standard W3C tilt-compensated formula:
-      //   Bx = cos(alpha)*cos(gamma) + sin(alpha)*sin(beta)*sin(gamma)
-      //   By = sin(alpha)*cos(gamma) - cos(alpha)*sin(beta)*sin(gamma)
-      //   heading = atan2(-By, Bx) converted to 0-360
-      const Bx =  Math.cos(a) * Math.cos(g) + Math.sin(a) * Math.sin(b) * Math.sin(g);
-      const By =  Math.sin(a) * Math.cos(g) - Math.cos(a) * Math.sin(b) * Math.sin(g);
+      // Project device pointing vector onto true horizontal plane
+      const rA = -cA * sG - sA * sB * cG;
+      const rB = -sA * sG + cA * sB * cG;
 
-      // deviceorientationabsolute: alpha = device azimuth (clockwise from north)
-      // BUT alpha is relative to the TOP of the screen, not geographic north directly
-      // Standard conversion: compass_heading = (360 - alpha) % 360
-      // This is correct for portrait mode (standard phone use)
-      // For landscape, we need to add/subtract screen orientation offset
-      // Android deviceorientationabsolute:
-      // alpha = device rotation CCW from north (0=north, 90=west, 180=south, 270=east)
-      // To get compass bearing (CW from north): heading = (360 - alpha) % 360
-      // Screen orientation correction:
-      //   portrait (0°): no extra offset  
-      //   landscape right (90°): add 90
-      //   upside down (180°): add 180
-      //   landscape left (270°): add 270
+      let heading = Math.atan2(rA, rB) * 180 / Math.PI;
+      if (heading < 0) heading += 360;
+
+      // Screen orientation correction (portrait=0, landscape=90, etc.)
       const screenAngle = (window.screen?.orientation?.angle ?? window.orientation ?? 0);
-      h = (360 - e.alpha + screenAngle + 360) % 360;
-      console.log('[Compass] α=', e.alpha.toFixed(1),
-        'screen=', screenAngle, '→', h.toFixed(1));
+      h = (heading + screenAngle) % 360;
+      console.log('[Compass] tilt-comp: α', e.alpha.toFixed(1),
+        'β', (e.beta||0).toFixed(1), 'γ', (e.gamma||0).toFixed(1),
+        'screen', screenAngle, '→', h.toFixed(1));
     } else {
       return;
     }
 
-    if (!isNaN(h)) { deviceHeading = h; updateCompassUI(); }
+    if (h !== null && !isNaN(h)) { deviceHeading = h; updateCompassUI(); }
   };
 
   window.addEventListener('deviceorientationabsolute', compassListener, true);
   window.addEventListener('deviceorientation',         compassListener, true);
   setQiblaStatus('🧭 מצפן פעיל');
-  console.log('[Compass] tilt-compensated listener started');
 }
 
 function _startDeviceOrientationFallback() {

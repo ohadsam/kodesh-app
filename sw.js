@@ -1,4 +1,4 @@
-const APP_VERSION = '3.6';
+const APP_VERSION = '3.8';
 const CACHE = `kodesh-v${APP_VERSION}`;
 const STATIC = [
   './',
