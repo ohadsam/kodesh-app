@@ -560,7 +560,7 @@
     <!-- Version & Copyright - INSIDE settings-inner -->
     <div style="text-align:center;padding:18px 0 8px;border-top:1px solid var(--border);margin-top:8px">
       <div style="font-size:13px;font-weight:600;color:var(--gold-dim);margin-bottom:4px">📖 לימוד יומי</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 3.8</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 3.9</div>
       <div style="font-size:11px;color:var(--muted)">© כל הזכויות שמורות לאוהד סמט</div>
     </div>
   </div>
@@ -1165,7 +1165,7 @@
     💡 לכיול המצפן: הזז את הטלפון בתנועת ∞ (שמונה שוכב) מספר פעמים
   </div>
   <div style="text-align:center;color:var(--muted);font-size:11px;padding:12px 0 4px">
-    גרסה 3.8 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
+    גרסה 3.9 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
   </div>
 </div>
 
@@ -1279,7 +1279,7 @@ let currentAliya = 'all';
 let rashiLoaded = false;
 let rashiVisible = false;
 
-const APP_VERSION  = '3.8';
+const APP_VERSION  = '3.9';
 const STORAGE_KEY  = 'kodesh_app_v1';
 const SIDDUR_CACHE_KEY = 'siddur_cache_v';
 
@@ -1407,11 +1407,12 @@ function cleanSefariaHtml(str) {
     .replace(/&thinsp;/g, '\u2009').replace(/&nbsp;/g, '\u00a0')
     .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
     .replace(/&mdash;/g, '\u2014').replace(/&ndash;/g, '\u2013')
-    // <small> → paragraph break marker + label on its own line
-    // \u2029 = paragraph separator used to signal "new section header"
-    .replace(/<small[^>]*>(.*?)<\/small>/gi, '|||HEADER|||$1|||HEADER|||')
+    .replace(/<small[^>]*>(.*?)<\/small>/gi,
+      '<span style="display:block;font-size:13px;color:var(--addition);background:var(--addition-bg);' +
+      'padding:6px 10px;border-radius:6px;margin:6px 0;line-height:1.5;font-style:normal;' +
+      'border-right:3px solid var(--addition)">$1</span>')
     .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<(?!\/?(?:b|i|strong|em)\b)[^>]+>/gi, '')
+    .replace(/<(?!\/?(?:b|i|strong|em|span)\b)[^>]+>/gi, '')
     .trim();
 }
 
@@ -2199,7 +2200,7 @@ async function loadSpecificParasha(ref) {
 
 let _parashaLoading = false;
 async function loadParasha() {
-  if (_parashaLoading) { console.log('[Parasha] already loading, skip'); return; }
+  if (_parashaLoading) return;
   _parashaLoading = true;
   const loadingEl = document.getElementById('parasha-loading');
   const nameEl    = document.getElementById('parasha-name');
@@ -2209,45 +2210,53 @@ async function loadParasha() {
   loadingEl.style.display = 'block';
   document.getElementById('parasha-content').innerHTML = '';
 
-  // Always populate the dropdown
   populateParashaDropdown(null);
 
   try {
-    console.log('[Parasha] fetching calendar...');
-    const cal = await fetchWithDelay(`https://www.sefaria.org/api/calendars?diaspora=0`);
-    console.log('[Parasha] calendar items:', cal?.calendar_items?.map(i=>i.title?.en));
-    const parasha = (cal?.calendar_items || []).find(i =>
-      (i.title?.en || '').toLowerCase().includes('parashat') ||
-      (i.title?.en || '').toLowerCase().includes('parasha')
-    );
-    if (!parasha) {
-      console.warn('[Parasha] no parasha found in calendar');
-      loadingEl.textContent = 'לא נמצאה פרשה – בחר מהרשימה';
-      return;
-    }
-    const heName = parasha.displayValue?.he || parasha.displayValue?.en || '';
-    console.log('[Parasha] found:', heName, 'ref:', parasha.ref);
-    nameEl.textContent = heName;
-    aliyot = parasha.extraDetails?.aliyot || [];
+    // Use Hebcal for reliable current parasha (avoids Sefaria caching issues)
+    const ds  = formatDate(getTargetDate());
+    const ds2 = formatDate(new Date(getTargetDate().getTime() + 8 * 86400000));
+    const hbUrl  = `https://www.hebcal.com/hebcal?v=1&cfg=json&s=on&start=${ds}&end=${ds2}`;
+    const hbData = await fetchWithDelay(hbUrl);
+    const parashaEvent = (hbData?.items || []).find(i => i.category === 'parashat');
+    if (!parashaEvent) throw new Error('לא נמצאה פרשה בלוח');
 
-    // Update dropdown to select current parasha by matching Hebrew name
-    const matchP = ALL_PARASHIOT.find(p => heName.includes(p.he) || p.he.includes(heName.replace('פרשת ','')));
-    populateParashaDropdown(matchP?.ref || null);
-    if (matchP) document.getElementById('parasha-select').value = matchP.ref;
+    const heName = parashaEvent.hebrew || parashaEvent.title || '';
+    console.log('[Parasha] Hebcal parasha:', heName);
+    nameEl.textContent = heName;
+
+    // Match to our ALL_PARASHIOT list
+    const clean = heName.replace(/פרשת\s*/,'').trim();
+    const matchP = ALL_PARASHIOT.find(p =>
+      clean === p.he || heName.includes(p.he) || p.he.includes(clean)
+    );
+    if (!matchP) throw new Error('לא נמצאה התאמה לפרשה: ' + heName);
+
+    document.getElementById('parasha-select').value = matchP.ref;
+
+    // Get aliyot from Sefaria calendar (bust cache with timestamp)
+    const cal = await fetchWithDelay(`https://www.sefaria.org/api/calendars?diaspora=0&_=${Date.now()}`);
+    const calItem = (cal?.calendar_items || []).find(i =>
+      (i.title?.en || '').toLowerCase().includes('parashat')
+    );
+    aliyot = calItem?.extraDetails?.aliyot || [];
+    console.log('[Parasha] found:', heName, 'ref:', matchP.ref, 'aliyot:', aliyot.length);
 
     tabsEl.innerHTML = '<div class="aliya-tab active" onclick="showAliya(\'all\', this)">הכל</div>';
-    const aliyaNames = ['א','ב','ג','ד','ה','ו','ז','מפטיר'];
-    aliyot.forEach((a,i) => {
-      tabsEl.innerHTML += `<div class="aliya-tab" onclick="showAliya(${i}, this)">${aliyaNames[i]||i+1}</div>`;
+    ['א','ב','ג','ד','ה','ו','ז','מפטיר'].forEach((name, i) => {
+      if (aliyot[i]) tabsEl.innerHTML +=
+        `<div class="aliya-tab" onclick="showAliya(${i}, this)">${name}</div>`;
     });
 
-    currentParashaRef = parasha.ref;
-    await loadAliyaText(parasha.ref);
+    currentParashaRef = matchP.ref;
+    await loadAliyaText(currentParashaRef);
     loadingEl.style.display = 'none';
-    updateDoneButton('parasha', parasha.ref);
+    updateDoneButton('parasha', currentParashaRef);
   } catch(e) {
-    console.error('[Parasha] loadParasha error:', e);
+    console.error('[Parasha] error:', e);
     loadingEl.textContent = 'שגיאה בטעינה: ' + e.message;
+  } finally {
+    _parashaLoading = false;
   }
 }
 
@@ -2281,72 +2290,71 @@ async function loadAliyaText(ref) {
 
 let _rashiLoading = false;
 async function loadRashiForRef(torahRef) {
-  if (_rashiLoading) { console.log('[Rashi] already loading, skip'); return; }
+  if (_rashiLoading) return;
   _rashiLoading = true;
 
   const m = torahRef.match(/^([^0-9]+)\s+(\d+):(\d+)(?:-(\d+):(\d+)|-(\d+))?$/);
-  if (!m) { console.warn('[Rashi] bad ref:', torahRef); _rashiLoading = false; return; }
+  if (!m) { _rashiLoading = false; return; }
 
-  const book   = m[1].trim();
+  const book    = m[1].trim();
   const startCh = parseInt(m[2]);
   const startV  = parseInt(m[3]);
   const endCh   = m[4] ? parseInt(m[4]) : startCh;
   const endV    = m[5] ? parseInt(m[5]) : (m[6] ? parseInt(m[6]) : startV);
 
-  console.log('[Rashi] loading for:', torahRef, '| book:', book, 'ch', startCh+':'+startV, '–', endCh+':'+endV);
+  console.log('[Rashi] loading:', book, startCh+':'+startV, '–', endCh+':'+endV);
 
-  const verseMap = new Map();
+  const verseMap     = new Map();
+  const chapterLengths = {};   // actual verse count per chapter
 
   for (let ch = startCh; ch <= endCh; ch++) {
     try {
       await new Promise(r => setTimeout(r, 300));
-      const chRef = `${book} ${ch}`;
-      const url = `https://www.sefaria.org/api/texts/${encodeURI(chRef)}?lang=he&commentary=1&context=0`;
+      const url = `https://www.sefaria.org/api/texts/${encodeURI(book + ' ' + ch)}?lang=he&commentary=1&context=0`;
       const resp = await fetch(url);
-      if (!resp.ok) { console.warn('[Rashi] ch', ch, resp.status); continue; }
+      if (!resp.ok) continue;
       const data = await resp.json();
 
-      const rashiItems = (data?.commentary || []).filter(c =>
-        c.collectiveTitle?.en === 'Rashi' || (c.ref||'').startsWith('Rashi on')
-      );
-      console.log('[Rashi] ch', ch, '→', rashiItems.length, 'Rashi items');
+      // Record real chapter length to prevent index drift
+      chapterLengths[ch] = Array.isArray(data.he) ? data.he.length : 999;
 
-      rashiItems.forEach(c => {
-        const vm = (c.ref||'').match(/(\d+):(\d+)/);
-        if (!vm) return;
-        const cCh = parseInt(vm[1]);
-        const cV  = parseInt(vm[2]);
-        // Only include verses within our range
-        if (cCh < startCh || cCh > endCh) return;
-        if (cCh === startCh && cV < startV) return;
-        if (cCh === endCh   && cV > endV)   return;
-        const key = `${cCh}:${cV}`;
-        let txt = Array.isArray(c.he) ? c.he.flat().filter(Boolean).join(' ') : (c.he||'');
-        txt = txt.replace(/<(?!\/?(?:b|i|strong)\b)[^>]+>/gi,'').trim();
-        if (!verseMap.has(key)) verseMap.set(key, []);
-        if (txt) verseMap.get(key).push(txt);
-      });
+      (data?.commentary || [])
+        .filter(c => c.collectiveTitle?.en === 'Rashi' || (c.ref||'').startsWith('Rashi on'))
+        .forEach(c => {
+          const vm = (c.ref||'').match(/(\d+):(\d+)/);
+          if (!vm) return;
+          const cCh = parseInt(vm[1]), cV = parseInt(vm[2]);
+          if (cCh < startCh || cCh > endCh) return;
+          if (cCh === startCh && cV < startV) return;
+          if (cCh === endCh   && cV > endV)   return;
+          const key = `${cCh}:${cV}`;
+          let txt = Array.isArray(c.he) ? c.he.flat().filter(Boolean).join(' ') : (c.he||'');
+          txt = txt.replace(/<(?!\/?(?:b|i|strong)\b)[^>]+>/gi,'').trim();
+          if (!verseMap.has(key)) verseMap.set(key, []);
+          if (txt) verseMap.get(key).push(txt);
+        });
+      console.log('[Rashi] ch', ch, 'len:', chapterLengths[ch], 'rashi entries:', verseMap.size);
     } catch(e) { console.warn('[Rashi] ch', ch, e.message); }
   }
 
-  // Map Rashi to verse indices by iterating the range in order
+  // Map Rashi to verse indices using exact chapter lengths
   rashiVerses = new Array(parashaVerses.length).fill('');
   let idx = 0;
   for (let ch = startCh; ch <= endCh; ch++) {
-    const firstV = (ch === startCh) ? startV : 1;
-    const lastV  = (ch === endCh)   ? endV   : 999;
-    for (let v = firstV; v <= lastV; v++) {
+    const firstV   = (ch === startCh) ? startV : 1;
+    const actualLast = (ch === endCh)
+      ? Math.min(endV, chapterLengths[ch] || 999)
+      : (chapterLengths[ch] || 999);
+    for (let v = firstV; v <= actualLast; v++) {
       if (idx >= parashaVerses.length) break;
       const key = `${ch}:${v}`;
-      if (verseMap.has(key)) {
-        rashiVerses[idx] = verseMap.get(key).join('<br><br>');
-      }
+      if (verseMap.has(key)) rashiVerses[idx] = verseMap.get(key).join('<br><br>');
       idx++;
     }
   }
 
-  rashiLoaded = true;
-  _rashiLoading = false;
+  rashiLoaded    = true;
+  _rashiLoading  = false;
   const cnt = rashiVerses.filter(Boolean).length;
   console.log('[Rashi] ✅', cnt, '/', parashaVerses.length, 'verses with Rashi');
   if (parashaView === 'rashi') renderParasha();
@@ -3254,20 +3262,18 @@ function _getCache(ref) { return null; /* always fetch fresh */ }
 
 // Fetch a single section and return rendered HTML (uses cache)
 async function _fetchSectionHtml(s, style, yaalehOccasion) {
-  // Static text
   if (s.staticText && !s.isHallel) {
     const txt = s.staticText.replace('<span id="yaaleh-occasion"></span>', yaalehOccasion);
     const isAdd = !!s.isAddition;
     const pStyle = isAdd
-      ? 'margin:0 0 8px 0;line-height:1.85;color:var(--addition);font-style:italic;font-weight:600'
-      : 'margin:0 0 8px 0;line-height:1.85;color:var(--cream)';
+      ? 'margin:0 0 6px 0;line-height:1.85;color:var(--addition);font-style:italic;font-weight:600'
+      : 'margin:0 0 6px 0;line-height:1.85;color:var(--cream)';
     const lines = txt.split('\n').map(l => l.trim()
       ? `<p style="${pStyle}">${l}</p>`
       : '<div style="height:4px"></div>').join('');
     return `<div style="${style}">${lines}</div>`;
   }
 
-  // הלל – 6 psalms, each individually cached
   if (s.isHallel) {
     let hallelHtml = '';
     for (const psRef of HALLEL_REFS) {
@@ -3285,26 +3291,18 @@ async function _fetchSectionHtml(s, style, yaalehOccasion) {
     return `<div style="${style}">${hallelHtml}</div>`;
   }
 
-  // Live Sefaria ref – check cache first
   const cached = _getCache(s.ref);
-  if (cached) {
-    console.log('[Siddur] cache hit:', s.label);
-    return cached;
-  }
+  if (cached) return cached;
 
-  // ref is already computed per-nusach by getSiddurSections()
   const data = await sefariaText(s.ref, 0);
-  const flat = heFlat(data)
-    .map(cleanSefariaHtml)
-    .filter(Boolean)
-    .flatMap(v => splitVerseOnHeaders(v));
+  const flat = heFlat(data).map(cleanSefariaHtml).filter(Boolean);
   if (!flat.length) return '<span style="color:var(--muted)">(אין טקסט זמין)</span>';
 
   const paragraphs = buildParagraphs(flat);
   const isAdd = !!s.isAddition;
-  const pColor  = isAdd ? 'var(--addition)'  : 'var(--cream)';
-  const pStyle  = isAdd ? 'italic'       : 'normal';
-  const pWeight = isAdd ? '600'          : '400';
+  const pColor  = isAdd ? 'var(--addition)' : 'var(--cream)';
+  const pStyle  = isAdd ? 'italic'          : 'normal';
+  const pWeight = isAdd ? '600'             : '400';
   const html = `<div style="${style}">${
     paragraphs.map(p => {
       if (p.startsWith('__HEADER__')) {
@@ -3313,7 +3311,7 @@ async function _fetchSectionHtml(s, style, yaalehOccasion) {
                `color:var(--gold-dim);letter-spacing:.5px;border-bottom:1px solid var(--border);` +
                `padding-bottom:2px">${label}</p>`;
       }
-      return `<p style="margin:0 0 8px 0;line-height:1.85;color:${pColor};` +
+      return `<p style="margin:0 0 5px 0;line-height:1.85;color:${pColor};` +
              `font-style:${pStyle};font-weight:${pWeight}">${p}</p>`;
     }).join('')
   }</div>`;
@@ -3734,29 +3732,10 @@ function startCompassListener() {
       console.log('[Compass] iOS webkit+decl:', h.toFixed(1));
 
     } else if (e.absolute === true && e.alpha !== null) {
-      // Android: full tilt-compensation (W3C standard)
-      // Works correctly in any hold angle (portrait, landscape, tilted)
-      const alpha = e.alpha * Math.PI / 180;
-      const beta  = e.beta  * Math.PI / 180;
-      const gamma = e.gamma * Math.PI / 180;
-
-      const cA = Math.cos(alpha), sA = Math.sin(alpha);
-      const cB = Math.cos(beta),  sB = Math.sin(beta);
-      const cG = Math.cos(gamma), sG = Math.sin(gamma);
-
-      // Project device pointing vector onto true horizontal plane
-      const rA = -cA * sG - sA * sB * cG;
-      const rB = -sA * sG + cA * sB * cG;
-
-      let heading = Math.atan2(rA, rB) * 180 / Math.PI;
-      if (heading < 0) heading += 360;
-
-      // Screen orientation correction (portrait=0, landscape=90, etc.)
+      // Android: use fused absolute heading from OS sensor (already tilt-compensated)
       const screenAngle = (window.screen?.orientation?.angle ?? window.orientation ?? 0);
-      h = (heading + screenAngle) % 360;
-      console.log('[Compass] tilt-comp: α', e.alpha.toFixed(1),
-        'β', (e.beta||0).toFixed(1), 'γ', (e.gamma||0).toFixed(1),
-        'screen', screenAngle, '→', h.toFixed(1));
+      h = (360 - e.alpha + screenAngle) % 360;
+      console.log('[Compass] Android heading:', h.toFixed(1), 'α=', e.alpha.toFixed(1), 'screen=', screenAngle);
     } else {
       return;
     }
