@@ -22,6 +22,9 @@
       --card:     #251a0c;
       --border:   #3d2b14;
       --gold:     #c9a54a;
+      --addition: #7ed6a0;  /* ירוק-מנטה בהיר לתוספות מיוחדות */
+      --addition-bg: rgba(126,214,160,.08);
+      --addition-border: rgba(126,214,160,.45);
       --gold-dim: #7a6128;
       --cream:    #f5ead4;
       --text:     #e8d9b8;
@@ -557,7 +560,7 @@
     <!-- Version & Copyright - INSIDE settings-inner -->
     <div style="text-align:center;padding:18px 0 8px;border-top:1px solid var(--border);margin-top:8px">
       <div style="font-size:13px;font-weight:600;color:var(--gold-dim);margin-bottom:4px">📖 לימוד יומי</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 3.2</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 3.6</div>
       <div style="font-size:11px;color:var(--muted)">© כל הזכויות שמורות לאוהד סמט</div>
     </div>
   </div>
@@ -1162,7 +1165,7 @@
     💡 לכיול המצפן: הזז את הטלפון בתנועת ∞ (שמונה שוכב) מספר פעמים
   </div>
   <div style="text-align:center;color:var(--muted);font-size:11px;padding:12px 0 4px">
-    גרסה 3.2 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
+    גרסה 3.6 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
   </div>
 </div>
 
@@ -1276,7 +1279,7 @@ let currentAliya = 'all';
 let rashiLoaded = false;
 let rashiVisible = false;
 
-const APP_VERSION  = '3.2';
+const APP_VERSION  = '3.6';
 const STORAGE_KEY  = 'kodesh_app_v1';
 const SIDDUR_CACHE_KEY = 'siddur_cache_v';
 
@@ -2189,7 +2192,10 @@ async function loadSpecificParasha(ref) {
   await loadAliyaText(ref);
 }
 
+let _parashaLoading = false;
 async function loadParasha() {
+  if (_parashaLoading) { console.log('[Parasha] already loading, skip'); return; }
+  _parashaLoading = true;
   const loadingEl = document.getElementById('parasha-loading');
   const nameEl    = document.getElementById('parasha-name');
   const tabsEl    = document.getElementById('aliya-tabs');
@@ -2263,10 +2269,15 @@ async function loadAliyaText(ref) {
   } catch(e) {
     console.error('[Parasha] loadAliyaText error:', e);
     loadingEl.textContent = 'שגיאה בטעינת הפרשה: ' + e.message;
+  } finally {
+    _parashaLoading = false;
   }
 }
 
+let _rashiLoading = false;
 async function loadRashiForRef(torahRef) {
+  if (_rashiLoading) { console.log('[Rashi] already loading, skip'); return; }
+  _rashiLoading = true;
   // torahRef: e.g. "Leviticus 6:1-8:36"
   // Fetch Rashi via inline commentary per Torah CHAPTER
   // (verse-level Rashi on ch 6 v1 may not exist, so we use commentary=1 per chapter)
@@ -2321,6 +2332,7 @@ async function loadRashiForRef(torahRef) {
   });
 
   rashiLoaded = true;
+  _rashiLoading = false;
   const cnt = rashiVerses.filter(Boolean).length;
   console.log('[Rashi] ✅', cnt, '/', parashaVerses.length, 'verses with Rashi');
   if (parashaView === 'rashi') renderParasha();
@@ -3038,6 +3050,12 @@ function getSiddurSections(nusach, prayer) {
     { label:'אבינו מלכנו ✨',
       ref: r('The_Morning_Prayers,_Avinu_Malkeinu', null, null),
       isAddition:true, condition:'isAvinuMalkeinu' },
+    { label:'למנצח ✨',
+      ref: 'Psalms.20',
+      isAddition: false,
+      // עדות המזרח: למנצח (תהלים כ') לפני עלינו במנחה בלבד
+      // ספרד ואשכנז: לא נהוג
+      condition: 'isMizrach', conditionType: 'show' },
     { label:'עלינו',
       ref: r('Mincha,_Aleinu', null, 'Weekday_Mincha,_Alenu') },
     { label:'קדיש יתום',          ref:null, staticText:KADDISH_YATOM },
@@ -3078,16 +3096,31 @@ function getSiddurSections(nusach, prayer) {
   return [];
 }
 
-// Legacy wrapper for compatibility
+// SIDDUR_SECTIONS reads siddurNusach directly (always current)
 const SIDDUR_SECTIONS = {
-  get shacharit() { return getSiddurSections(window._currentNusach || 'sfard', 'shacharit'); },
-  get mincha()    { return getSiddurSections(window._currentNusach || 'sfard', 'mincha'); },
-  get arvit()     { return getSiddurSections(window._currentNusach || 'sfard', 'arvit'); },
-  get birkat()    { return getSiddurSections(window._currentNusach || 'sfard', 'birkat'); },
-  get layla()     { return getSiddurSections(window._currentNusach || 'sfard', 'layla'); },
+  get shacharit() { return getSiddurSections(siddurNusach, 'shacharit'); },
+  get mincha()    { return getSiddurSections(siddurNusach, 'mincha'); },
+  get arvit()     { return getSiddurSections(siddurNusach, 'arvit'); },
+  get birkat()    { return getSiddurSections(siddurNusach, 'birkat'); },
+  get layla()     { return getSiddurSections(siddurNusach, 'layla'); },
 };
 
 
+
+// Labels describing when each addition is said (shown above the section)
+const CONDITION_LABELS = {
+  isRoshChodeshOrMoed:  'נאמר בראש חודש ובחול המועד',
+  isRoshChodesh:        'נאמר בראש חודש',
+  isCholHamoed:         'נאמר בחול המועד',
+  isYomTov:             'נאמר ביום טוב',
+  isHallelDay:          'נאמר בראש חודש, חנוכה וחול המועד',
+  isTorahReadingDay:    'נאמר בשני, חמישי וראש חודש',
+  isAvinuMalkeinu:      'נאמר בעשרת ימי תשובה ובתעניות',
+  isOmer:               'נאמר בימי ספירת העומר',
+  isChanuka:            'נאמר בחנוכה',
+  isPurim:              'נאמר בפורים',
+  isShabbat:            'נאמר בשבת',
+};
 
 const SIDDUR_CONDITIONS = {
   noTachanun:          () => (window._siddurCal||{}).skipTachanun,
@@ -3102,6 +3135,7 @@ const SIDDUR_CONDITIONS = {
   isPurim:             () => (window._siddurCal||{}).isPurim,
   isShabbat:           () => (window._siddurCal||{}).isShabbat,
   isYomTov:            () => (window._siddurCal||{}).isYomTov,
+  isMizrach:           () => siddurNusach === 'mizrach',
 };
 
 function setSiddurNusach(n) {
@@ -3198,10 +3232,15 @@ function _getCache(ref) { return null; /* always fetch fresh */ }
 async function _fetchSectionHtml(s, style, yaalehOccasion) {
   // Static text
   if (s.staticText && !s.isHallel) {
-    const html = s.staticText.replace('<span id="yaaleh-occasion"></span>', yaalehOccasion);
-    return `<div style="${style}">${html.split('\n').map(l => l
-      ? `<div>${l}</div>`
-      : '<div style="height:6px"></div>').join('')}</div>`;
+    const txt = s.staticText.replace('<span id="yaaleh-occasion"></span>', yaalehOccasion);
+    const isAdd = !!s.isAddition;
+    const pStyle = isAdd
+      ? 'margin:0 0 8px 0;line-height:1.85;color:var(--addition);font-style:italic;font-weight:600'
+      : 'margin:0 0 8px 0;line-height:1.85;color:var(--cream)';
+    const lines = txt.split('\n').map(l => l.trim()
+      ? `<p style="${pStyle}">${l}</p>`
+      : '<div style="height:4px"></div>').join('');
+    return `<div style="${style}">${lines}</div>`;
   }
 
   // הלל – 6 psalms, each individually cached
@@ -3238,15 +3277,20 @@ async function _fetchSectionHtml(s, style, yaalehOccasion) {
   if (!flat.length) return '<span style="color:var(--muted)">(אין טקסט זמין)</span>';
 
   const paragraphs = buildParagraphs(flat);
+  const isAdd = !!s.isAddition;
+  const pColor  = isAdd ? 'var(--addition)'  : 'var(--cream)';
+  const pStyle  = isAdd ? 'italic'       : 'normal';
+  const pWeight = isAdd ? '600'          : '400';
   const html = `<div style="${style}">${
     paragraphs.map(p => {
       if (p.startsWith('__HEADER__')) {
         const label = p.slice(10);
-        return `<p style="margin:14px 0 2px 0;font-size:10px;font-weight:700;` +
+        return `<p style="margin:12px 0 2px 0;font-size:10px;font-weight:700;font-style:normal;` +
                `color:var(--gold-dim);letter-spacing:.5px;border-bottom:1px solid var(--border);` +
                `padding-bottom:2px">${label}</p>`;
       }
-      return `<p style="margin:0 0 8px 0;line-height:1.85">${p}</p>`;
+      return `<p style="margin:0 0 8px 0;line-height:1.85;color:${pColor};` +
+             `font-style:${pStyle};font-weight:${pWeight}">${p}</p>`;
     }).join('')
   }</div>`;
   _putCache(s.ref, html);
@@ -3295,8 +3339,8 @@ async function loadSiddur() {
       const id = s.label.replace(/\s/g,'_');
       return `<button onclick="document.getElementById('ss-${id}')?.scrollIntoView({behavior:'smooth'})"
         style="font-size:10px;padding:3px 8px;border-radius:12px;border:1px solid var(--border);
-        background:${s.isAddition?'rgba(201,165,74,.15)':'var(--surface)'};
-        color:${s.isAddition?'var(--gold)':'var(--muted)'};cursor:pointer;font-family:'Heebo',sans-serif">
+        background:${s.isAddition?'rgba(126,214,160,.12)':'var(--surface)'};
+        color:${s.isAddition?'var(--addition)':'var(--muted)'};cursor:pointer;font-family:'Heebo',sans-serif">
         ${s.label}</button>`;
     }).join('');
   }
@@ -3305,11 +3349,27 @@ async function loadSiddur() {
   const el = document.getElementById('siddur-content');
   el.innerHTML = sections.map(s => {
     const id = s.label.replace(/\s/g,'_');
-    const cached = !s.staticText && !s.isHallel && _getCache(s.ref);
-    return `<div id="ss-${id}" style="margin-bottom:2px;padding-bottom:4px;border-bottom:1px solid var(--border)">
-      <div style="font-size:10px;font-weight:700;color:${s.isAddition?'var(--gold)':'var(--gold-dim)'};
-        margin-bottom:3px;padding-top:6px">${s.label}</div>
-      <div id="sc-${id}" style="color:var(--muted);font-size:12px">טוען...</div>
+    const whenLabel = s.isAddition && s.condition ? (CONDITION_LABELS[s.condition] || '') : '';
+    const addWrap = s.isAddition
+      ? 'background:var(--addition-bg);border-radius:10px;padding:8px 12px 6px;' +
+        'border-right:3px solid var(--addition);margin-right:-2px;margin-bottom:2px;' +
+        'border-top:1px solid var(--addition-border);border-bottom:1px solid var(--addition-border)'
+      : '';
+    const titleStyle = s.isAddition
+      ? 'font-size:11px;font-weight:700;font-style:italic;color:var(--addition);' +
+        'letter-spacing:.3px;margin-bottom:2px'
+      : 'font-size:10px;font-weight:700;color:var(--gold-dim);margin-bottom:3px;padding-top:6px';
+    const whenHtml = whenLabel
+      ? `<div style="font-size:9px;color:var(--addition);opacity:.85;margin-bottom:4px;` +
+        `font-style:normal;letter-spacing:.2px">📅 ${whenLabel}</div>`
+      : '';
+    return `<div id="ss-${id}" style="margin-bottom:2px;padding-bottom:4px;` +
+      `border-bottom:${s.isAddition ? 'none' : '1px solid var(--border)'}">
+      <div style="${addWrap}">
+        ${whenHtml}
+        <div style="${titleStyle}">${s.label.replace(' ✨','')}</div>
+        <div id="sc-${id}" style="color:var(--muted);font-size:12px">טוען...</div>
+      </div>
     </div>`;
   }).join('');
 
@@ -3381,8 +3441,13 @@ async function loadSiddur() {
 }
 
 function _sectionStyle(s) {
+  if (s.isAddition) {
+    // Special additions: gold, bold, italic to make them stand out
+    return `font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);line-height:1.9;` +
+           `color:var(--gold);font-weight:600;font-style:italic`;
+  }
   return `font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);line-height:1.9;` +
-         `color:${s.isAddition ? 'var(--gold)' : 'var(--cream)'}`;
+         `color:var(--cream)`;
 }
 
 // Show/hide floating nav button based on scroll position
