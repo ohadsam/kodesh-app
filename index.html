@@ -557,7 +557,7 @@
     <!-- Version & Copyright - INSIDE settings-inner -->
     <div style="text-align:center;padding:18px 0 8px;border-top:1px solid var(--border);margin-top:8px">
       <div style="font-size:13px;font-weight:600;color:var(--gold-dim);margin-bottom:4px">📖 לימוד יומי</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 3.0</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 3.2</div>
       <div style="font-size:11px;color:var(--muted)">© כל הזכויות שמורות לאוהד סמט</div>
     </div>
   </div>
@@ -1162,7 +1162,7 @@
     💡 לכיול המצפן: הזז את הטלפון בתנועת ∞ (שמונה שוכב) מספר פעמים
   </div>
   <div style="text-align:center;color:var(--muted);font-size:11px;padding:12px 0 4px">
-    גרסה 3.0 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
+    גרסה 3.2 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
   </div>
 </div>
 
@@ -1276,7 +1276,7 @@ let currentAliya = 'all';
 let rashiLoaded = false;
 let rashiVisible = false;
 
-const APP_VERSION  = '3.0';
+const APP_VERSION  = '3.2';
 const STORAGE_KEY  = 'kodesh_app_v1';
 const SIDDUR_CACHE_KEY = 'siddur_cache_v';
 
@@ -2267,55 +2267,64 @@ async function loadAliyaText(ref) {
 }
 
 async function loadRashiForRef(torahRef) {
-  // torahRef format: "Genesis 1:1-6:8"
-  // Use dedicated Rashi book: "Rashi on Genesis 1" per chapter
+  // torahRef: e.g. "Leviticus 6:1-8:36"
+  // Fetch Rashi via inline commentary per Torah CHAPTER
+  // (verse-level Rashi on ch 6 v1 may not exist, so we use commentary=1 per chapter)
   console.log('[Rashi] loading for:', torahRef);
   const m = torahRef.match(/^(\S+)\s+(\d+):(\d+)-(\d+):(\d+)$/);
   if (!m) { console.warn('[Rashi] bad ref:', torahRef); return; }
-  const [, book, startCh,, endCh] = m;
-  const startChN = parseInt(startCh), endChN = parseInt(endCh);
-  const rashiBook = 'Rashi on ' + book;
+  const [, book, startChS,, endChS] = m;
+  const startCh = parseInt(startChS), endCh = parseInt(endChS);
 
-  const allItems = [];
-  for (let ch = startChN; ch <= endChN; ch++) {
+  const verseMap = new Map();
+
+  for (let ch = startCh; ch <= endCh; ch++) {
     try {
-      await new Promise(r => setTimeout(r, 250));
-      // Sefaria Rashi ref: "Rashi_on_Leviticus.6" (underscore spaces, dot before chapter)
-      const ref = rashiBook.replace(/ /g, '_') + '.' + ch;
-      const url = `https://www.sefaria.org/api/texts/${encodeURI(ref)}?lang=he&commentary=0&context=0`;
-      console.log('[Rashi] fetching:', ref);
+      await new Promise(r => setTimeout(r, 300));
+      const chRef = `${book} ${ch}`;
+      const url = `https://www.sefaria.org/api/texts/${encodeURI(chRef)}?lang=he&commentary=1&context=0`;
       const resp = await fetch(url);
       if (!resp.ok) { console.warn('[Rashi] ch', ch, resp.status); continue; }
       const data = await resp.json();
-      // data.he = array of arrays: [verse][comment]
-      const heArr = data?.he || [];
-      heArr.forEach((verseComments, vIdx) => {
-        if (!verseComments) return;
-        const comments = Array.isArray(verseComments) ? verseComments : [verseComments];
-        const txt = comments.flat().filter(Boolean)
-          .map(c => c.replace(/<(?!\/?(b|i|strong)\b)[^>]+>/gi,'').trim())
-          .join('<br>');
-        if (txt) allItems.push({ ch, verse: vIdx + 1, txt });
+
+      // Extract only Rashi from commentary
+      const rashiItems = (data?.commentary || []).filter(c =>
+        c.collectiveTitle?.en === 'Rashi' || (c.ref||'').startsWith('Rashi on')
+      );
+      console.log('[Rashi] ch', ch, '→', rashiItems.length, 'Rashi items');
+
+      rashiItems.forEach(c => {
+        const vm = (c.ref||'').match(/(\d+):(\d+)/);
+        if (!vm) return;
+        const key = `${parseInt(vm[1])}:${parseInt(vm[2])}`;
+        let txt = Array.isArray(c.he) ? c.he.flat().filter(Boolean).join(' ') : (c.he||'');
+        // Keep <b> for dibur hamatchil, strip all other tags
+        txt = txt.replace(/<(?!\/?(?:b|i|strong)\b)[^>]+>/gi,'').trim();
+        if (!verseMap.has(key)) verseMap.set(key,[]);
+        if (txt) verseMap.get(key).push(txt);
       });
-      console.log('[Rashi] ch', ch, '-', heArr.length, 'verses');
     } catch(e) {
-      console.warn('[Rashi] ch', ch, 'error:', e.message);
+      console.warn('[Rashi] ch', ch, e.message);
     }
   }
 
-  // Map to parashaVerses sequentially
+  // Sort by chapter:verse and assign to verse indices
+  const sorted = [...verseMap.entries()].sort((a,b) => {
+    const [ac,av] = a[0].split(':').map(Number);
+    const [bc,bv] = b[0].split(':').map(Number);
+    return ac !== bc ? ac-bc : av-bv;
+  });
+
   rashiVerses = new Array(parashaVerses.length).fill('');
-  allItems.forEach((item, i) => {
-    if (i < rashiVerses.length) rashiVerses[i] = item.txt;
+  sorted.forEach(([,comments], i) => {
+    if (i < rashiVerses.length) rashiVerses[i] = comments.join('<br>');
   });
 
   rashiLoaded = true;
   const cnt = rashiVerses.filter(Boolean).length;
-  console.log('[Rashi] ✅', cnt, '/', parashaVerses.length, 'verses have Rashi');
+  console.log('[Rashi] ✅', cnt, '/', parashaVerses.length, 'verses with Rashi');
   if (parashaView === 'rashi') renderParasha();
 }
-
-
 async function showAliya(index, btn) {
   document.querySelectorAll('#aliya-tabs .aliya-tab').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
@@ -2918,99 +2927,155 @@ const KADDISH_YATOM = `יִתְגַּדַּל וְיִתְקַדַּשׁ שְׁ�
 // הלל = תהילים קיג–קיח מספריא
 const HALLEL_REFS = ['Psalms.113', 'Psalms.114', 'Psalms.115', 'Psalms.116', 'Psalms.117', 'Psalms.118'];
 // ── Section builder per nusach ─────────────────────────────────
-// Returns sections array for given nusach and prayer
+// All refs verified via Sefaria API scanner
 function getSiddurSections(nusach, prayer) {
   const SFARD   = 'Weekday_Siddur_Sefard_Linear';
   const ASHK    = 'Siddur_Ashkenaz';
-  const MIZRACH = 'Siddur_Edot_HaMizrach';
+  const MIZ     = 'Siddur_Edot_HaMizrach';
   const n = nusach || 'sfard';
 
-  // Helper: builds ref for given book
-  const r = (sfardPath, ashkPath, mizrachPath) => {
-    if (n === 'ashkenaz') return ashkPath  ? `${ASHK},_${ashkPath}`    : `${SFARD},_${sfardPath}`;
-    if (n === 'mizrach')  return mizrachPath ? `${MIZRACH},_${mizrachPath}` : `${SFARD},_${sfardPath}`;
-    return `${SFARD},_${sfardPath}`;
+  // r(sfardPath, ashkPath, mizrachPath)
+  // null = no dedicated ref → fallback to sfard automatically
+  const r = (s, a, m) => {
+    if (n === 'ashkenaz' && a) return `${ASHK},_${a}`;
+    if (n === 'mizrach'  && m) return `${MIZ},_${m}`;
+    return `${SFARD},_${s}`;
   };
 
-  // Shared additions
-  const yaaleh    = { label: 'יעלה ויבוא ✨',  ref: null, staticText: YAALEH_VEYAVO, isAddition: true, condition: 'isRoshChodeshOrMoed' };
-  const yaalehYT  = { label: 'יעלה ויבוא (יו"ט) ✨', ref: null, staticText: YAALEH_VEYAVO, isAddition: true, condition: 'isYomTov' };
-  const tachanun  = (path_s, path_a, path_m) => ({ label: 'תחנון', ref: r(path_s, path_a, path_m), condition: 'noTachanun', conditionType: 'skip' });
-  const avinuMal  = { label: 'אבינו מלכנו ✨', ref: r('The_Morning_Prayers,_Avinu_Malkeinu', 'Weekday,_Shacharit,_Avinu_Malkeinu', 'Weekday_Shacharit,_Amida'), isAddition: true, condition: 'isAvinuMalkeinu' };
-  const hallel    = { label: 'הלל ✨',          ref: r('Hallel', 'Festivals,_Hallel', 'Weekday_Shacharit,_Amida'), isAddition: true, condition: 'isHallelDay' };
-  const kaddish_s = (path_s, path_a, path_m) => ({ label: 'קדיש יתום', ref: null, staticText: KADDISH_YATOM });
-  const aleinu    = (path_s, path_a, path_m) => ({ label: 'עלינו', ref: r(path_s, path_a, path_m) });
+  // Shared additions (always sfard refs – same text everywhere)
+  const yaaleh = { label:'יעלה ויבוא ✨', ref:null, staticText:YAALEH_VEYAVO, isAddition:true, condition:'isRoshChodeshOrMoed' };
+  const yaalehYT = { label:'יעלה ויבוא (יו"ט) ✨', ref:null, staticText:YAALEH_VEYAVO, isAddition:true, condition:'isYomTov' };
 
-  const sections = {
-    shacharit: [
-      { label: 'מודה אני',         ref: r('The_Morning_Prayers,_Upon_Arising_in_the_Morning', 'Weekday,_Shacharit,_Preparatory_Prayers,_Modeh_Ani', 'Preparatory_Prayers,_Modeh_Ani') },
-      { label: 'עטיפת טלית',       ref: r('The_Morning_Prayers,_Putting_On_the_Tallis', 'Weekday,_Shacharit,_Preparatory_Prayers,_Tallit', 'Preparatory_Prayers,_Order_of_Talit') },
-      { label: 'הנחת תפילין',      ref: r('The_Morning_Prayers,_Putting_on_the_Tefillin', 'Weekday,_Shacharit,_Preparatory_Prayers,_Tefillin', 'Preparatory_Prayers,_Order_of_Tefillin') },
-      { label: 'ברכות השחר',       ref: r('The_Morning_Prayers,_Blessings_Upon_Arising', 'Weekday,_Shacharit,_Preparatory_Prayers,_Morning_Blessings', 'Preparatory_Prayers,_Morning_Blessings') },
-      { label: 'ברכות התורה',      ref: r('The_Morning_Prayers,_Blessings_of_the_Torah', 'Weekday,_Shacharit,_Preparatory_Prayers,_Torah_Blessings', 'Preparatory_Prayers,_Torah_Blessings') },
-      { label: 'ברכות הבוקר',      ref: r('The_Morning_Prayers,_Morning_Blessings', 'Weekday,_Shacharit,_Preparatory_Prayers,_Morning_Blessings', 'Preparatory_Prayers,_Morning_Blessings') },
-      { label: 'עקידה',            ref: r('The_Morning_Prayers,_Akeidah_(The_Binding_of_Isaac)', 'Weekday,_Shacharit,_Preparatory_Prayers,_Akeidah', null) },
-      { label: 'תחנות הבוקר',      ref: r('The_Morning_Prayers,_Morning_Supplications', 'Weekday,_Shacharit,_Preparatory_Prayers,_Leshem_Yichud', null) },
-      { label: 'קרבנות',           ref: r('The_Morning_Prayers,_Korbanos_(Sacrificial_Offerings)', 'Weekday,_Shacharit,_Preparatory_Prayers,_Korbanot', null) },
-      { label: 'קרבן תמיד',        ref: r('The_Morning_Prayers,_Korban_Tamid_(Daily_Offering)', null, null) },
-      { label: 'קטורת',            ref: r('The_Morning_Prayers,_Ketores_(Incense_Offering)', null, 'Weekday_Shacharit,_Incense_Offering') },
-      { label: "קדיש דרבנן",       ref: r("The_Morning_Prayers,_Kaddish_d'Rabanan", "Kaddish,_Kaddish_d'Rabbanan", null) },
-      { label: 'הודו',             ref: r('The_Morning_Prayers,_Hodu', 'Weekday,_Shacharit,_Pesukei_DeZimra,_Hodu', 'Weekday_Shacharit,_Hodu') },
-      { label: 'ברוך שאמר',        ref: r("The_Morning_Prayers,_Baruch_She'amar", "Weekday,_Shacharit,_Pesukei_DeZimra,_Baruch_She'amar", 'Weekday_Shacharit,_Pesukei_DZimra') },
-      { label: 'אשרי',             ref: r('The_Morning_Prayers,_Ashrei', 'Weekday,_Shacharit,_Pesukei_DeZimra,_Ashrei', 'Weekday_Shacharit,_Pesukei_DZimra') },
-      { label: 'שירת הים',         ref: r('The_Morning_Prayers,_Shiras_Hayam', 'Weekday,_Shacharit,_Pesukei_DeZimra,_Az_Yashir', null) },
-      { label: 'ישתבח',            ref: r('The_Morning_Prayers,_Yishtabach', 'Weekday,_Shacharit,_Pesukei_DeZimra,_Yishtabach', null) },
-      { label: 'ברכות קריאת שמע',  ref: r('The_Morning_Prayers,_The_Blessings_of_Shema', 'Weekday,_Shacharit,_Shacharit_Amidah,_Blessings_of_the_Shema', 'Weekday_Shacharit,_The_Shema') },
-      { label: 'קריאת שמע',        ref: r('The_Morning_Prayers,_Recitation_of_Shema', 'Weekday,_Shacharit,_Shacharit_Amidah,_Shema', 'Weekday_Shacharit,_The_Shema') },
-      { label: 'שמונה עשרה',       ref: r('The_Morning_Prayers,_Shemoneh_Esrei', 'Weekday,_Shacharit,_Shacharit_Amidah,_Amidah', 'Weekday_Shacharit,_Amida') },
-      yaaleh,
-      tachanun('The_Morning_Prayers,_Tachanun', 'Weekday,_Shacharit,_Tachanun,_Tachanun', 'Weekday_Shacharit,_Vidui'),
-      avinuMal,
-      { label: 'והוא רחום',        ref: r('The_Morning_Prayers,_Vehu_Rachum', null, null) },
-      hallel,
-      { label: 'קריאת התורה ✨',   ref: r('The_Morning_Prayers,_Reading_of_the_Torah', 'Weekday,_Shacharit,_Torah_Reading,_Torah_Reading', 'Weekday_Shacharit,_Torah_Reading'), isAddition: true, condition: 'isTorahReadingDay' },
-      { label: 'מוסף ר"ח ✨',      ref: r('Musaf_for_Rosh_Chodesh', 'Rosh_Chodesh,_Musaf,_Amidah', null), isAddition: true, condition: 'isRoshChodesh' },
-      { label: 'ספירת העומר ✨',   ref: r('Counting_the_Omer', 'Berachot,_Counting_of_the_Omer', 'Weekday_Arvit,_Counting_of_the_Omer'), isAddition: true, condition: 'isOmer' },
-      { label: 'שירות חנוכה ✨',   ref: r('Chanukah_Service', 'Chanukah,_Shacharit', 'Hanukkah,_Shacharit'), isAddition: true, condition: 'isChanuka' },
-      { label: "אשרי / ובא לציון", ref: r("The_Morning_Prayers,_Ashrei_U'va_L'Tzion", 'Weekday,_Shacharit,_Post_Amidah,_Ashrei_Uva_LeTziyon', 'Weekday_Shacharit,_Ashrei') },
-      { label: 'מזמור של יום',     ref: r('The_Morning_Prayers,_Psalm_of_the_Day', 'Weekday,_Shacharit,_Post_Amidah,_Song_of_the_Day', 'Weekday_Shacharit,_Song_of_the_Day') },
-      { label: 'ברכי נפשי',        ref: r('The_Morning_Prayers,_My_Soul_Bless', null, null) },
-      aleinu('The_Morning_Prayers,_Aleinu', 'Weekday,_Shacharit,_Post_Amidah,_Alenu', 'Weekday_Shacharit,_Alenu'),
-      { label: 'קדיש יתום',        ref: r("The_Morning_Prayers,_Mourner's_Kaddish", "Kaddish,_Mourner's_Kaddish", null), staticText: null },
-      { label: 'שלש עשרה עיקרים', ref: r('The_Morning_Prayers,_Thirteen_Principles_of_Faith', null, 'Additions_for_Shacharit,_Thirteen_Principles_of_Faith') },
-    ],
-    mincha: [
-      { label: 'אשרי',             ref: r('Mincha,_Ashrei', 'Weekday,_Minchah,_Mincha_Ashrei', 'Weekday_Mincha,_Offerings') },
-      { label: 'קריאת התורה ✨',   ref: r('The_Morning_Prayers,_Reading_of_the_Torah', 'Weekday,_Shacharit,_Torah_Reading,_Torah_Reading', null), isAddition: true, condition: 'isTorahReadingDay' },
-      { label: 'שמונה עשרה',       ref: r('Mincha,_Shemoneh_Esrei', 'Weekday,_Minchah,_Amidah,_Amidah', 'Weekday_Mincha,_Amida') },
-      yaaleh,
-      tachanun('Mincha,_Tachanun', 'Weekday,_Minchah,_Tachanun,_Tachanun', 'Weekday_Mincha,_Vidui'),
-      avinuMal,
-      aleinu('Mincha,_Aleinu', 'Weekday,_Minchah,_Post_Amidah,_Alenu', 'Weekday_Mincha,_Alenu'),
-      kaddish_s("Mincha,_Mourner's_Kaddish", null, null),
-    ],
-    arvit: [
-      { label: 'ברכות קריאת שמע',  ref: r('Maariv,_Berachos_Preceding_Shema', 'Weekday,_Maariv,_Blessings_of_the_Shema,_Blessings_Before_Shema', 'Weekday_Arvit,_Barchu') },
-      { label: 'קריאת שמע',        ref: r('Maariv,_Shema', 'Weekday,_Maariv,_Shema,_Shema', 'Weekday_Arvit,_The_Shema') },
-      { label: 'ברכות לאחר שמע',   ref: r('Maariv,_Berachos_Following_Shema', 'Weekday,_Maariv,_Blessings_of_the_Shema,_Blessings_After_Shema', null) },
-      { label: 'שמונה עשרה',       ref: r('Maariv,_Shemoneh_Esrei', 'Weekday,_Maariv,_Amidah,_Amidah', 'Weekday_Arvit,_Amidah') },
-      yaaleh,
-      aleinu('Maariv,_Aleinu', 'Weekday,_Maariv,_Post_Amidah,_Alenu', 'Weekday_Arvit,_Alenu'),
-      kaddish_s("Maariv,_Mourner's_Kaddish", null, null),
-    ],
-    birkat: [
-      { label: 'ברכת המזון',        ref: r('Birkas_Hamazon,_Birkas_Hamazon', 'Berachot,_Birkat_HaMazon', 'Berachot,_Post_Meal_Blessing') },
-      { label: 'רצה (שבת) ✨',      ref: null, staticText: RATZE_SHABBAT, isAddition: true, condition: 'isShabbat' },
-      yaaleh,
-      yaalehYT,
-      { label: 'על הנסים – חנוכה ✨', ref: r('Birkas_Hamazon,_Al_Hanissim_for_Chanukah', null, null), isAddition: true, condition: 'isChanuka' },
-      { label: 'על הנסים – פורים ✨', ref: r('Birkas_Hamazon,_Al_Hanissim_for_Purim', null, null), isAddition: true, condition: 'isPurim' },
-    ],
-    layla: [
-      { label: 'קריאת שמע על המיטה', ref: r('Prayer_Before_Retiring_at_Night', 'Berachot,_Bedtime_Shema', 'Weekday_Arvit,_Bedtime_Shema') },
-    ],
-  };
-  return sections[prayer] || [];
+  if (prayer === 'shacharit') return [
+    { label:'מודה אני',
+      ref: r('The_Morning_Prayers,_Upon_Arising_in_the_Morning',
+             'Weekday,_Shacharit,_Preparatory_Prayers,_Modeh_Ani',
+             'Preparatory_Prayers,_Modeh_Ani') },
+    { label:'עטיפת טלית',
+      ref: r('The_Morning_Prayers,_Putting_On_the_Tallis',
+             'Weekday,_Shacharit,_Preparatory_Prayers,_Tallit', null) },
+    { label:'הנחת תפילין',
+      ref: r('The_Morning_Prayers,_Putting_on_the_Tefillin',
+             'Weekday,_Shacharit,_Preparatory_Prayers,_Tefillin', null) },
+    { label:'ברכות השחר',
+      ref: r('The_Morning_Prayers,_Blessings_Upon_Arising',
+             'Weekday,_Shacharit,_Preparatory_Prayers,_Morning_Blessings',
+             'Preparatory_Prayers,_Morning_Blessings') },
+    { label:'ברכות התורה',
+      ref: r('The_Morning_Prayers,_Blessings_of_the_Torah',
+             'Weekday,_Shacharit,_Preparatory_Prayers,_Torah_Blessings',
+             'Preparatory_Prayers,_Torah_Blessings') },
+    { label:'ברכות הבוקר',        ref: r('The_Morning_Prayers,_Morning_Blessings', null, null) },
+    { label:'עקידה',              ref: r('The_Morning_Prayers,_Akeidah_(The_Binding_of_Isaac)', null, null) },
+    { label:'תחנות הבוקר',        ref: r('The_Morning_Prayers,_Morning_Supplications', null, null) },
+    { label:'קרבנות',             ref: r('The_Morning_Prayers,_Korbanos_(Sacrificial_Offerings)', null, null) },
+    { label:'קרבן תמיד',          ref: r('The_Morning_Prayers,_Korban_Tamid_(Daily_Offering)', null, null) },
+    { label:'קטורת',              ref: r('The_Morning_Prayers,_Ketores_(Incense_Offering)', null, null) },
+    { label:"קדיש דרבנן",         ref: r("The_Morning_Prayers,_Kaddish_d'Rabanan",
+                                          "Kaddish,_Kaddish_d'Rabbanan", null) },
+    { label:'הודו',
+      ref: r('The_Morning_Prayers,_Hodu', null, 'Weekday_Shacharit,_Hodu') },
+    { label:'מזמור שיר',          ref: r('The_Morning_Prayers,_Mizmor_Shir', null, null) },
+    { label:"ברוך שאמר",
+      ref: r("The_Morning_Prayers,_Baruch_She'amar", null, null) },
+    { label:'מזמור לתודה',        ref: r('The_Morning_Prayers,_Mizmor_Lesodah', null, null) },
+    { label:'יהי כבוד',           ref: r('The_Morning_Prayers,_Yehi_Chevod', null, null) },
+    { label:'אשרי',
+      ref: r('The_Morning_Prayers,_Ashrei', null, 'Weekday_Shacharit,_Ashrei') },
+    { label:'שירת הים',           ref: r('The_Morning_Prayers,_Shiras_Hayam', null, null) },
+    { label:'ישתבח',              ref: r('The_Morning_Prayers,_Yishtabach', null, null) },
+    { label:'ברכות קריאת שמע',
+      ref: r('The_Morning_Prayers,_The_Blessings_of_Shema', null,
+             'Weekday_Shacharit,_The_Shema') },
+    { label:'קריאת שמע',
+      ref: r('The_Morning_Prayers,_Recitation_of_Shema', null,
+             'Weekday_Shacharit,_The_Shema') },
+    { label:'שמונה עשרה',
+      ref: r('The_Morning_Prayers,_Shemoneh_Esrei', null,
+             'Weekday_Shacharit,_Amida') },
+    yaaleh,
+    { label:'תחנון',
+      ref: r('The_Morning_Prayers,_Tachanun', null, null),
+      condition:'noTachanun', conditionType:'skip' },
+    { label:'אבינו מלכנו ✨',
+      ref: r('The_Morning_Prayers,_Avinu_Malkeinu', null, null),
+      isAddition:true, condition:'isAvinuMalkeinu' },
+    { label:'והוא רחום',          ref: r('The_Morning_Prayers,_Vehu_Rachum', null, null) },
+    { label:'הלל ✨',             ref: r('Hallel', null, null), isAddition:true, condition:'isHallelDay' },
+    { label:'קריאת התורה ✨',
+      ref: r('The_Morning_Prayers,_Reading_of_the_Torah', null,
+             'Weekday_Shacharit,_Torah_Reading'),
+      isAddition:true, condition:'isTorahReadingDay' },
+    { label:'מוסף ר"ח ✨',        ref: r('Musaf_for_Rosh_Chodesh', null, null), isAddition:true, condition:'isRoshChodesh' },
+    { label:'ספירת העומר ✨',     ref: r('Counting_the_Omer', null, null), isAddition:true, condition:'isOmer' },
+    { label:'שירות חנוכה ✨',     ref: r('Chanukah_Service', null, null), isAddition:true, condition:'isChanuka' },
+    { label:"אשרי / ובא לציון",
+      ref: r("The_Morning_Prayers,_Ashrei_U'va_L'Tzion", null, null) },
+    { label:'מזמור של יום',
+      ref: r('The_Morning_Prayers,_Psalm_of_the_Day', null,
+             'Weekday_Shacharit,_Song_of_the_Day') },
+    { label:'ברכי נפשי',          ref: r('The_Morning_Prayers,_My_Soul_Bless', null, null) },
+    { label:'עלינו',
+      ref: r('The_Morning_Prayers,_Aleinu', null, 'Weekday_Shacharit,_Alenu') },
+    { label:'קדיש יתום',
+      ref: r("The_Morning_Prayers,_Mourner's_Kaddish",
+             "Kaddish,_Mourner's_Kaddish", null) },
+    { label:'שלש עשרה עיקרים',   ref: r('The_Morning_Prayers,_Thirteen_Principles_of_Faith', null, null) },
+  ];
+
+  if (prayer === 'mincha') return [
+    { label:'אשרי',
+      ref: r('Mincha,_Ashrei', 'Weekday,_Minchah,_Ashrei', null) },
+    { label:'קריאת התורה ✨',
+      ref: r('The_Morning_Prayers,_Reading_of_the_Torah', null, null),
+      isAddition:true, condition:'isTorahReadingDay' },
+    { label:'שמונה עשרה',
+      ref: r('Mincha,_Shemoneh_Esrei', null, 'Weekday_Mincha,_Amida') },
+    yaaleh,
+    { label:'תחנון',
+      ref: r('Mincha,_Tachanun', null, null),
+      condition:'noTachanun', conditionType:'skip' },
+    { label:'אבינו מלכנו ✨',
+      ref: r('The_Morning_Prayers,_Avinu_Malkeinu', null, null),
+      isAddition:true, condition:'isAvinuMalkeinu' },
+    { label:'עלינו',
+      ref: r('Mincha,_Aleinu', null, 'Weekday_Mincha,_Alenu') },
+    { label:'קדיש יתום',          ref:null, staticText:KADDISH_YATOM },
+  ];
+
+  if (prayer === 'arvit') return [
+    { label:'ברכות קריאת שמע',
+      ref: r('Maariv,_Berachos_Preceding_Shema', null, 'Weekday_Arvit,_Barchu') },
+    { label:'קריאת שמע',
+      ref: r('Maariv,_Shema', null, 'Weekday_Arvit,_The_Shema') },
+    { label:'ברכות לאחר שמע',
+      ref: r('Maariv,_Berachos_Following_Shema', null, null) },
+    { label:'שמונה עשרה',
+      ref: r('Maariv,_Shemoneh_Esrei', null, null) },
+    yaaleh,
+    { label:'עלינו',
+      ref: r('Maariv,_Aleinu', null, 'Weekday_Arvit,_Alenu') },
+    { label:'קדיש יתום',          ref:null, staticText:KADDISH_YATOM },
+  ];
+
+  if (prayer === 'birkat') return [
+    { label:'ברכת המזון',
+      // Mizrach has no birkat hamazon section → fallback to sfard
+      ref: n === 'ashkenaz'
+             ? `${ASHK},_Berachot,_Birkat_HaMazon`
+             : `${SFARD},_Birkas_Hamazon,_Birkas_Hamazon` },
+    { label:'רצה (שבת) ✨',       ref:null, staticText:RATZE_SHABBAT, isAddition:true, condition:'isShabbat' },
+    yaaleh, yaalehYT,
+    { label:'על הנסים – חנוכה ✨', ref:`${SFARD},_Birkas_Hamazon,_Al_Hanissim_for_Chanukah`, isAddition:true, condition:'isChanuka' },
+    { label:'על הנסים – פורים ✨', ref:`${SFARD},_Birkas_Hamazon,_Al_Hanissim_for_Purim`,   isAddition:true, condition:'isPurim' },
+  ];
+
+  if (prayer === 'layla') return [
+    { label:'קריאת שמע על המיטה',
+      ref: r('Prayer_Before_Retiring_at_Night', null, null) },
+  ];
+
+  return [];
 }
 
 // Legacy wrapper for compatibility
@@ -3021,6 +3086,7 @@ const SIDDUR_SECTIONS = {
   get birkat()    { return getSiddurSections(window._currentNusach || 'sfard', 'birkat'); },
   get layla()     { return getSiddurSections(window._currentNusach || 'sfard', 'layla'); },
 };
+
 
 
 const SIDDUR_CONDITIONS = {
