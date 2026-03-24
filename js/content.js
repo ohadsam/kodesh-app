@@ -286,6 +286,7 @@ async function loadRashiForRef(torahRef) {
 
         // Record real chapter length to prevent index drift
         chapterLengths[ch] = Array.isArray(data.he) ? data.he.length : 999;
+        const chapLen = chapterLengths[ch];
 
         (data?.commentary || [])
           .filter(c => c.collectiveTitle?.en === 'Rashi' || (c.ref||'').startsWith('Rashi on'))
@@ -293,7 +294,9 @@ async function loadRashiForRef(torahRef) {
             const vm = (c.ref||'').match(/(\d+):(\d+)/);
             if (!vm) return;
             const cCh = parseInt(vm[1]), cV = parseInt(vm[2]);
-            if (cCh < startCh || cCh > endCh) return;
+            // Strict range check: must be exactly the chapter we fetched
+            if (cCh !== ch) return;                     // ignore commentary that bled in from other chapters
+            if (cV < 1 || cV > chapLen) return;         // ignore out-of-range verses
             if (cCh === startCh && cV < startV) return;
             if (cCh === endCh   && cV > endV)   return;
             const key = `${cCh}:${cV}`;
@@ -302,7 +305,8 @@ async function loadRashiForRef(torahRef) {
             if (!verseMap.has(key)) verseMap.set(key, []);
             if (txt) verseMap.get(key).push(txt);
           });
-        console.log('[Rashi] ch', ch, 'len:', chapterLengths[ch], 'rashi entries:', verseMap.size);
+        const chEntries = [...verseMap.keys()].filter(k => k.startsWith(ch+':')).length;
+        console.log('[Rashi] ch', ch, 'len:', chapLen, '| entries this ch:', chEntries, '| total:', verseMap.size);
         success = true;
       } catch(e) {
         console.warn('[Rashi] ch', ch, 'attempt', attempt+1, e.message);

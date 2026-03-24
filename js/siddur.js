@@ -578,36 +578,107 @@ async function loadSiddur() {
 }
 
 function _sectionStyle(s) {
-  if (s.isAddition) {
-    // Special additions: gold, bold, italic to make them stand out
-    return `font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);line-height:1.9;` +
-           `color:var(--gold);font-weight:600;font-style:italic`;
+  // Font/layout base only – color is set per-paragraph in _renderParagraphs/_staticTextToHtml
+  return `font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);line-height:1.9;`;
+}
+
+// ── Sections quick-nav popup ──────────────
+function openSiddurSectionsPopup() {
+  const overlay = document.getElementById('siddur-sec-popup-overlay');
+  const popup   = document.getElementById('siddur-sec-popup');
+  const list    = document.getElementById('siddur-sec-popup-list');
+  if (!popup || !list) return;
+
+  // Rebuild list fresh each time (sections may have changed)
+  const sections = document.querySelectorAll('#siddur-content [id^="ss-"]');
+  if (!sections.length) return;
+
+  list.innerHTML = '';
+  sections.forEach(sec => {
+    const id    = sec.id;                        // ss-שמונה_עשרה
+    const label = id.slice(3).replace(/_/g,' '); // strip ss- prefix, restore spaces
+    const isAdd = sec.querySelector('.siddur-addition-block') !== null;
+
+    const btn = document.createElement('button');
+    btn.textContent = label;
+    btn.style.cssText = `
+      display:block;width:100%;text-align:right;padding:9px 14px;
+      background:none;border:none;cursor:pointer;
+      font-family:'Frank Ruhl Libre',serif;font-size:14px;
+      color:${isAdd ? 'var(--addition)' : 'var(--cream)'};
+      font-style:${isAdd ? 'italic' : 'normal'};
+      border-bottom:1px solid rgba(255,255,255,.05);
+      transition:background .15s;
+    `;
+    btn.onmouseover = () => btn.style.background = 'rgba(255,255,255,.07)';
+    btn.onmouseout  = () => btn.style.background = 'none';
+    btn.onclick = () => {
+      closeSiddurSectionsPopup();
+      document.getElementById(id)?.scrollIntoView({behavior:'smooth', block:'start'});
+    };
+    list.appendChild(btn);
+  });
+
+  overlay.style.display = 'block';
+  popup.style.display   = 'block';
+  // scroll the popup to show current viewport's active section
+  _scrollPopupToActive(list);
+}
+
+function _scrollPopupToActive(list) {
+  // Find which section is currently near the top of the viewport
+  const sections = document.querySelectorAll('#siddur-content [id^="ss-"]');
+  let activeId = null;
+  for (const sec of sections) {
+    const rect = sec.getBoundingClientRect();
+    if (rect.top >= 0 && rect.top < window.innerHeight * 0.5) {
+      activeId = sec.id;
+      break;
+    }
   }
-  return `font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);line-height:1.9;` +
-         `color:var(--cream)`;
+  if (!activeId) return;
+  const label = activeId.slice(3).replace(/_/g,' ');
+  const btns  = list.querySelectorAll('button');
+  for (const btn of btns) {
+    if (btn.textContent === label) {
+      btn.style.background = 'rgba(201,165,74,.12)';
+      btn.style.color      = 'var(--gold)';
+      btn.scrollIntoView({block:'nearest'});
+      break;
+    }
+  }
+}
+
+function closeSiddurSectionsPopup() {
+  const overlay = document.getElementById('siddur-sec-popup-overlay');
+  const popup   = document.getElementById('siddur-sec-popup');
+  if (overlay) overlay.style.display = 'none';
+  if (popup)   popup.style.display   = 'none';
 }
 
 // Show/hide floating nav button based on scroll position
 function initSiddurFloatBtn() {
-  const btn = document.getElementById('siddur-float-btn');
+  const btn    = document.getElementById('siddur-float-btn');
+  const secBtn = document.getElementById('siddur-sec-btn');
   if (!btn) return;
-  // Listen on both page div and window (PWA may scroll either)
-  const page = document.getElementById('page-siddur');
+  const page      = document.getElementById('page-siddur');
   const topAnchor = document.getElementById('siddur-top');
 
   function updateBtn() {
     if (!page || !page.classList.contains('active')) return;
-    // How far has siddur-top scrolled above viewport?
-    const anchorY = topAnchor ? topAnchor.getBoundingClientRect().top : -999;
+    const anchorY  = topAnchor ? topAnchor.getBoundingClientRect().top : -999;
     const scrolled = anchorY < -80 || (page.scrollTop || 0) > 150;
-    btn.style.opacity = scrolled ? '1' : '0';
+    btn.style.opacity       = scrolled ? '1' : '0';
     btn.style.pointerEvents = scrolled ? 'auto' : 'none';
+    if (secBtn) {
+      secBtn.style.opacity       = scrolled ? '1' : '0';
+      secBtn.style.pointerEvents = scrolled ? 'auto' : 'none';
+    }
   }
 
   page.addEventListener('scroll', updateBtn, { passive: true });
   window.addEventListener('scroll', updateBtn, { passive: true });
   document.addEventListener('scroll', updateBtn, { passive: true });
-  // Also update when content changes
   btn._update = updateBtn;
 }
 
