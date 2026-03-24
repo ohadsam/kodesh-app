@@ -132,7 +132,7 @@
     <!-- Version & Copyright - INSIDE settings-inner -->
     <div style="text-align:center;padding:18px 0 8px;border-top:1px solid var(--border);margin-top:8px">
       <div style="font-size:13px;font-weight:600;color:var(--gold-dim);margin-bottom:4px">📖 לימוד יומי</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 4.0</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 4.1</div>
       <div style="font-size:11px;color:var(--muted)">© כל הזכויות שמורות לאוהד סמט</div>
     </div>
   </div>
@@ -249,7 +249,7 @@
 
 <!-- ─── PAGE: SIDDUR ──────────────────────── -->
 <div class="page" id="page-siddur">
-  <!-- Floating back-to-nav button -->
+  <!-- Floating back-to-top button -->
   <button id="siddur-float-btn" onclick="document.getElementById('siddur-top').scrollIntoView({behavior:'smooth'})"
     style="position:fixed;bottom:76px;left:12px;z-index:9999;
     width:40px;height:40px;border-radius:50%;border:1px solid var(--gold-dim);
@@ -259,6 +259,39 @@
     opacity:0;transition:opacity 0.25s;pointer-events:none" title="חזור לניווט">
     ☰
   </button>
+
+  <!-- Floating sections quick-nav button -->
+  <button id="siddur-sec-btn" onclick="openSiddurSectionsPopup()"
+    style="position:fixed;bottom:122px;left:12px;z-index:9999;
+    width:40px;height:40px;border-radius:50%;border:1px solid var(--addition-border);
+    background:rgba(20,30,25,0.93);color:var(--addition);font-size:17px;cursor:pointer;
+    box-shadow:0 2px 10px rgba(0,0,0,.6);backdrop-filter:blur(4px);
+    display:flex;align-items:center;justify-content:center;
+    opacity:0;transition:opacity 0.25s;pointer-events:none" title="קפוץ לקטע">
+    ≡
+  </button>
+
+  <!-- Sections popup overlay -->
+  <div id="siddur-sec-popup-overlay" onclick="closeSiddurSectionsPopup()"
+    style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.45)">
+  </div>
+  <!-- Sections popup panel -->
+  <div id="siddur-sec-popup"
+    style="display:none;position:fixed;bottom:76px;left:8px;z-index:10001;
+    width:220px;max-height:65vh;
+    background:rgba(18,12,6,0.97);border:1px solid var(--border);
+    border-radius:16px;backdrop-filter:blur(16px);
+    box-shadow:0 8px 32px rgba(0,0,0,.7);
+    overflow-y:auto;overflow-x:hidden;
+    padding:8px 0 8px;">
+    <div style="padding:6px 14px 8px;font-size:11px;color:var(--gold);font-weight:700;
+      border-bottom:1px solid var(--border);letter-spacing:.3px;">
+      📜 קטעי התפילה
+      <button onclick="closeSiddurSectionsPopup()" style="float:left;background:none;border:none;
+        color:var(--muted);font-size:16px;cursor:pointer;line-height:1;padding:0">✕</button>
+    </div>
+    <div id="siddur-sec-popup-list" style="padding:4px 0"></div>
+  </div>
 
   <!-- Nusach selector -->
   <div class="card" style="padding:12px 14px;margin-bottom:10px">
@@ -743,7 +776,7 @@
     💡 לכיול המצפן: הזז את הטלפון בתנועת ∞ (שמונה שוכב) מספר פעמים
   </div>
   <div style="text-align:center;color:var(--muted);font-size:11px;padding:12px 0 4px">
-    גרסה 4.0 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
+    גרסה 4.1 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
   </div>
 </div>
 

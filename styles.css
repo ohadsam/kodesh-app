@@ -512,3 +512,15 @@ body {
   min-width: 80px;
   text-align: left;
 }
+
+/* ─── SIDDUR SECTIONS POPUP ──────────────────
+   Floating quick-nav panel (opens from ≡ button)
+   ──────────────────────────────────────────── */
+#siddur-sec-popup {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+#siddur-sec-popup::-webkit-scrollbar { width: 4px; }
+#siddur-sec-popup::-webkit-scrollbar-thumb {
+  background: var(--border); border-radius: 2px;
+}
