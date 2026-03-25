@@ -18,6 +18,11 @@ function showTab(name) {
   if (tab) tab.classList.add('active');
   if (bn)  bn.classList.add('active');
   currentTab = name;
+
+  // Scroll to top on every tab switch
+  window.scrollTo({ top: 0, behavior: 'instant' });
+  page.scrollTop = 0;
+
   if (name === 'logs')  { renderLogs(); return; }
   if (name === 'qibla') { if (!loaded[name]) { loaded[name]=true; initQibla(); } resumeQibla(); return; }
   // Siddur always re-inits on tab switch to reset loading state
