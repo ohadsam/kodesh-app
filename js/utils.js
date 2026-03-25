@@ -76,21 +76,28 @@ let currentAliya = 'all';
 let rashiLoaded = false;
 let rashiVisible = false;
 
-const APP_VERSION  = '4.4';
+const APP_VERSION  = '4.5';
 const STORAGE_KEY  = 'kodesh_app_v1';
 const SIDDUR_CACHE_KEY = 'siddur_cache_v';
 
-// ── Startup: force-clear SW and caches on version change ──────────────
+// ── Startup: show version in splash + force-clear SW and caches on version change ──
 (function() {
+  // Show version immediately in splash screen
+  const splashV = document.getElementById('splash-version');
+  if (splashV) splashV.textContent = 'גרסה ' + APP_VERSION;
+
   const savedVer = localStorage.getItem('app_version');
   if (savedVer !== APP_VERSION) {
     console.log('[Cache] New version', APP_VERSION, '← was', savedVer);
+    if (splashV) splashV.textContent = 'גרסה ' + APP_VERSION + ' – מנקה cache...';
+
     const doReload = () => {
       localStorage.setItem('app_version', APP_VERSION);
       console.log('[Cache] Reloading with fresh files...');
-      window.location.reload(true);
+      // Add nocache param to bust any HTTP cache too
+      const url = window.location.href.split('?')[0] + '?nocache=' + APP_VERSION;
+      window.location.replace(url);
     };
-    // Unregister ALL service workers first, then clear all caches
     const sw = navigator.serviceWorker;
     const p1 = sw ? sw.getRegistrations().then(regs => {
       console.log('[Cache] Unregistering', regs.length, 'SW(s)');
@@ -235,72 +242,66 @@ function splitVerseOnHeaders(v) {
 }
 
 function buildParagraphs(flat) {
-  // Keywords that force a paragraph break BEFORE them
+  // Strip cantillation marks + nikud (U+0591–U+05C7) so patterns work
+  // regardless of Sefaria encoding (which embeds טעמי מקרא between letters)
+  const stripDiacritics = s => s.replace(/[\u0591-\u05C7]/g, '');
+
+  // Keywords that start a new paragraph (matched against stripped plain text)
   const BREAK_BEFORE = [
-    // ברכות – כל פתיחה של ברכה
-    /^בָּרוּךְ אַתָּה/,
-    // לשם יחוד / יהי רצון / קבלה
-    /^לְשֵׁם יִחוּד/,
-    /^יְהִי רָצוֹן/,
-    /^הֲרֵינִי/,
-    // תחילת קטעים מרכזיים בתפילה
-    /^אָמֵן/,
-    /^וִיהִי/,
-    /^אֱלֹהַי/,
-    /^רִבּוֹנוֹ/,
-    /^מַה יָּקָר/,
-    /^יִרְוְיֻן/,
-    /^כִּי עִמְּ/,
-    /^מְשֹׁךְ/,
-    /^עֹֽטֶה/,
-    // ברכת המזון – 4 ברכות + מקטעים מרכזיים
-    /^נוֹדֶה לְּ?ךָ/,          // ברכת הארץ
-    /^רַחֵם.*יְהֹוָה/,          // ברכת ירושלים
-    /^הָאֵל אָבִינוּ/,          // הטוב והמטיב
-    /^הָרַחֲמָן/,               // הרחמן הוא (סדרת הרחמן)
-    /^מַלְכוּתוֹ/,
-    /^עֹשֶׂה שָׁלוֹם/,           // עושה שלום
-    /^יִרְאוּ אֶת/,
-    // ק"ש וברכותיה
-    /^שְׁמַע יִשְׂרָאֵל/,
-    /^וְאָהַבְתָּ/,
-    /^וְהָיָה אִם/,
-    /^וַיֹּאמֶר/,
-    // עמידה
-    /^אַתָּה קָדוֹשׁ/,
-    /^אַתָּה חוֹנֵן/,
-    /^הֲשִׁיבֵנוּ/,
-    /^סְלַח לָנוּ/,
-    /^רְאֵה.*עָנְיֵנוּ/,
-    /^רְפָאֵנוּ/,
-    /^בָּרֵךְ עָלֵינוּ/,
-    /^תְּקַע בְּשׁוֹפָר/,
-    /^הָשִׁיבָה/,
-    /^וְלַמַּלְשִׁינִים/,
-    /^עַל הַצַּדִּיקִים/,
-    /^וְלִירוּשָׁלַיִם/,
-    /^אֶת צֶמַח/,
-    /^שְׁמַע קוֹלֵנוּ/,
-    /^רְצֵה.*יְהֹוָה/,
-    /^מוֹדִים/,
-    /^שִׂים שָׁלוֹם/,
+    /^ברוך אתה/,           // כל ברכה
+    /^לשם יחוד/,
+    /^יהי רצון/,
+    /^הריני/,
+    /^אמן/,
+    /^ויהי/,
+    /^אלהי/,
+    /^רבונו/,
+    /^מה יקר/,
+    // ברכת המזון
+    /^נודה לך/,            // ברכת הארץ
+    /^רחם.*יהוה/,          // ברכת ירושלים
+    /^האל אבינו/,          // הטוב והמטיב
+    /^הרחמן הוא/,          // הרחמן
+    /^עושה שלום/,
+    /^יראו את/,
+    // שמע וברכותיה
+    /^שמע ישראל/,
+    /^ואהבת/,
+    /^והיה אם/,
+    /^ויאמר/,
+    // עמידה – כל ברכה
+    /^אתה קדוש/,
+    /^אתה חונן/,
+    /^השיבנו/,
+    /^סלח לנו/,
+    /^ראה.*ענינו/,
+    /^רפאנו/,
+    /^ברך עלינו/,
+    /^תקע בשופר/,
+    /^השיבה/,
+    /^ולמלשינים/,
+    /^על הצדיקים/,
+    /^ולירושלים/,
+    /^את צמח/,
+    /^שמע קולנו/,
+    /^רצה.*יהוה/,
+    /^מודים/,
+    /^שים שלום/,
     // פסוקי דזמרה
-    /^הַלְלוּיָהּ/,
-    /^אַשְׁרֵי/,
+    /^הללויה/,
+    /^אשרי/,
     // קדיש
-    /^יִתְגַּדַּל/,
-    /^יְהֵא שְׁמֵהּ/,
-    /^יִתְבָּרַךְ/,
-    /^יְהֵא שְׁלָמָא/,
-    // תחנון
-    /^וִידּוּי/,
-    /^אֱלֹהֵינוּ.*שָׁמַעְנוּ/,
+    /^יתגדל/,
+    /^יהא שמה/,
+    /^יתברך/,
+    /^יהא שלמא/,
+    // תחנון / וידוי
+    /^אלהינו.*שמענו/,
   ];
 
-  // Only flush after genuine bracha-closing formula
   const BRACHA_END = [
-    /בָּרוּךְ אַתָּה יְ[יה]/,
-    /הַמְּבָרֵךְ אֶת עַמּוֹ יִשְׂרָאֵל בַּשָּׁלוֹם/,
+    /ברוך אתה י[יה]/,
+    /המברך את עמו ישראל בשלום/,
   ];
 
   const paragraphs = [];
@@ -311,10 +312,13 @@ function buildParagraphs(flat) {
   };
 
   for (let v of flat) {
-    // Join internal \n (from <br> tags) – verse is one unit
+    // Normalize: join internal \n (from <br>), collapse whitespace
     v = v.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
 
-    const plain = v.replace(/<[^>]+>/g,'').trim();
+    // Strip HTML tags for matching, then strip cantillation/nikud
+    const plain       = stripDiacritics(v.replace(/<[^>]+>/g, '').trim());
+    const plainNikud  = v.replace(/<[^>]+>/g, '').trim(); // keep nikud for BRACHA_END
+
     if (!plain) { flush(); continue; }
 
     if (v.startsWith('__HEADER__')) {
@@ -323,13 +327,11 @@ function buildParagraphs(flat) {
       continue;
     }
 
-    const isBreakPoint = BREAK_BEFORE.some(r => r.test(plain));
-    if (isBreakPoint) flush();
+    if (BREAK_BEFORE.some(r => r.test(plain))) flush();
 
     current.push(v);
 
-    const isBrachaEnd = BRACHA_END.some(r => r.test(plain));
-    if (isBrachaEnd) flush();
+    if (BRACHA_END.some(r => r.test(stripDiacritics(plainNikud)))) flush();
   }
   flush();
   return paragraphs;
