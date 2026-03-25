@@ -132,7 +132,7 @@
     <!-- Version & Copyright - INSIDE settings-inner -->
     <div style="text-align:center;padding:18px 0 8px;border-top:1px solid var(--border);margin-top:8px">
       <div style="font-size:13px;font-weight:600;color:var(--gold-dim);margin-bottom:4px">📖 לימוד יומי</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 4.2</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 4.3</div>
       <div style="font-size:11px;color:var(--muted)">© כל הזכויות שמורות לאוהד סמט</div>
     </div>
   </div>
@@ -776,7 +776,7 @@
     💡 לכיול המצפן: הזז את הטלפון בתנועת ∞ (שמונה שוכב) מספר פעמים
   </div>
   <div style="text-align:center;color:var(--muted);font-size:11px;padding:12px 0 4px">
-    גרסה 4.2 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
+    גרסה 4.3 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
   </div>
 </div>
 
@@ -814,16 +814,17 @@
 
 <!-- ═══════════════════════════════════════
      JavaScript modules (load order matters)
+     v4.3 – querystring busts browser/SW cache
      ═══════════════════════════════════════ -->
-<script src="js/utils.js"></script>
-<script src="js/settings.js"></script>
-<script src="js/app.js"></script>
-<script src="js/tehilim.js"></script>
-<script src="js/calendar.js"></script>
-<script src="js/content.js"></script>
-<script src="js/tefilot.js"></script>
-<script src="js/siddur.js"></script>
-<script src="js/misc.js"></script>
-<script src="js/init.js"></script>
+<script src="js/utils.js?v=4.3"></script>
+<script src="js/settings.js?v=4.3"></script>
+<script src="js/app.js?v=4.3"></script>
+<script src="js/tehilim.js?v=4.3"></script>
+<script src="js/calendar.js?v=4.3"></script>
+<script src="js/content.js?v=4.3"></script>
+<script src="js/tefilot.js?v=4.3"></script>
+<script src="js/siddur.js?v=4.3"></script>
+<script src="js/misc.js?v=4.3"></script>
+<script src="js/init.js?v=4.3"></script>
 </body>
 </html>
