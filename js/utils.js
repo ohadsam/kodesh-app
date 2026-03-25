@@ -250,10 +250,9 @@ function buildParagraphs(flat) {
     /^עֹֽטֶה/,
   ];
 
-  // Patterns that signal the END of a complete bracha (flush after)
-  // Only the actual closing formula – not every verse ending with ':'
+  // Only flush after a genuine bracha-closing formula
   const BRACHA_END = [
-    /בָּרוּךְ אַתָּה יְ[יה][ֹוָה].*[.::]$/,   // ברוך אתה ה' ... (סיום ברכה)
+    /בָּרוּךְ אַתָּה יְ[יה]/,
     /הַמְּבָרֵךְ אֶת עַמּוֹ יִשְׂרָאֵל בַּשָּׁלוֹם/,
   ];
 
@@ -264,18 +263,12 @@ function buildParagraphs(flat) {
     if (current.length) { paragraphs.push(current.join(' ')); current = []; }
   };
 
-  for (const v of flat) {
-    const plain = v.replace(/<[^>]+>/g,'').trim();
+  for (let v of flat) {
+    // Join internal newlines (from <br> tags) – keep the verse as one unit
+    // A \n inside a single verse is just a line-continuation, not a paragraph break
+    v = v.replace(/\n/g, ' ').trim();
 
-    // Explicit newline marker (from <br> tags converted by cleanSefariaHtml)
-    if (v.includes('\n')) {
-      v.split('\n').forEach((p, pi, arr) => {
-        const t = p.trim();
-        if (t) current.push(t);
-        if (pi < arr.length - 1) flush();
-      });
-      continue;
-    }
+    const plain = v.replace(/<[^>]+>/g,'').trim();
 
     // Empty verse = hard paragraph break
     if (!plain) { flush(); continue; }
@@ -293,7 +286,7 @@ function buildParagraphs(flat) {
 
     current.push(v);
 
-    // Only flush after a genuine bracha-closing formula, not every ':'
+    // Flush after genuine bracha-closing formula
     const isBrachaEnd = BRACHA_END.some(r => r.test(plain));
     if (isBrachaEnd) flush();
   }
