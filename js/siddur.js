@@ -400,11 +400,12 @@ function _staticTextToHtml(rawText, isAdd) {
 }
 
 // Fetch a single section and return rendered HTML
-async function _fetchSectionHtml(s, style, yaalehOccasion) {
+// Returns ONLY the inner text content (no wrapper div with condition label)
+// The skeleton wrapper (with label) stays in place; we replace only the content placeholder
+async function _fetchSectionHtml(s, _unused, yaalehOccasion) {
   if (s.staticText && !s.isHallel) {
     const txt = s.staticText.replace('<span id="yaaleh-occasion"></span>', yaalehOccasion);
-    const inner = _staticTextToHtml(txt, !!s.isAddition);
-    return `<div style="${style}">${inner}</div>`;
+    return _staticTextToHtml(txt, !!s.isAddition);
   }
 
   if (s.isHallel) {
@@ -413,10 +414,10 @@ async function _fetchSectionHtml(s, style, yaalehOccasion) {
       const pData = await sefariaText(psRef, 100);
       const flat  = heFlat(pData).map(cleanSefariaHtml).filter(Boolean);
       const psNum = psRef.split('.')[1];
-      hallelHtml += `<div style="font-size:11px;font-weight:700;color:var(--gold-dim);margin:12px 0 4px">תהילים פרק ${psNum}</div>`
-                 + flat.map(v => `<div style="margin-bottom:3px">${v}</div>`).join('');
+      hallelHtml += `<div style="font-size:11px;font-weight:700;color:var(--addition);margin:10px 0 4px">תהילים פרק ${psNum}</div>`
+                 + flat.map(v => `<div style="margin-bottom:2px;color:var(--addition);font-style:italic;font-weight:600">${v}</div>`).join('');
     }
-    return `<div style="${style}">${hallelHtml}</div>`;
+    return hallelHtml;
   }
 
   const cached = _getCache(s.ref);
@@ -427,7 +428,7 @@ async function _fetchSectionHtml(s, style, yaalehOccasion) {
   if (!flat.length) return '<span style="color:var(--muted)">(אין טקסט זמין)</span>';
 
   const paragraphs = buildParagraphs(flat);
-  const html = `<div style="${style}">${_renderParagraphs(paragraphs, !!s.isAddition)}</div>`;
+  const html = _renderParagraphs(paragraphs, !!s.isAddition);
   _putCache(s.ref, html);
   console.log('[Siddur] fetched:', s.label, paragraphs.length, 'paragraphs');
   return html;
@@ -486,27 +487,33 @@ async function loadSiddur() {
     const id = s.label.replace(/\s/g,'_');
     const whenLabel = s.isAddition && s.condition ? (CONDITION_LABELS[s.condition] || '') : '';
     const prevIsAdd = idx > 0 && sections[idx-1].isAddition;
-    const nextIsAdd = idx < sections.length-1 && sections[idx+1].isAddition;
 
     if (s.isAddition) {
+      // Addition block: green border, label stays visible permanently
       const whenHtml = whenLabel
-        ? `<div style="font-size:9px;color:var(--addition);opacity:.85;margin-bottom:3px;font-style:normal;letter-spacing:.2px">📅 ${whenLabel}</div>`
+        ? `<div style="font-size:10px;color:var(--addition);opacity:.8;margin-bottom:4px;
+            font-style:normal;font-weight:500;font-family:'Heebo',sans-serif">
+            📅 ${whenLabel}</div>`
         : '';
-      return `<div id="ss-${id}" style="margin:4px 0 6px;">
+      const cleanLabel = s.label.replace(' ✨','');
+      return `<div id="ss-${id}" style="margin:6px 0 8px;">
         <div class="siddur-addition-block">
           ${whenHtml}
-          <div style="font-size:11px;font-weight:700;font-style:italic;color:var(--addition);letter-spacing:.3px;margin-bottom:3px">${s.label.replace(' ✨','')}</div>
-          <div id="sc-${id}" style="color:var(--muted);font-size:12px">טוען...</div>
+          <div style="font-size:11px;font-weight:700;font-style:italic;color:var(--addition);
+            letter-spacing:.3px;margin-bottom:5px;border-bottom:1px solid var(--addition-border);
+            padding-bottom:4px">${cleanLabel}</div>
+          <div id="sc-${id}">טוען...</div>
         </div>
       </div>`;
     }
 
-    // Regular section: thin separator, compact spacing
+    // Regular section: thin separator between sections, NO extra gap
     const sep = idx > 0 && !prevIsAdd
-      ? '<div class="siddur-section-divider"></div>' : '';
-    return `${sep}<div id="ss-${id}" style="margin-bottom:4px;padding-bottom:2px;">
-      <div style="font-size:10px;font-weight:700;color:var(--gold-dim);margin-bottom:2px;padding-top:4px">${s.label}</div>
-      <div id="sc-${id}" style="color:var(--muted);font-size:12px">טוען...</div>
+      ? '<hr style="border:none;border-top:1px solid var(--border);margin:4px 0 6px">' : '';
+    return `${sep}<div id="ss-${id}" style="margin-bottom:2px;">
+      <div style="font-size:10px;font-weight:700;color:var(--gold-dim);
+        margin-bottom:2px;padding-top:2px;font-family:'Heebo',sans-serif">${s.label}</div>
+      <div id="sc-${id}">טוען...</div>
     </div>`;
   }).join('');
 
@@ -514,19 +521,16 @@ async function loadSiddur() {
   const yaalehOccasion = cal.isRoshChodesh ? 'רֹאשׁ הַחֹדֶשׁ' : cal.isCholHamoed ? 'חֹל הַמּוֹעֵד' : '';
 
   // ── Prefetch map: ref → Promise<html> ─────
-  // Start fetching section i+1 while rendering section i
   const prefetchMap = new Map();
 
   function startPrefetch(idx) {
     if (idx >= sections.length) return;
     const s = sections[idx];
-    if (s.staticText || s.isHallel) return; // instant, no need
+    if (s.staticText || s.isHallel) return;
     if (_getCache(s.ref) || prefetchMap.has(s.ref)) return;
-    const style = _sectionStyle(s);
-    prefetchMap.set(s.ref, _fetchSectionHtml(s, style, yaalehOccasion).catch(() => null));
+    prefetchMap.set(s.ref, _fetchSectionHtml(s, null, yaalehOccasion).catch(() => null));
   }
 
-  // Kick off first 2 sections immediately
   startPrefetch(0);
   startPrefetch(1);
 
@@ -537,7 +541,6 @@ async function loadSiddur() {
     if (!contentEl) { setProgress(i+1, ''); continue; }
 
     setProgress(i, s.label);
-    const style = _sectionStyle(s);
 
     try {
       let html;
@@ -546,7 +549,7 @@ async function loadSiddur() {
         prefetchMap.delete(s.ref);
       }
       if (!html) {
-        html = await _fetchSectionHtml(s, style, yaalehOccasion);
+        html = await _fetchSectionHtml(s, null, yaalehOccasion);
       }
       contentEl.innerHTML = html || '<span style="color:var(--muted)">(אין טקסט)</span>';
     } catch(e) {
@@ -554,7 +557,6 @@ async function loadSiddur() {
       console.warn('[Siddur] failed:', s.label, e.message);
     }
 
-    // Prefetch 2 ahead
     startPrefetch(i + 2);
     setProgress(i + 1, i + 1 < sections.length ? sections[i+1].label : '');
   }
@@ -575,11 +577,6 @@ async function loadSiddur() {
     siddurLoading = false;
     console.log('[Siddur] done:', siddurPrayer, '| cache:', Object.keys(_siddurCache).length);
   }
-}
-
-function _sectionStyle(s) {
-  // Font/layout base only – color is set per-paragraph in _renderParagraphs/_staticTextToHtml
-  return `font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);line-height:1.9;`;
 }
 
 // ── Sections quick-nav popup ──────────────

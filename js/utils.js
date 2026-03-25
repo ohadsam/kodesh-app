@@ -76,7 +76,7 @@ let currentAliya = 'all';
 let rashiLoaded = false;
 let rashiVisible = false;
 
-const APP_VERSION  = '4.1';
+const APP_VERSION  = '4.2';
 const STORAGE_KEY  = 'kodesh_app_v1';
 const SIDDUR_CACHE_KEY = 'siddur_cache_v';
 
@@ -233,7 +233,7 @@ function splitVerseOnHeaders(v) {
 }
 
 function buildParagraphs(flat) {
-  // Keywords that force a paragraph break BEFORE them
+  // Keywords that force a paragraph break BEFORE them (start a new semantic unit)
   const BREAK_BEFORE = [
     /^בָּרוּךְ אַתָּה/,       // ברכה
     /^לְשֵׁם יִחוּד/,         // לשם יחוד
@@ -241,13 +241,20 @@ function buildParagraphs(flat) {
     /^אָמֵן/,                 // אמן (אחרי ברכה)
     /^וִיהִי/,                // ויהי
     /^הֲרֵינִי/,              // הריני מוכן
-    /^אֱלֹהַי/,              // אלוהי
+    /^אֱלֹהַי/,               // אלוהי
     /^רִבּוֹנוֹ/,             // ריבונו
     /^מַה יָּקָר/,            // מה יקר (לאחר ברכת טלית)
     /^יִרְוְיֻן/,
     /^כִּי עִמְּ/,
     /^מְשֹׁךְ/,
     /^עֹֽטֶה/,
+  ];
+
+  // Patterns that signal the END of a complete bracha (flush after)
+  // Only the actual closing formula – not every verse ending with ':'
+  const BRACHA_END = [
+    /בָּרוּךְ אַתָּה יְ[יה][ֹוָה].*[.::]$/,   // ברוך אתה ה' ... (סיום ברכה)
+    /הַמְּבָרֵךְ אֶת עַמּוֹ יִשְׂרָאֵל בַּשָּׁלוֹם/,
   ];
 
   const paragraphs = [];
@@ -260,7 +267,7 @@ function buildParagraphs(flat) {
   for (const v of flat) {
     const plain = v.replace(/<[^>]+>/g,'').trim();
 
-    // Explicit <br> marker
+    // Explicit newline marker (from <br> tags converted by cleanSefariaHtml)
     if (v.includes('\n')) {
       v.split('\n').forEach((p, pi, arr) => {
         const t = p.trim();
@@ -270,24 +277,25 @@ function buildParagraphs(flat) {
       continue;
     }
 
-    // Empty verse
+    // Empty verse = hard paragraph break
     if (!plain) { flush(); continue; }
 
-    // Section header (from <small> tag, split out by splitVerseOnHeaders)
+    // Section header
     if (v.startsWith('__HEADER__')) {
       flush();
       paragraphs.push('__HEADER__' + v.slice(10));
       continue;
     }
 
-    // Check if this line starts a new section
+    // Check if this verse starts a new semantic block
     const isBreakPoint = BREAK_BEFORE.some(r => r.test(plain));
     if (isBreakPoint) flush();
 
     current.push(v);
 
-    // After a complete bracha (ends with :) → flush
-    if (plain.endsWith(':') || plain.endsWith('׃')) flush();
+    // Only flush after a genuine bracha-closing formula, not every ':'
+    const isBrachaEnd = BRACHA_END.some(r => r.test(plain));
+    if (isBrachaEnd) flush();
   }
   flush();
   return paragraphs;
