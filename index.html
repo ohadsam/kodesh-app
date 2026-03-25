@@ -37,10 +37,14 @@
     <!-- Reload -->
     <div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)">
       <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600">רענון</div>
-      <div style="display:flex;gap:8px">
+      <div style="display:flex;gap:8px;margin-bottom:8px">
         <button onclick="softReload()" style="flex:1;background:var(--card);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:10px;font-size:12px;cursor:pointer;font-family:'Heebo',sans-serif">🔄 רענון רגיל</button>
         <button onclick="hardReload()" style="flex:1;background:var(--card);border:1px solid var(--gold-dim);color:var(--gold);padding:8px;border-radius:10px;font-size:12px;cursor:pointer;font-family:'Heebo',sans-serif">🧹 ניקוי Cache</button>
       </div>
+      <button onclick="nuclearReset()" style="width:100%;background:rgba(201,65,65,.15);border:1px solid rgba(201,65,65,.5);color:#e07070;padding:10px;border-radius:10px;font-size:12px;cursor:pointer;font-family:'Heebo',sans-serif;font-weight:600">
+        💥 איפוס מוחלט – נקה הכל וטען מחדש
+      </button>
+      <div style="font-size:10px;color:var(--muted);margin-top:5px;text-align:center">מוחק: Service Worker, כל ה-cache, localStorage, ומרענן</div>
     </div>
 
     <!-- Font size -->
@@ -132,7 +136,7 @@
     <!-- Version & Copyright - INSIDE settings-inner -->
     <div style="text-align:center;padding:18px 0 8px;border-top:1px solid var(--border);margin-top:8px">
       <div style="font-size:13px;font-weight:600;color:var(--gold-dim);margin-bottom:4px">📖 לימוד יומי</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 4.3</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 4.4</div>
       <div style="font-size:11px;color:var(--muted)">© כל הזכויות שמורות לאוהד סמט</div>
     </div>
   </div>
@@ -776,7 +780,7 @@
     💡 לכיול המצפן: הזז את הטלפון בתנועת ∞ (שמונה שוכב) מספר פעמים
   </div>
   <div style="text-align:center;color:var(--muted);font-size:11px;padding:12px 0 4px">
-    גרסה 4.3 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
+    גרסה 4.4 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
   </div>
 </div>
 
@@ -816,15 +820,15 @@
      JavaScript modules (load order matters)
      v4.3 – querystring busts browser/SW cache
      ═══════════════════════════════════════ -->
-<script src="js/utils.js?v=4.3"></script>
-<script src="js/settings.js?v=4.3"></script>
-<script src="js/app.js?v=4.3"></script>
-<script src="js/tehilim.js?v=4.3"></script>
-<script src="js/calendar.js?v=4.3"></script>
-<script src="js/content.js?v=4.3"></script>
-<script src="js/tefilot.js?v=4.3"></script>
-<script src="js/siddur.js?v=4.3"></script>
-<script src="js/misc.js?v=4.3"></script>
-<script src="js/init.js?v=4.3"></script>
+<script src="js/utils.js?v=4.4"></script>
+<script src="js/settings.js?v=4.4"></script>
+<script src="js/app.js?v=4.4"></script>
+<script src="js/tehilim.js?v=4.4"></script>
+<script src="js/calendar.js?v=4.4"></script>
+<script src="js/content.js?v=4.4"></script>
+<script src="js/tefilot.js?v=4.4"></script>
+<script src="js/siddur.js?v=4.4"></script>
+<script src="js/misc.js?v=4.4"></script>
+<script src="js/init.js?v=4.4"></script>
 </body>
 </html>
