@@ -148,7 +148,7 @@ function scheduleReminder(key) {
 
 function softReload() {
   closeSettings();
-  window.location.reload(false); // reload from cache
+  window.location.reload(false);
 }
 async function hardReload() {
   closeSettings();
@@ -163,5 +163,39 @@ async function hardReload() {
     await Promise.all(registrations.map(r => r.unregister()));
     console.log('[Cache] unregistered service workers');
   }
-  window.location.reload(true); // force fresh from server
+  window.location.reload(true);
+}
+
+async function nuclearReset() {
+  // Show progress in button
+  const btn = document.querySelector('[onclick="nuclearReset()"]');
+  if (btn) btn.textContent = '⏳ מנקה הכל...';
+
+  console.log('[NuclearReset] START');
+
+  // 1. Unregister ALL service workers
+  if ('serviceWorker' in navigator) {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(regs.map(r => r.unregister()));
+    console.log('[NuclearReset] SW unregistered:', regs.length);
+  }
+
+  // 2. Clear ALL browser caches (Cache API)
+  if ('caches' in window) {
+    const keys = await caches.keys();
+    await Promise.all(keys.map(k => caches.delete(k)));
+    console.log('[NuclearReset] caches deleted:', keys);
+  }
+
+  // 3. Clear ALL localStorage
+  const savedKeys = Object.keys(localStorage);
+  localStorage.clear();
+  console.log('[NuclearReset] localStorage cleared:', savedKeys);
+
+  // 4. Clear sessionStorage
+  sessionStorage.clear();
+
+  // 5. Force full reload from server (no cache)
+  console.log('[NuclearReset] reloading...');
+  window.location.href = window.location.href.split('?')[0] + '?nocache=' + Date.now();
 }

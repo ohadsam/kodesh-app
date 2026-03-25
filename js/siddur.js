@@ -421,7 +421,10 @@ async function _fetchSectionHtml(s, _unused, yaalehOccasion) {
   }
 
   const cached = _getCache(s.ref);
-  if (cached) return cached;
+  if (cached) {
+    console.log('[Siddur] 💾 from-memory-cache:', s.label);
+    return cached;
+  }
 
   const data = await sefariaText(s.ref, 0);
   const flat = heFlat(data).map(cleanSefariaHtml).filter(Boolean);
@@ -430,16 +433,27 @@ async function _fetchSectionHtml(s, _unused, yaalehOccasion) {
   const paragraphs = buildParagraphs(flat);
   const html = _renderParagraphs(paragraphs, !!s.isAddition);
   _putCache(s.ref, html);
-  console.log('[Siddur] fetched:', s.label, paragraphs.length, 'paragraphs');
+  console.log('[Siddur] 🌐 fetched-network:', s.label, '→', paragraphs.length, 'paragraphs,', flat.length, 'verses');
   return html;
 }
 
 async function loadSiddur() {
   const dbg2 = document.getElementById('siddur-debug');
   if (dbg2) dbg2.textContent = '⏳ loadSiddur נקרא... ' + new Date().toLocaleTimeString();
-  console.log('[Siddur] loadSiddur called, siddurLoading=', siddurLoading, 'prayer=', siddurPrayer);
+  console.log('[Siddur] loadSiddur called, siddurLoading=', siddurLoading, 'prayer=', siddurPrayer, 'nusach=', siddurNusach);
   if (siddurLoading) { console.log('[Siddur] already loading, skip'); if(dbg2) dbg2.textContent += ' (כבר טוען)'; return; }
   siddurLoading = true;
+
+  // Log SW cache status so we can diagnose caching issues
+  if ('caches' in window) {
+    caches.keys().then(keys => console.log('[SW-Cache] active caches:', keys));
+    caches.has(`kodesh-v${APP_VERSION}`).then(has => console.log(`[SW-Cache] kodesh-v${APP_VERSION}:`, has ? '✅ EXISTS' : '❌ NOT FOUND'));
+  }
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(regs =>
+      console.log('[SW] registered:', regs.map(r => r.scope + ' state=' + (r.active?.state||'?')))
+    );
+  }
   if (dbg2) dbg2.textContent = '⏳ sections building... ' + new Date().toLocaleTimeString();
 
   const titleEl = document.getElementById('siddur-title');

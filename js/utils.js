@@ -76,29 +76,31 @@ let currentAliya = 'all';
 let rashiLoaded = false;
 let rashiVisible = false;
 
-const APP_VERSION  = '4.3';
+const APP_VERSION  = '4.4';
 const STORAGE_KEY  = 'kodesh_app_v1';
 const SIDDUR_CACHE_KEY = 'siddur_cache_v';
 
-// Invalidate siddur localStorage cache if version changed
+// ── Startup: force-clear SW and caches on version change ──────────────
 (function() {
   const savedVer = localStorage.getItem('app_version');
   if (savedVer !== APP_VERSION) {
     console.log('[Cache] New version', APP_VERSION, '← was', savedVer);
-    // Clear ALL caches aggressively
-    if ('caches' in window) {
-      caches.keys().then(keys => {
-        console.log('[Cache] Deleting', keys.length, 'SW caches:', keys);
-        return Promise.all(keys.map(k => caches.delete(k)));
-      }).then(() => {
-        localStorage.setItem('app_version', APP_VERSION);
-        // Force reload to get fresh files
-        console.log('[Cache] Reloading...');
-        window.location.reload(true);
-      });
-    } else {
+    const doReload = () => {
       localStorage.setItem('app_version', APP_VERSION);
-    }
+      console.log('[Cache] Reloading with fresh files...');
+      window.location.reload(true);
+    };
+    // Unregister ALL service workers first, then clear all caches
+    const sw = navigator.serviceWorker;
+    const p1 = sw ? sw.getRegistrations().then(regs => {
+      console.log('[Cache] Unregistering', regs.length, 'SW(s)');
+      return Promise.all(regs.map(r => r.unregister()));
+    }) : Promise.resolve();
+    const p2 = ('caches' in window) ? caches.keys().then(keys => {
+      console.log('[Cache] Deleting caches:', keys);
+      return Promise.all(keys.map(k => caches.delete(k)));
+    }) : Promise.resolve();
+    Promise.all([p1, p2]).then(doReload);
   }
 })();
 
@@ -233,24 +235,69 @@ function splitVerseOnHeaders(v) {
 }
 
 function buildParagraphs(flat) {
-  // Keywords that force a paragraph break BEFORE them (start a new semantic unit)
+  // Keywords that force a paragraph break BEFORE them
   const BREAK_BEFORE = [
-    /^בָּרוּךְ אַתָּה/,       // ברכה
-    /^לְשֵׁם יִחוּד/,         // לשם יחוד
-    /^יְהִי רָצוֹן/,          // יהי רצון
-    /^אָמֵן/,                 // אמן (אחרי ברכה)
-    /^וִיהִי/,                // ויהי
-    /^הֲרֵינִי/,              // הריני מוכן
-    /^אֱלֹהַי/,               // אלוהי
-    /^רִבּוֹנוֹ/,             // ריבונו
-    /^מַה יָּקָר/,            // מה יקר (לאחר ברכת טלית)
+    // ברכות – כל פתיחה של ברכה
+    /^בָּרוּךְ אַתָּה/,
+    // לשם יחוד / יהי רצון / קבלה
+    /^לְשֵׁם יִחוּד/,
+    /^יְהִי רָצוֹן/,
+    /^הֲרֵינִי/,
+    // תחילת קטעים מרכזיים בתפילה
+    /^אָמֵן/,
+    /^וִיהִי/,
+    /^אֱלֹהַי/,
+    /^רִבּוֹנוֹ/,
+    /^מַה יָּקָר/,
     /^יִרְוְיֻן/,
     /^כִּי עִמְּ/,
     /^מְשֹׁךְ/,
     /^עֹֽטֶה/,
+    // ברכת המזון – 4 ברכות + מקטעים מרכזיים
+    /^נוֹדֶה לְּ?ךָ/,          // ברכת הארץ
+    /^רַחֵם.*יְהֹוָה/,          // ברכת ירושלים
+    /^הָאֵל אָבִינוּ/,          // הטוב והמטיב
+    /^הָרַחֲמָן/,               // הרחמן הוא (סדרת הרחמן)
+    /^מַלְכוּתוֹ/,
+    /^עֹשֶׂה שָׁלוֹם/,           // עושה שלום
+    /^יִרְאוּ אֶת/,
+    // ק"ש וברכותיה
+    /^שְׁמַע יִשְׂרָאֵל/,
+    /^וְאָהַבְתָּ/,
+    /^וְהָיָה אִם/,
+    /^וַיֹּאמֶר/,
+    // עמידה
+    /^אַתָּה קָדוֹשׁ/,
+    /^אַתָּה חוֹנֵן/,
+    /^הֲשִׁיבֵנוּ/,
+    /^סְלַח לָנוּ/,
+    /^רְאֵה.*עָנְיֵנוּ/,
+    /^רְפָאֵנוּ/,
+    /^בָּרֵךְ עָלֵינוּ/,
+    /^תְּקַע בְּשׁוֹפָר/,
+    /^הָשִׁיבָה/,
+    /^וְלַמַּלְשִׁינִים/,
+    /^עַל הַצַּדִּיקִים/,
+    /^וְלִירוּשָׁלַיִם/,
+    /^אֶת צֶמַח/,
+    /^שְׁמַע קוֹלֵנוּ/,
+    /^רְצֵה.*יְהֹוָה/,
+    /^מוֹדִים/,
+    /^שִׂים שָׁלוֹם/,
+    // פסוקי דזמרה
+    /^הַלְלוּיָהּ/,
+    /^אַשְׁרֵי/,
+    // קדיש
+    /^יִתְגַּדַּל/,
+    /^יְהֵא שְׁמֵהּ/,
+    /^יִתְבָּרַךְ/,
+    /^יְהֵא שְׁלָמָא/,
+    // תחנון
+    /^וִידּוּי/,
+    /^אֱלֹהֵינוּ.*שָׁמַעְנוּ/,
   ];
 
-  // Only flush after a genuine bracha-closing formula
+  // Only flush after genuine bracha-closing formula
   const BRACHA_END = [
     /בָּרוּךְ אַתָּה יְ[יה]/,
     /הַמְּבָרֵךְ אֶת עַמּוֹ יִשְׂרָאֵל בַּשָּׁלוֹם/,
@@ -264,29 +311,23 @@ function buildParagraphs(flat) {
   };
 
   for (let v of flat) {
-    // Join internal newlines (from <br> tags) – keep the verse as one unit
-    // A \n inside a single verse is just a line-continuation, not a paragraph break
-    v = v.replace(/\n/g, ' ').trim();
+    // Join internal \n (from <br> tags) – verse is one unit
+    v = v.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
 
     const plain = v.replace(/<[^>]+>/g,'').trim();
-
-    // Empty verse = hard paragraph break
     if (!plain) { flush(); continue; }
 
-    // Section header
     if (v.startsWith('__HEADER__')) {
       flush();
       paragraphs.push('__HEADER__' + v.slice(10));
       continue;
     }
 
-    // Check if this verse starts a new semantic block
     const isBreakPoint = BREAK_BEFORE.some(r => r.test(plain));
     if (isBreakPoint) flush();
 
     current.push(v);
 
-    // Flush after genuine bracha-closing formula
     const isBrachaEnd = BRACHA_END.some(r => r.test(plain));
     if (isBrachaEnd) flush();
   }
