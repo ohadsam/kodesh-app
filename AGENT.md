@@ -1,4 +1,4 @@
-# לימוד יומי – Agent Reference v4.1
+# לימוד יומי – Agent Reference v4.2
 
 **URL**: `https://ohadsam.github.io/kodesh-app/`  
 **Stack**: Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API  
@@ -93,12 +93,14 @@ let appState = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
 
 **Conditions** (in `SIDDUR_CONDITIONS`): `isShabbat`, `isRoshChodesh`, `isRoshChodeshOrMoed`, `isCholHamoed`, `isYomTov`, `isHallel`, `isTachanun`, `isSefirat`, `isAlNisim`, `isMussaf`, `isMussakRH`
 
-**Rendering pipeline** (v4.1):
-- `_sectionStyle(s)` – returns **only** font/layout CSS (no color – color is set per-paragraph)
-- `_staticTextToHtml(rawText, isAdd)` – groups multiline static text into flowing `<p>` blocks; isAdd=true → `color:var(--addition)`, italic, bold
+**Rendering pipeline** (v4.2):
+- `_fetchSectionHtml(s, _unused, yaalehOccasion)` – returns **inner HTML only** (no wrapper); inserted into `#sc-{id}` placeholder which already sits inside the skeleton wrapper with label
+- `_staticTextToHtml(rawText, isAdd)` – joins consecutive non-empty lines into one `<p>` per blank-separated block; isAdd=true → `color:var(--addition)`, italic, bold
 - `_renderParagraphs(paragraphs, isAdd)` – renders API-fetched paragraphs; isAdd=true → `color:var(--addition)`
+- `buildParagraphs(flat)` – groups Sefaria verses into paragraphs; flushes ONLY on `BREAK_BEFORE` patterns or genuine bracha-end (`BRACHA_END`), **NOT on every verse ending with ':'** (v4.2 fix – was causing one-verse-per-line)
 - Addition blocks in skeleton use CSS class `.siddur-addition-block` with green border + background
-- CONDITION_LABELS shown as `📅 מתי נאמר` label inside addition block header
+- Condition label (`📅 מתי נאמר`) is inside the addition block wrapper `ss-{id}`, **above** the `sc-{id}` content placeholder — so it persists after content loads
+- `content-text` CSS class: `white-space:normal` (v4.2 fix – was `pre-wrap` causing huge gaps)
 
 **Floating buttons** (v4.1):
 - `#siddur-float-btn` (☰) – scrolls back to top nav, shown after 150px scroll
@@ -222,18 +224,16 @@ if (cV < 1 || cV > chapLen) return; // verse must be within actual chapter lengt
 
 | Problem | File | What to look for |
 |---|---|---|
-| Tefilot tab shows nothing | `js/tefilot.js` | Check `initTefilot` exists and `showTefila` renders `#tefila-content` |
-| **tefilot.js is broken** | `js/tefilot.js` | Must end after `showTefila` closing `}` – no ALL_TABS or settings code inside |
-| Wrong parasha shown | `js/content.js` | `matchP` logic in `loadParasha()` |
-| Rashi bleeds to wrong verses | `js/content.js` | `cCh !== ch` filter in `loadRashiForRef()` |
-| Rashi not loading | `js/content.js` | Retry loop: 3 attempts, backoff 0/1.5s/3s |
-| Siddur additions wrong color | `js/siddur.js` | `_sectionStyle` must NOT set color; color set in `_renderParagraphs`/`_staticTextToHtml` |
-| Siddur additions no label | `js/siddur.js` | `whenLabel` from `CONDITION_LABELS[s.condition]` in skeleton builder |
-| Sections popup not working | `js/siddur.js` | `openSiddurSectionsPopup`, `closeSiddurSectionsPopup`; HTML: `#siddur-sec-popup-overlay`, `#siddur-sec-popup` |
+| Siddur text word-per-line | `js/utils.js` | `buildParagraphs` – `isBrachaEnd` check; must NOT flush on every `:` |
+| Addition text wrong color | `js/siddur.js` | `_renderParagraphs`/`_staticTextToHtml` – isAdd→`var(--addition)` |
+| Addition label disappears after load | `js/siddur.js` | Label is in skeleton wrapper `ss-{id}`, content in `sc-{id}` – never replace the whole `ss-{id}` el |
+| Huge gaps between sections | `styles.css` | `.content-text` must be `white-space:normal` not `pre-wrap` |
+| Tefilot tab shows nothing | `js/tefilot.js` | Must end after `showTefila` — no ALL_TABS or settings code |
+| **tefilot.js broken** | `js/tefilot.js` | File must contain ONLY: `TEFILOT`, `initTefilot`, `showTefila` |
+| Wrong parasha shown | `js/content.js` | `matchP` exact-first logic in `loadParasha()` |
+| Rashi bleeds wrong verses | `js/content.js` | `cCh !== ch` filter in `loadRashiForRef()` |
+| Sections popup not working | `js/siddur.js` | `openSiddurSectionsPopup`, `closeSiddurSectionsPopup` |
 | Float buttons not showing | `js/siddur.js` | `initSiddurFloatBtn()` – checks scroll > 150px |
-| Wrong zman shown | `js/calendar.js` | Field names in Hebcal zmanim response |
-| Tab not loading | `js/app.js` | `loadTab()` switch |
-| Settings not saving | `js/settings.js` | `saveState()` + `appState` |
 | Cache stale after deploy | `sw.js` + `js/utils.js` | Bump `APP_VERSION` in **both** files |
 | New JS file added | `index.html` + `sw.js` | Add `<script src>` before `init.js` AND add to `STATIC[]` in sw.js |
 
