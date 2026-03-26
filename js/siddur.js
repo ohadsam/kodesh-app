@@ -359,29 +359,28 @@ function _renderParagraphs(paragraphs, isAdd) {
   const pColor  = isAdd ? 'var(--addition)' : 'var(--cream)';
   const pStyle  = isAdd ? 'italic'          : 'normal';
   const pWeight = isAdd ? '600'             : '400';
-  // Base paragraph style: block, flows naturally, compact bottom margin
-  const baseStyle = `display:block;margin:0 0 4px 0;line-height:1.9;` +
+  const baseStyle = `display:block;margin:0 0 8px 0;line-height:1.9;` +
+                    `font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);` +
                     `color:${pColor};font-style:${pStyle};font-weight:${pWeight}`;
 
   return paragraphs.map(p => {
     if (p.startsWith('__HEADER__')) {
       const label = p.slice(10);
       return `<p style="display:block;margin:10px 0 3px 0;font-size:10px;font-weight:700;` +
-             `font-style:normal;color:var(--gold-dim);letter-spacing:.5px;` +
-             `border-bottom:1px solid var(--border);padding-bottom:2px">${label}</p>`;
+             `font-style:normal;font-family:'Heebo',sans-serif;color:var(--gold-dim);` +
+             `letter-spacing:.5px;border-bottom:1px solid var(--border);padding-bottom:2px">${label}</p>`;
     }
     return `<p style="${baseStyle}">${p}</p>`;
   }).join('');
 }
 
 // Convert static multiline text into flowing paragraphs.
-// Groups consecutive non-empty lines into one <p> per logical block
-// (blank line = paragraph break).
 function _staticTextToHtml(rawText, isAdd) {
   const pColor  = isAdd ? 'var(--addition)' : 'var(--cream)';
   const pStyle  = isAdd ? 'italic'          : 'normal';
   const pWeight = isAdd ? '600'             : '400';
-  const baseStyle = `display:block;margin:0 0 6px 0;line-height:1.9;` +
+  const baseStyle = `display:block;margin:0 0 8px 0;line-height:1.9;` +
+                    `font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);` +
                     `color:${pColor};font-style:${pStyle};font-weight:${pWeight}`;
 
   const blocks = [];
@@ -431,6 +430,7 @@ async function _fetchSectionHtml(s, _unused, yaalehOccasion) {
   if (!flat.length) return '<span style="color:var(--muted)">(אין טקסט זמין)</span>';
 
   const paragraphs = buildParagraphs(flat);
+  if (typeof _logParagraphs === 'function') _logParagraphs(s.label, paragraphs);
   const html = _renderParagraphs(paragraphs, !!s.isAddition);
   _putCache(s.ref, html);
   console.log('[Siddur] 🌐 fetched-network:', s.label, '→', paragraphs.length, 'paragraphs,', flat.length, 'verses');

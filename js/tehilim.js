@@ -185,6 +185,16 @@ function getTehilimNavInfo(chapter) {
 
 let currentTehilimChapter = 1;
 
+function scrollTehilimTop() {
+  // Scroll the tehilim card into view when navigating between chapters
+  const el = document.getElementById('tehilim-content');
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } else {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+}
+
 async function loadTehilim(chapter) {
   chapter = parseInt(chapter);
   if (!chapter || chapter < 1 || chapter > 150) return;
@@ -206,13 +216,15 @@ async function loadTehilim(chapter) {
     if (!flat.length) throw new Error(`אין טקסט עברי לפרק ${chapter}`);
 
     // Build smart navigation buttons
+    // scrollTehilimTop() is called alongside loadTehilim to scroll back to chapter top
     const nav = getTehilimNavInfo(chapter);
-    const btnStyle = `background:var(--surface);border:1px solid var(--border);color:var(--gold);padding:6px 12px;border-radius:20px;font-size:12px;cursor:pointer;font-family:'Heebo',sans-serif;max-width:48%`;
-    // For day-boundary nav, use slightly different styling
+    const btnStyle    = `background:var(--surface);border:1px solid var(--border);color:var(--gold);padding:6px 12px;border-radius:20px;font-size:12px;cursor:pointer;font-family:'Heebo',sans-serif;max-width:48%`;
     const dayBtnStyle = `background:rgba(201,165,74,.12);border:1px solid var(--gold-dim);color:var(--gold);padding:6px 12px;border-radius:20px;font-size:12px;cursor:pointer;font-family:'Heebo',sans-serif;max-width:48%`;
 
-    const prevBtn = nav ? `<button onclick="${nav.prevAction}" style="${nav.isFirstInDay ? dayBtnStyle : btnStyle}">${nav.prevLabel}</button>` : '<span></span>';
-    const nextBtn = nav ? `<button onclick="${nav.nextAction}" style="${nav.isLastInDay  ? dayBtnStyle : btnStyle}">${nav.nextLabel}</button>` : '<span></span>';
+    // Wrap each action to also scroll to top of tehilim-content
+    const wrapAction = action => `scrollTehilimTop();${action}`;
+    const prevBtn = nav ? `<button onclick="${wrapAction(nav.prevAction)}" style="${nav.isFirstInDay ? dayBtnStyle : btnStyle}">${nav.prevLabel}</button>` : '<span></span>';
+    const nextBtn = nav ? `<button onclick="${wrapAction(nav.nextAction)}" style="${nav.isLastInDay  ? dayBtnStyle : btnStyle}">${nav.nextLabel}</button>` : '<span></span>';
     const navRow  = `<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:14px">${prevBtn}${nextBtn}</div>`;
 
     // Day indicator

@@ -4,6 +4,17 @@
 // ═══════════════════════════════════════════
 const appLogs = [];
 const MAX_LOGS = 300;
+const LOG_TTL_MS = 48 * 60 * 60 * 1000; // 48 hours
+
+// Auto-clear logs if last clear was >48h ago
+(function() {
+  const lastClear = parseInt(localStorage.getItem('logs_last_clear') || '0');
+  if (Date.now() - lastClear > LOG_TTL_MS) {
+    localStorage.setItem('logs_last_clear', String(Date.now()));
+    // appLogs is empty at this point anyway (fresh page load clears memory)
+    // but mark the timestamp so we don't re-trigger immediately
+  }
+})();
 
 function addLog(level, args) {
   const msg = args.map(a => {
@@ -34,7 +45,11 @@ function renderLogs() {
   if (!el) return;
   const errors = appLogs.filter(l => l.level === 'error').length;
   const warns  = appLogs.filter(l => l.level === 'warn').length;
-  if (stats) stats.textContent = `סה"כ: ${appLogs.length} | שגיאות: ${errors} | אזהרות: ${warns}`;
+  const lastClear = parseInt(localStorage.getItem('logs_last_clear') || '0');
+  const sinceStr  = lastClear
+    ? `ניקוי אחרון: ${new Date(lastClear).toLocaleDateString('he-IL')} ${new Date(lastClear).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}`
+    : '';
+  if (stats) stats.textContent = `סה"כ: ${appLogs.length}/${MAX_LOGS} | שגיאות: ${errors} | אזהרות: ${warns}  ${sinceStr}`;
   if (!appLogs.length) {
     el.innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center;padding:20px">אין לוגים</div>';
     return;
@@ -52,8 +67,9 @@ function renderLogs() {
 
 function clearLogs() {
   appLogs.length = 0;
+  localStorage.setItem('logs_last_clear', String(Date.now()));
   renderLogs();
-  console.log('[Logs] cleared');
+  console.log('[Logs] cleared manually');
 }
 
 function copyLogs() {
@@ -76,7 +92,7 @@ let currentAliya = 'all';
 let rashiLoaded = false;
 let rashiVisible = false;
 
-const APP_VERSION  = '4.5';
+const APP_VERSION  = '4.7';
 const STORAGE_KEY  = 'kodesh_app_v1';
 const SIDDUR_CACHE_KEY = 'siddur_cache_v';
 
@@ -242,63 +258,23 @@ function splitVerseOnHeaders(v) {
 }
 
 function buildParagraphs(flat) {
-  // Strip cantillation marks + nikud (U+0591–U+05C7) so patterns work
-  // regardless of Sefaria encoding (which embeds טעמי מקרא between letters)
-  const stripDiacritics = s => s.replace(/[\u0591-\u05C7]/g, '');
+  // Strip cantillation marks + nikud for pattern matching only
+  const stripD = s => s.replace(/[\u0591-\u05C7]/g, '');
 
-  // Keywords that start a new paragraph (matched against stripped plain text)
-  const BREAK_BEFORE = [
-    /^ברוך אתה/,           // כל ברכה
-    /^לשם יחוד/,
-    /^יהי רצון/,
+  // Only break into a NEW paragraph at these major structural points.
+  // Keep each bracha (blessing unit) as ONE flowing paragraph.
+  const MAJOR_BREAK = [
+    /^לשם יחוד/,     // קבלת עול מצוות – always starts a new unit
+    /^יהי רצון/,     // יהי רצון – standalone prayer
     /^הריני/,
-    /^אמן/,
-    /^ויהי/,
-    /^אלהי/,
-    /^רבונו/,
-    /^מה יקר/,
-    // ברכת המזון
-    /^נודה לך/,            // ברכת הארץ
-    /^רחם.*יהוה/,          // ברכת ירושלים
-    /^האל אבינו/,          // הטוב והמטיב
-    /^הרחמן הוא/,          // הרחמן
-    /^עושה שלום/,
-    /^יראו את/,
-    // שמע וברכותיה
-    /^שמע ישראל/,
-    /^ואהבת/,
-    /^והיה אם/,
-    /^ויאמר/,
-    // עמידה – כל ברכה
-    /^אתה קדוש/,
-    /^אתה חונן/,
-    /^השיבנו/,
-    /^סלח לנו/,
-    /^ראה.*ענינו/,
-    /^רפאנו/,
-    /^ברך עלינו/,
-    /^תקע בשופר/,
-    /^השיבה/,
-    /^ולמלשינים/,
-    /^על הצדיקים/,
-    /^ולירושלים/,
-    /^את צמח/,
-    /^שמע קולנו/,
-    /^רצה.*יהוה/,
-    /^מודים/,
-    /^שים שלום/,
-    // פסוקי דזמרה
-    /^הללויה/,
-    /^אשרי/,
-    // קדיש
-    /^יתגדל/,
-    /^יהא שמה/,
-    /^יתברך/,
-    /^יהא שלמא/,
-    // תחנון / וידוי
-    /^אלהינו.*שמענו/,
+    /^שמע ישראל/,    // ק"ש – major unit
+    /^ואהבת/,        // פרשת ואהבת
+    /^והיה אם/,      // פרשת והיה
+    /^ויאמר/,        // פרשת ציצית
+    /^אני מאמין/,    // עיקרי האמונה
   ];
 
+  // Flush AFTER these closing formulas
   const BRACHA_END = [
     /ברוך אתה י[יה]/,
     /המברך את עמו ישראל בשלום/,
@@ -308,32 +284,35 @@ function buildParagraphs(flat) {
   let current = [];
 
   const flush = () => {
-    if (current.length) { paragraphs.push(current.join(' ')); current = []; }
+    if (current.length) {
+      paragraphs.push(current.join(' '));
+      current = [];
+    }
   };
 
   for (let v of flat) {
-    // Normalize: join internal \n (from <br>), collapse whitespace
     v = v.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
-
-    // Strip HTML tags for matching, then strip cantillation/nikud
-    const plain       = stripDiacritics(v.replace(/<[^>]+>/g, '').trim());
-    const plainNikud  = v.replace(/<[^>]+>/g, '').trim(); // keep nikud for BRACHA_END
-
+    const plain = stripD(v.replace(/<[^>]+>/g, '').trim());
     if (!plain) { flush(); continue; }
+    if (v.startsWith('__HEADER__')) { flush(); paragraphs.push('__HEADER__' + v.slice(10)); continue; }
 
-    if (v.startsWith('__HEADER__')) {
-      flush();
-      paragraphs.push('__HEADER__' + v.slice(10));
-      continue;
-    }
-
-    if (BREAK_BEFORE.some(r => r.test(plain))) flush();
-
+    if (MAJOR_BREAK.some(r => r.test(plain))) flush();
     current.push(v);
-
-    if (BRACHA_END.some(r => r.test(stripDiacritics(plainNikud)))) flush();
+    if (BRACHA_END.some(r => r.test(plain))) flush();
   }
   flush();
   return paragraphs;
+}
+
+// Debug helper: log first few words of each paragraph
+function _logParagraphs(label, paragraphs) {
+  const stripD = s => s.replace(/[\u0591-\u05C7]/g, '');
+  console.log(`[Siddur-para] ${label}: ${paragraphs.length} paragraphs`);
+  if (paragraphs.length <= 20) {
+    paragraphs.forEach((p, i) => {
+      const words = stripD(p.replace(/<[^>]+>/g,'')).trim().split(/\s+/);
+      console.log(`  [${i+1}] ${words.length}w: ${words.slice(0,5).join(' ')}...`);
+    });
+  }
 }
 
