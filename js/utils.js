@@ -92,7 +92,7 @@ let currentAliya = 'all';
 let rashiLoaded = false;
 let rashiVisible = false;
 
-const APP_VERSION  = '4.7';
+const APP_VERSION  = '4.8';
 const STORAGE_KEY  = 'kodesh_app_v1';
 const SIDDUR_CACHE_KEY = 'siddur_cache_v';
 
@@ -229,10 +229,10 @@ function cleanSefariaHtml(str) {
     .replace(/&thinsp;/g, '\u2009').replace(/&nbsp;/g, '\u00a0')
     .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
     .replace(/&mdash;/g, '\u2014').replace(/&ndash;/g, '\u2013')
+    // <small> = seasonal/special insertions (זכרנו לחיים etc.)
+    // render INLINE with addition color – do NOT use display:block
     .replace(/<small[^>]*>(.*?)<\/small>/gi,
-      '<span style="display:block;font-size:13px;color:var(--addition);background:var(--addition-bg);' +
-      'padding:6px 10px;border-radius:6px;margin:6px 0;line-height:1.5;font-style:normal;' +
-      'border-right:3px solid var(--addition)">$1</span>')
+      '<span style="color:var(--addition);font-style:italic;font-weight:600">$1</span>')
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<(?!\/?(?:b|i|strong|em|span)\b)[^>]+>/gi, '')
     .trim();
