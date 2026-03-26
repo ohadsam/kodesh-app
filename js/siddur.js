@@ -364,6 +364,25 @@ function _renderParagraphs(paragraphs, isAdd) {
                     `color:${pColor};font-style:${pStyle};font-weight:${pWeight}`;
 
   return paragraphs.map(p => {
+    // SEASONAL insert (from <small> tags – seasonal prayers like יעלה ויבוא within Amida)
+    if (p.startsWith('\x01SEASONAL\x02')) {
+      const parts  = p.split('\x02');  // [\x01SEASONAL, label, content]
+      const label  = parts[1] || '';
+      const content = parts[2] || '';
+      if (!content) return '';
+      const labelHtml = label
+        ? `<span style="display:block;font-size:9px;font-family:'Heebo',sans-serif;` +
+          `color:var(--addition);opacity:.85;font-style:normal;font-weight:600;` +
+          `letter-spacing:.3px;margin-bottom:2px">${label}</span>`
+        : '';
+      return `<p style="display:block;margin:4px 0 8px 0;padding:5px 10px;` +
+             `background:var(--addition-bg);border-right:2px solid var(--addition);` +
+             `border-radius:0 6px 6px 0;font-family:'Frank Ruhl Libre',serif;` +
+             `font-size:var(--font-size);color:var(--addition);font-style:italic;font-weight:600;` +
+             `line-height:1.85">` +
+             labelHtml + content + `</p>`;
+    }
+
     if (p.startsWith('__HEADER__')) {
       const label = p.slice(10);
       return `<p style="display:block;margin:10px 0 3px 0;font-size:10px;font-weight:700;` +

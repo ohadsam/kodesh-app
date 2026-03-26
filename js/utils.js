@@ -92,7 +92,7 @@ let currentAliya = 'all';
 let rashiLoaded = false;
 let rashiVisible = false;
 
-const APP_VERSION  = '4.8';
+const APP_VERSION  = '4.9';
 const STORAGE_KEY  = 'kodesh_app_v1';
 const SIDDUR_CACHE_KEY = 'siddur_cache_v';
 
@@ -225,14 +225,34 @@ function heFlat(data) {
 // Also decode common HTML entities that Sefaria uses
 function cleanSefariaHtml(str) {
   if (!str) return '';
+
+  // Determine label for seasonal inserts based on content
+  function seasonalLabel(content) {
+    const c = content.replace(/[\u0591-\u05C7<>]/g, '').trim();
+    if (/קיץ|טל.?ברכ|ברך.?עלינו.*קיץ/i.test(c)) return 'קיץ';
+    if (/חורף|טל.?מטר|גשם/i.test(c)) return 'חורף';
+    if (/ר"ח|ראש.?חודש/i.test(c)) return 'ר"ח';
+    if (/פסח/i.test(c)) return 'פסח';
+    if (/שבועות/i.test(c)) return 'שבועות';
+    if (/סוכות/i.test(c)) return 'סוכות';
+    if (/חנוכה/i.test(c)) return 'חנוכה';
+    if (/פורים/i.test(c)) return 'פורים';
+    if (/שבת/i.test(c)) return 'שבת';
+    return null;
+  }
+
   return str
     .replace(/&thinsp;/g, '\u2009').replace(/&nbsp;/g, '\u00a0')
     .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
     .replace(/&mdash;/g, '\u2014').replace(/&ndash;/g, '\u2013')
-    // <small> = seasonal/special insertions (זכרנו לחיים etc.)
-    // render INLINE with addition color – do NOT use display:block
-    .replace(/<small[^>]*>(.*?)<\/small>/gi,
-      '<span style="color:var(--addition);font-style:italic;font-weight:600">$1</span>')
+    // <small> = seasonal/special inserts (יעלה ויבוא, ברכת השנים קיץ/חורף etc.)
+    // Convert to a block marker: __SEASONAL__label|content__
+    // This will be rendered as a block with a label by _renderParagraphs
+    .replace(/<small[^>]*>(.*?)<\/small>/gi, (match, content) => {
+      const label = seasonalLabel(content);
+      const clean = content.replace(/<[^>]+>/g, '').trim();
+      return `\x01SEASONAL\x02${label || ''}\x02${clean}\x01`;
+    })
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<(?!\/?(?:b|i|strong|em|span)\b)[^>]+>/gi, '')
     .trim();
@@ -292,6 +312,43 @@ function buildParagraphs(flat) {
 
   for (let v of flat) {
     v = v.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+
+    // If verse contains SEASONAL marker(s), split around them
+    if (v.includes('\x01SEASONAL\x02')) {
+      // Split on \x01 boundaries: text | \x01SEASONAL...\x01 | text | ...
+      let i = 0;
+      while (i <= v.length) {
+        const start = v.indexOf('\x01', i);
+        if (start === -1) {
+          // remaining regular text
+          const rem = v.slice(i).trim();
+          if (rem) {
+            const plain2 = stripD(rem.replace(/<[^>]+>/g, ''));
+            if (MAJOR_BREAK.some(r => r.test(plain2))) flush();
+            current.push(rem);
+            if (BRACHA_END.some(r => r.test(plain2))) flush();
+          }
+          break;
+        }
+        // text before the marker
+        const before = v.slice(i, start).trim();
+        if (before) {
+          const plain2 = stripD(before.replace(/<[^>]+>/g, ''));
+          if (MAJOR_BREAK.some(r => r.test(plain2))) flush();
+          current.push(before);
+          if (BRACHA_END.some(r => r.test(plain2))) flush();
+        }
+        // find closing \x01
+        const end = v.indexOf('\x01', start + 1);
+        if (end === -1) break;
+        const marker = v.slice(start, end + 1);
+        flush();                // break paragraph before seasonal insert
+        paragraphs.push(marker); // seasonal is its own paragraph
+        i = end + 1;
+      }
+      continue;
+    }
+
     const plain = stripD(v.replace(/<[^>]+>/g, '').trim());
     if (!plain) { flush(); continue; }
     if (v.startsWith('__HEADER__')) { flush(); paragraphs.push('__HEADER__' + v.slice(10)); continue; }
@@ -306,12 +363,15 @@ function buildParagraphs(flat) {
 
 // Debug helper: log first few words of each paragraph
 function _logParagraphs(label, paragraphs) {
-  const stripD = s => s.replace(/[\u0591-\u05C7]/g, '');
+  const stripD = s => s.replace(/[\u0591-\u05C7]/g, '').replace(/\x01[^\x01]*\x01/g, '[seasonal]');
   console.log(`[Siddur-para] ${label}: ${paragraphs.length} paragraphs`);
   if (paragraphs.length <= 20) {
     paragraphs.forEach((p, i) => {
-      const words = stripD(p.replace(/<[^>]+>/g,'')).trim().split(/\s+/);
-      console.log(`  [${i+1}] ${words.length}w: ${words.slice(0,5).join(' ')}...`);
+      const isSeasonal = p.startsWith('\x01SEASONAL\x02');
+      const display = isSeasonal
+        ? '[seasonal: ' + p.split('\x02').slice(1, 3).join('|').slice(0, 30) + ']'
+        : stripD(p.replace(/<[^>]+>/g,'')).trim().split(/\s+/).slice(0,5).join(' ') + '...';
+      console.log(`  [${i+1}] ${display}`);
     });
   }
 }
