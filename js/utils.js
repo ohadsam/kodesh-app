@@ -92,7 +92,7 @@ let currentAliya = 'all';
 let rashiLoaded = false;
 let rashiVisible = false;
 
-const APP_VERSION  = '4.9';
+const APP_VERSION  = '5.1';
 const STORAGE_KEY  = 'kodesh_app_v1';
 const SIDDUR_CACHE_KEY = 'siddur_cache_v';
 
@@ -222,43 +222,35 @@ function heFlat(data) {
 }
 
 // Clean Sefaria HTML: keep <b>/<i> for bold/italic, strip the rest
-// Also decode common HTML entities that Sefaria uses
 function cleanSefariaHtml(str) {
   if (!str) return '';
 
-  // Determine label for seasonal inserts based on content
-  function seasonalLabel(content) {
-    const c = content.replace(/[\u0591-\u05C7<>]/g, '').trim();
-    if (/קיץ|טל.?ברכ|ברך.?עלינו.*קיץ/i.test(c)) return 'קיץ';
-    if (/חורף|טל.?מטר|גשם/i.test(c)) return 'חורף';
-    if (/ר"ח|ראש.?חודש/i.test(c)) return 'ר"ח';
-    if (/פסח/i.test(c)) return 'פסח';
-    if (/שבועות/i.test(c)) return 'שבועות';
-    if (/סוכות/i.test(c)) return 'סוכות';
-    if (/חנוכה/i.test(c)) return 'חנוכה';
-    if (/פורים/i.test(c)) return 'פורים';
-    if (/שבת/i.test(c)) return 'שבת';
-    return null;
+  // Only treat <small> as a seasonal block if it contains specific holiday/season keywords.
+  // Other uses: "ברוך שם" (quiet), "בעשי"ת" (alternate text), parentheticals → inline muted.
+  function isSeasonalInsert(text) {
+    const t = text.replace(/[\u0591-\u05C7<>]/g, '').trim();
+    return /ר["\s.]?ח|ראש.?ח|פסח|שבועות|סוכות|חנוכה|פורים|קיץ|חורף|מטר|גשם/.test(t);
   }
 
   return str
     .replace(/&thinsp;/g, '\u2009').replace(/&nbsp;/g, '\u00a0')
     .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
     .replace(/&mdash;/g, '\u2014').replace(/&ndash;/g, '\u2013')
-    // <small> = seasonal/special inserts (יעלה ויבוא, ברכת השנים קיץ/חורף etc.)
-    // Convert to a block marker: __SEASONAL__label|content__
-    // This will be rendered as a block with a label by _renderParagraphs
-    .replace(/<small[^>]*>(.*?)<\/small>/gi, (match, content) => {
-      const label = seasonalLabel(content);
-      const clean = content.replace(/<[^>]+>/g, '').trim();
-      return `\x01SEASONAL\x02${label || ''}\x02${clean}\x01`;
+    .replace(/<small[^>]*>(.*?)<\/small>/gi, (_, inner) => {
+      const text = inner.replace(/<[^>]+>/g, '').trim();
+      if (isSeasonalInsert(text)) {
+        // True seasonal insert → uE001 markers for block rendering
+        return '\uE001' + text + '\uE001';
+      }
+      // Non-seasonal (ברוך שם, בעשי"ת, parentheticals) → inline muted italic
+      return `<span style="color:var(--muted);font-style:italic;font-size:.9em">${text}</span>`;
     })
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<(?!\/?(?:b|i|strong|em|span)\b)[^>]+>/gi, '')
     .trim();
 }
 
-// Split a cleaned verse that may contain \u2029 section markers
+// Split a cleaned verse that may contain section markers
 function splitVerseOnHeaders(v) {
   const SEP = '|||HEADER|||';
   if (!v.includes(SEP)) return [v];
@@ -267,111 +259,116 @@ function splitVerseOnHeaders(v) {
   for (let i = 0; i < parts.length; i++) {
     const p = parts[i].trim();
     if (!p) continue;
-    // Odd positions are header labels (between sentinel pairs)
-    if (i % 2 === 1) {
-      result.push('__HEADER__' + p);
-    } else {
-      result.push(p);
-    }
+    if (i % 2 === 1) result.push('__HEADER__' + p);
+    else result.push(p);
   }
   return result;
 }
 
+// Detect label for a seasonal insert
+function _seasonalLabel(text) {
+  const t = text.replace(/[\u0591-\u05C7]/g,'');
+  if (/ר.?ח|ראש.?ח/.test(t))   return 'ר"ח';
+  if (/פסח/.test(t))             return 'פסח';
+  if (/שבועות/.test(t))         return 'שבועות';
+  if (/סוכות/.test(t))          return 'סוכות';
+  if (/חנוכה/.test(t))          return 'חנוכה';
+  if (/פורים/.test(t))          return 'פורים';
+  if (/שבת/.test(t))            return 'שבת';
+  if (/חורף|מטר|גשם/.test(t))  return 'חורף';
+  if (/קיץ|טל.?ברכ/.test(t))   return 'קיץ';
+  return '';
+}
+
 function buildParagraphs(flat) {
-  // Strip cantillation marks + nikud for pattern matching only
   const stripD = s => s.replace(/[\u0591-\u05C7]/g, '');
 
-  // Only break into a NEW paragraph at these major structural points.
-  // Keep each bracha (blessing unit) as ONE flowing paragraph.
-  const MAJOR_BREAK = [
-    /^לשם יחוד/,     // קבלת עול מצוות – always starts a new unit
-    /^יהי רצון/,     // יהי רצון – standalone prayer
+  // Break paragraph BEFORE these patterns
+  const BREAK_BEFORE = [
+    /^לשם יחוד/,
+    /^יהי רצון/,
     /^הריני/,
-    /^שמע ישראל/,    // ק"ש – major unit
-    /^ואהבת/,        // פרשת ואהבת
-    /^והיה אם/,      // פרשת והיה
-    /^ויאמר/,        // פרשת ציצית
-    /^אני מאמין/,    // עיקרי האמונה
+    /^שמע ישראל/,
+    /^ואהבת/,
+    /^והיה אם/,
+    /^ויאמר/,
+    /^אני מאמין/,
   ];
 
-  // Flush AFTER these closing formulas
-  const BRACHA_END = [
-    /ברוך אתה י[יה]/,
-    /המברך את עמו ישראל בשלום/,
-  ];
+  // Flush AFTER this pattern (marks end of a bracha)
+  const BRACHA_END = /ברוך אתה י[יה]/;
 
   const paragraphs = [];
   let current = [];
 
   const flush = () => {
-    if (current.length) {
-      paragraphs.push(current.join(' '));
-      current = [];
-    }
+    const joined = current.join(' ').trim();
+    if (joined) paragraphs.push(joined);
+    current = [];
   };
 
   for (let v of flat) {
-    v = v.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+    // Normalize whitespace but preserve \uE001 markers
+    v = v.replace(/\n/g, ' ').replace(/ +/g, ' ').trim();
 
-    // If verse contains SEASONAL marker(s), split around them
-    if (v.includes('\x01SEASONAL\x02')) {
-      // Split on \x01 boundaries: text | \x01SEASONAL...\x01 | text | ...
-      let i = 0;
-      while (i <= v.length) {
-        const start = v.indexOf('\x01', i);
-        if (start === -1) {
-          // remaining regular text
-          const rem = v.slice(i).trim();
-          if (rem) {
-            const plain2 = stripD(rem.replace(/<[^>]+>/g, ''));
-            if (MAJOR_BREAK.some(r => r.test(plain2))) flush();
-            current.push(rem);
-            if (BRACHA_END.some(r => r.test(plain2))) flush();
-          }
-          break;
+    // ── Handle seasonal markers ────────────────────────────────────────
+    if (v.includes('\uE001')) {
+      // Split the verse into text segments and seasonal segments
+      const segs = v.split('\uE001');
+      // segs: [text, seasonal, text, seasonal, text, ...]
+      // odd indices = seasonal content, even indices = regular text
+      segs.forEach((seg, idx) => {
+        seg = seg.trim();
+        if (!seg) return;
+        if (idx % 2 === 1) {
+          // Seasonal segment: flush, then add as its own paragraph
+          flush();
+          const label = _seasonalLabel(seg);
+          paragraphs.push('\uE002' + label + '\uE003' + seg + '\uE004');
+        } else {
+          // Regular text segment
+          const plain = stripD(seg.replace(/<[^>]+>/g, ''));
+          if (BREAK_BEFORE.some(r => r.test(plain))) flush();
+          current.push(seg);
+          if (BRACHA_END.test(plain)) flush();
         }
-        // text before the marker
-        const before = v.slice(i, start).trim();
-        if (before) {
-          const plain2 = stripD(before.replace(/<[^>]+>/g, ''));
-          if (MAJOR_BREAK.some(r => r.test(plain2))) flush();
-          current.push(before);
-          if (BRACHA_END.some(r => r.test(plain2))) flush();
-        }
-        // find closing \x01
-        const end = v.indexOf('\x01', start + 1);
-        if (end === -1) break;
-        const marker = v.slice(start, end + 1);
-        flush();                // break paragraph before seasonal insert
-        paragraphs.push(marker); // seasonal is its own paragraph
-        i = end + 1;
-      }
+      });
       continue;
     }
 
+    // ── Regular verse ────────────────────────────────────────────────
     const plain = stripD(v.replace(/<[^>]+>/g, '').trim());
     if (!plain) { flush(); continue; }
-    if (v.startsWith('__HEADER__')) { flush(); paragraphs.push('__HEADER__' + v.slice(10)); continue; }
+    if (v.startsWith('__HEADER__')) {
+      flush();
+      paragraphs.push('__HEADER__' + v.slice(10));
+      continue;
+    }
 
-    if (MAJOR_BREAK.some(r => r.test(plain))) flush();
+    if (BREAK_BEFORE.some(r => r.test(plain))) flush();
     current.push(v);
-    if (BRACHA_END.some(r => r.test(plain))) flush();
+    if (BRACHA_END.test(plain)) flush();
   }
   flush();
   return paragraphs;
 }
 
-// Debug helper: log first few words of each paragraph
+// Debug helper
 function _logParagraphs(label, paragraphs) {
-  const stripD = s => s.replace(/[\u0591-\u05C7]/g, '').replace(/\x01[^\x01]*\x01/g, '[seasonal]');
   console.log(`[Siddur-para] ${label}: ${paragraphs.length} paragraphs`);
-  if (paragraphs.length <= 20) {
+  if (paragraphs.length <= 25) {
+    const stripD = s => s.replace(/[\u0591-\u05C7\uE001-\uE004]/g, '');
     paragraphs.forEach((p, i) => {
-      const isSeasonal = p.startsWith('\x01SEASONAL\x02');
-      const display = isSeasonal
-        ? '[seasonal: ' + p.split('\x02').slice(1, 3).join('|').slice(0, 30) + ']'
-        : stripD(p.replace(/<[^>]+>/g,'')).trim().split(/\s+/).slice(0,5).join(' ') + '...';
-      console.log(`  [${i+1}] ${display}`);
+      if (p.startsWith('\uE002')) {
+        const label2 = p.slice(1, p.indexOf('\uE003'));
+        const content = p.slice(p.indexOf('\uE003')+1, p.lastIndexOf('\uE004'));
+        console.log(`  [${i+1}] [seasonal "${label2}"] ${content.slice(0,30)}...`);
+      } else if (p.startsWith('__HEADER__')) {
+        console.log(`  [${i+1}] [header] ${p.slice(10)}`);
+      } else {
+        const words = stripD(p.replace(/<[^>]+>/g,'')).trim().split(/\s+/);
+        console.log(`  [${i+1}] ${words.length}w: ${words.slice(0,6).join(' ')}...`);
+      }
     });
   }
 }
