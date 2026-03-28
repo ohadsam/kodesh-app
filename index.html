@@ -14,7 +14,31 @@
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@300;400;500;700;900&family=Heebo:wght@300;400;500;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=5.1" />
+  <!-- INLINE version guard – runs SYNCHRONOUSLY before any SW can intercept.
+       Kills any cached service worker and forces a fresh load when version changes. -->
+  <script>
+    (function() {
+      var V = '5.1';
+      var stored = localStorage.getItem('app_version');
+      if (stored !== V && 'serviceWorker' in navigator) {
+        // Unregister ALL workers synchronously (returns promise, fire-and-forget is fine)
+        navigator.serviceWorker.getRegistrations().then(function(regs) {
+          var ps = regs.map(function(r){ return r.unregister(); });
+          return Promise.all(ps);
+        }).then(function() {
+          return 'caches' in window ? caches.keys().then(function(keys) {
+            return Promise.all(keys.map(function(k){ return caches.delete(k); }));
+          }) : Promise.resolve();
+        }).then(function() {
+          localStorage.setItem('app_version', V);
+          // Reload with cache-busting query param
+          var url = location.href.split('?')[0] + '?v=' + V + '&t=' + Date.now();
+          location.replace(url);
+        });
+      }
+    })();
+  </script>
 </head>
 <body>
 
