@@ -229,7 +229,7 @@ function cleanSefariaHtml(str) {
   // Other uses: "ברוך שם" (quiet), "בעשי"ת" (alternate text), parentheticals → inline muted.
   function isSeasonalInsert(text) {
     const t = text.replace(/[\u0591-\u05C7<>]/g, '').trim();
-    return /ר["\s.]?ח|ראש.?ח|פסח|שבועות|סוכות|חנוכה|פורים|קיץ|חורף|מטר|גשם/.test(t);
+    return /ר["\s.]?ח|ראש.?ח|פסח|שבועות|סוכות|חנוכה|פורים|קיץ|חרף|חורף|מטר|גשם/.test(t);
   }
 
   return str
