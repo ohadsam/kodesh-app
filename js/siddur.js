@@ -586,6 +586,8 @@ async function loadSiddur() {
         html = await _fetchSectionHtml(s, null, yaalehOccasion);
       }
       contentEl.innerHTML = html || '<span style="color:var(--muted)">(אין טקסט)</span>';
+      // Apply static seasonal inserts (labels + green blocks) based on calendar
+      if (typeof postProcessInserts === 'function') postProcessInserts(contentEl);
     } catch(e) {
       contentEl.innerHTML = `<span style="color:var(--muted)">⚠️ ${e.message}</span>`;
       console.warn('[Siddur] failed:', s.label, e.message);

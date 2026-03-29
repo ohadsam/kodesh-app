@@ -92,7 +92,7 @@ let currentAliya = 'all';
 let rashiLoaded = false;
 let rashiVisible = false;
 
-const APP_VERSION  = '5.1';
+const APP_VERSION  = '5.2';
 const STORAGE_KEY  = 'kodesh_app_v1';
 const SIDDUR_CACHE_KEY = 'siddur_cache_v';
 
@@ -225,11 +225,20 @@ function heFlat(data) {
 function cleanSefariaHtml(str) {
   if (!str) return '';
 
-  // Only treat <small> as a seasonal block if it contains specific holiday/season keywords.
-  // Other uses: "ברוך שם" (quiet), "בעשי"ת" (alternate text), parentheticals → inline muted.
+  // Only treat <small> as a seasonal block if it contains specific holiday/season keywords
+  // as the PRIMARY subject (at start or after ל/ב preposition), not incidentally (e.g. רחמן).
   function isSeasonalInsert(text) {
     const t = text.replace(/[\u0591-\u05C7<>]/g, '').trim();
-    return /ר["\s.]?ח|ראש.?ח|פסח|שבועות|סוכות|חנוכה|פורים|קיץ|חרף|חורף|מטר|גשם/.test(t);
+    return (
+      // ר"ח or ראש חודש: must have quote/dot separator or be preceded by ל/ב
+      /(?:^|[לב])(?:ר[".]ח|ראש.?ח)/.test(t) ||
+      // Holidays: at start or after ל/ב preposition
+      /(?:^|[לב])(?:פסח|שבועות|סוכות|חנוכה|פורים|יו"ט)/.test(t) ||
+      // Seasons: בקיץ, בחרף, בחורף at start or after ב
+      /(?:^|ב)(?:קיץ|חרף|חורף)/.test(t) ||
+      // Rain/dew variants typical in ברכת השנים
+      /^(?:טל|גשם|מטר)/.test(t)
+    );
   }
 
   return str
