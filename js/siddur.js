@@ -161,6 +161,9 @@ function getSiddurSections(nusach, prayer) {
         window._psalmOfDayNum  = psalmNum;
         return `Psalms.${psalmNum}`;
       })() },
+    { label:'הושיענו',
+      ref: null,
+      staticText: 'הוֹשִׁיעֵנוּ יְהֹוָה אֱלֹהֵינוּ וְקַבְּצֵנוּ מִן הַגּוֹיִם לְהוֹדוֹת לְשֵׁם קָדְשֶׁךָ לְהִשְׁתַּבֵּחַ בִּתְהִלָּתֶךָ:\n\nוּבָרוּךְ יְהֹוָה אֱלֹהֵי יִשְׂרָאֵל מִן הָעוֹלָם וְעַד הָעוֹלָם וְאָמַר כָּל הָעָם אָמֵן הַלְלוּיָהּ:' },
     { label:'ברכי נפשי',          ref: r('The_Morning_Prayers,_My_Soul_Bless', null, null) },
     { label:'עלינו',
       ref: r('The_Morning_Prayers,_Aleinu', null, 'Weekday_Shacharit,_Alenu') },
@@ -483,7 +486,11 @@ async function _fetchSectionHtml(s, _unused, yaalehOccasion) {
       `font-size:calc(var(--font-size)*.9);color:var(--muted);font-style:italic;line-height:1.8">` +
       window._psalmOfDayIntro + `</p>`
     : '';
-  const html = introHtml + _renderParagraphs(paragraphs, !!s.isAddition);
+  let html = introHtml + _renderParagraphs(paragraphs, !!s.isAddition);
+  // Wrap seasonal inserts (מוריד הגשם, יעלה ויבוא etc.) in green blocks
+  if (typeof wrapSeasonalParagraphs === 'function' && !s.isAddition) {
+    html = wrapSeasonalParagraphs(html, false);
+  }
   _putCache(s.ref, html);
   console.log('[Siddur] 🌐 fetched-network:', s.label, '→', paragraphs.length, 'paragraphs,', flat.length, 'verses');
   return html;

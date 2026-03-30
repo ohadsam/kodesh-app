@@ -92,7 +92,7 @@ let currentAliya = 'all';
 let rashiLoaded = false;
 let rashiVisible = false;
 
-const APP_VERSION  = '5.5';
+const APP_VERSION  = '5.6';
 const STORAGE_KEY  = 'kodesh_app_v1';
 const SIDDUR_CACHE_KEY = 'siddur_cache_v';
 
@@ -302,6 +302,12 @@ function buildParagraphs(flat) {
     /^והיה אם/,
     /^ויאמר/,
     /^אני מאמין/,
+    // Amida bracha titles embedded in text (appear as labels before next bracha)
+    /^עבודה רצה/,
+    /^מודים אנחנו/,
+    /^שים שלום/,
+    /^אלהינו ואלהי אבותינו/,
+    /^יעלה ויבוא/,
   ];
 
   // Flush AFTER this pattern (marks end of a bracha)

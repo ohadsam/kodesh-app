@@ -272,13 +272,12 @@ async function loadParasha() {
     document.getElementById('parasha-select').value = matchP.ref;
 
     // Get aliyot: prefer Hebcal leyning data (reliable for current AND future parasha)
-    // Hebcal leyning keys: "1","2"..."7","M" (maftir)
+    // Hebcal leyning format: {"1":"Leviticus 9:1-9:16", "2":..., "M":...}
     const leyning = parashaEvent.leyning || {};
     const hebcalAliyot = ['1','2','3','4','5','6','7','M']
       .map(k => leyning[k])
       .filter(Boolean)
-      .map(r => r.replace(/\s+/g,'').replace(/,/g,'-'))  // normalize "Leviticus 9:1-9:16"
-      .map(r => r.replace(/(\w)\s+(\d)/g, '$1 $2'));      // ensure space between book and chapter
+      .map(r => r.trim());  // just trim, preserve spaces (book name NEEDS space before chapter)
 
     if (hebcalAliyot.length >= 3) {
       aliyot = hebcalAliyot;
@@ -296,7 +295,7 @@ async function loadParasha() {
       }
       console.log('[Parasha] using Sefaria aliyot:', aliyot.length);
     }
-    console.log('[Parasha] found:', heName, 'ref:', matchP.ref, 'aliyot:', aliyot.length);
+    console.log('[Parasha] found:', heName, 'ref:', matchP.ref, 'aliyot:', aliyot.length, aliyot[0] || '');
 
     const aliyaNames = ['א','ב','ג','ד','ה','ו','ז','מפטיר'];
     tabsEl.innerHTML = aliyaNames.map((name, i) => {
