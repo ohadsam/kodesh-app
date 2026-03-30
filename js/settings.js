@@ -15,6 +15,7 @@ const ALL_TABS = [
   { id: 'tefilot',  label: '🤲 תפילות נוספות'                  },
   { id: 'qibla',    label: '🧭 מצפן תפילה'                    },
   { id: 'logs',     label: '🐛 לוגי מערכת',   defaultHidden: true },
+  { id: 'network',  label: '🌐 קריאות רשת',   defaultHidden: true },
 ];
 
 function getTabVisibility() {

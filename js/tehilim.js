@@ -186,13 +186,15 @@ function getTehilimNavInfo(chapter) {
 let currentTehilimChapter = 1;
 
 function scrollTehilimTop() {
-  // Scroll the tehilim card into view when navigating between chapters
-  const el = document.getElementById('tehilim-content');
-  if (el) {
-    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  } else {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
+  // Delay to wait for the new chapter content to render before scrolling
+  setTimeout(() => {
+    const el = document.getElementById('tehilim-content');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, 150);
 }
 
 async function loadTehilim(chapter) {

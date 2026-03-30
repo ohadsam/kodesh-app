@@ -4,7 +4,7 @@
 // ═══════════════════════════════════════════
 const appLogs = [];
 const MAX_LOGS = 300;
-const LOG_TTL_MS = 48 * 60 * 60 * 1000; // 48 hours
+const LOG_TTL_MS = 60 * 60 * 1000;  // 1 hour
 
 // Auto-clear logs if last clear was >48h ago
 (function() {
@@ -92,7 +92,7 @@ let currentAliya = 'all';
 let rashiLoaded = false;
 let rashiVisible = false;
 
-const APP_VERSION  = '5.2';
+const APP_VERSION  = '5.4';
 const STORAGE_KEY  = 'kodesh_app_v1';
 const SIDDUR_CACHE_KEY = 'siddur_cache_v';
 

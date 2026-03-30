@@ -23,7 +23,8 @@ function showTab(name) {
   window.scrollTo({ top: 0, behavior: 'instant' });
   page.scrollTop = 0;
 
-  if (name === 'logs')  { renderLogs(); return; }
+  if (name === 'logs')    { renderLogs(); return; }
+  if (name === 'network') { renderNetworkLog(); return; }
   if (name === 'qibla') { if (!loaded[name]) { loaded[name]=true; initQibla(); } resumeQibla(); return; }
   // Siddur always re-inits on tab switch to reset loading state
   if (name === 'siddur') { siddurLoading = false; initSiddur(); return; }

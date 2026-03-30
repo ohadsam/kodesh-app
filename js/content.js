@@ -54,14 +54,43 @@ async function loadHalacha() {
 // ═══════════════════════════════════════════
 let parashaVerses = [];   // current Torah verses
 let rashiVerses   = [];   // current Rashi verses (parallel array)
-let parashaView   = 'text'; // 'text' | 'rashi'
+let onkelosVerses = [];   // current Onkelos verses (parallel array)
+let onkelosLoaded = false;
+let parashaView   = 'text'; // 'text' | 'rashi' | 'onkelos'
 let currentParashaRef = null;
 
 function setParashaView(mode) {
   parashaView = mode;
-  document.getElementById('view-text-btn').classList.toggle('active', mode === 'text');
-  document.getElementById('view-rashi-btn').classList.toggle('active', mode === 'rashi');
+  document.getElementById('view-text-btn').classList.toggle('active',    mode === 'text');
+  document.getElementById('view-rashi-btn').classList.toggle('active',   mode === 'rashi');
+  document.getElementById('view-onkelos-btn').classList.toggle('active', mode === 'onkelos');
   renderParasha();
+}
+
+function _updateAliyaNav() {
+  const nav = document.getElementById('aliya-nav');
+  if (!nav || !aliyot.length) return;
+  const idx = typeof currentAliya === 'number' ? currentAliya : -1;
+  const hasPrev = idx > 0;
+  const hasNext = idx < aliyot.length - 1;
+  const aliyaNames = ['א','ב','ג','ד','ה','ו','ז','מפטיר'];
+  const btnStyle = (enabled) =>
+    `background:var(--surface);border:1px solid ${enabled?'var(--gold-dim)':'var(--border)'};` +
+    `color:${enabled?'var(--gold)':'var(--muted)'};padding:6px 14px;border-radius:20px;` +
+    `font-size:12px;cursor:${enabled?'pointer':'default'};font-family:'Heebo',sans-serif`;
+  nav.innerHTML = hasPrev
+    ? `<button style="${btnStyle(true)}" onclick="navAliya(${idx-1})">→ עליה ${aliyaNames[idx-1]||''}</button>`
+    : `<span></span>`;
+  if (hasNext) {
+    nav.innerHTML += `<button style="${btnStyle(true)}" onclick="navAliya(${idx+1})">עליה ${aliyaNames[idx+1]||''} ←</button>`;
+  } else {
+    nav.innerHTML += `<span></span>`;
+  }
+}
+
+async function navAliya(idx) {
+  const tab = document.querySelector(`#aliya-tabs .aliya-tab:nth-child(${idx+1})`);
+  if (tab) await showAliya(idx, tab);
 }
 
 function renderParasha() {
@@ -70,28 +99,39 @@ function renderParasha() {
 
   if (parashaView === 'text') {
     el.innerHTML = parashaVerses.map((v,i) =>
-      `<div style="margin-bottom:8px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span><span class="content-text" style="font-size:var(--font-size)">${v}</span></div>`
+      `<div style="margin-bottom:8px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span><span style="font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);line-height:1.85">${v}</span></div>`
     ).join('');
-  } else {
-    // Show loading message if Rashi not yet loaded
+
+  } else if (parashaView === 'rashi') {
     if (!rashiLoaded) {
       el.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center">⏳ טוען פירוש רש"י...</div>';
       return;
     }
-    // interleaved: verse → rashi comment
     el.innerHTML = parashaVerses.map((v,i) => {
       const r = rashiVerses[i];
-      return `
-        <div style="margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:12px">
-          <div style="margin-bottom:6px">
-            <span style="color:var(--gold-dim);font-size:11px">${i+1} </span>
-            <span style="font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);color:var(--cream);line-height:1.8">${v}</span>
-          </div>
-          ${r ? `<div style="padding:8px 10px;background:rgba(201,165,74,.06);border-right:2px solid var(--gold-dim);border-radius:0 6px 6px 0;margin-top:4px">
-            <div style="font-size:10px;color:var(--gold);font-weight:600;margin-bottom:3px">רש"י</div>
-            <span style="font-family:'Frank Ruhl Libre',serif;font-size:calc(var(--font-size)*.9);color:var(--text);line-height:1.7">${r}</span>
-          </div>` : ''}
-        </div>`;
+      return `<div style="margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:10px">
+        <div style="margin-bottom:5px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>
+        <span style="font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);color:var(--cream);line-height:1.85">${v}</span></div>
+        ${r ? `<div style="padding:7px 10px;background:rgba(201,165,74,.06);border-right:2px solid var(--gold-dim);border-radius:0 6px 6px 0">
+          <div style="font-size:10px;color:var(--gold);font-weight:600;margin-bottom:2px">רש"י</div>
+          <span style="font-family:'Frank Ruhl Libre',serif;font-size:calc(var(--font-size)*.88);color:var(--text);line-height:1.7">${r}</span></div>` : ''}
+      </div>`;
+    }).join('');
+
+  } else if (parashaView === 'onkelos') {
+    if (!onkelosLoaded) {
+      el.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center">⏳ טוען תרגום אונקלוס...</div>';
+      return;
+    }
+    el.innerHTML = parashaVerses.map((v,i) => {
+      const o = onkelosVerses[i];
+      return `<div style="margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:10px">
+        <div style="margin-bottom:5px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>
+        <span style="font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);color:var(--cream);line-height:1.85">${v}</span></div>
+        ${o ? `<div style="padding:7px 10px;background:rgba(42,120,140,.08);border-right:2px solid rgba(42,180,200,.4);border-radius:0 6px 6px 0">
+          <div style="font-size:10px;color:rgba(100,200,220,.9);font-weight:600;margin-bottom:2px">אונקלוס</div>
+          <span style="font-family:'Frank Ruhl Libre',serif;font-size:calc(var(--font-size)*.88);color:var(--text);line-height:1.7;font-style:italic">${o}</span></div>` : ''}
+      </div>`;
     }).join('');
   }
 }
@@ -152,29 +192,54 @@ async function loadParasha() {
   const loadingEl = document.getElementById('parasha-loading');
   const nameEl    = document.getElementById('parasha-name');
   const tabsEl    = document.getElementById('aliya-tabs');
+  const noticeEl  = document.getElementById('parasha-notice');
   parashaVerses = []; rashiVerses = [];
   loadingEl.textContent = 'טוען פרשת השבוע...';
   loadingEl.style.display = 'block';
   document.getElementById('parasha-content').innerHTML = '';
+  if (noticeEl) noticeEl.style.display = 'none';
 
   populateParashaDropdown(null);
 
   try {
-    // Use Hebcal for reliable current parasha (avoids Sefaria caching issues)
     const ds  = formatDate(getTargetDate());
-    const ds2 = formatDate(new Date(getTargetDate().getTime() + 8 * 86400000));
-    const hbUrl  = `https://www.hebcal.com/hebcal?v=1&cfg=json&s=on&start=${ds}&end=${ds2}`;
+    // Search up to 21 days to find next parasha (handles Yom Tov + Chol HaMoed periods)
+    const ds3w = formatDate(new Date(getTargetDate().getTime() + 21 * 86400000));
+    const hbUrl  = `https://www.hebcal.com/hebcal?v=1&cfg=json&s=on&start=${ds}&end=${ds3w}`;
     const hbData = await fetchWithDelay(hbUrl);
-    const parashaEvent = (hbData?.items || []).find(i => i.category === 'parashat');
+    const items  = hbData?.items || [];
+
+    const parashaEvent = items.find(i => i.category === 'parashat');
+
+    // Detect if we're in a holiday period (Chol HaMoed, Yom Tov)
+    const holidayThisWeek = items.find(i =>
+      i.category === 'holiday' &&
+      /Chol|Pesach|Passover|Sukkot|Shavuot|חג|חנוכה|פורים|ראש|יום טוב/i.test(i.title || '')
+    );
+
+    let isFutureParasha = false;
     if (!parashaEvent) throw new Error('לא נמצאה פרשה בלוח');
 
+    // If parashaEvent is more than 8 days from now → it's the NEXT parasha after Yom Tov
+    const parashaDate = new Date(parashaEvent.date);
+    const today = getTargetDate();
+    const daysAhead = Math.round((parashaDate - today) / 86400000);
+    if (daysAhead > 8) {
+      isFutureParasha = true;
+      const holidayName = holidayThisWeek?.hebrew || holidayThisWeek?.title || 'יום טוב / חג';
+      if (noticeEl) {
+        noticeEl.textContent = `⚠️ שבת זו היא ${holidayName} – אין פרשת שבוע רגילה. מוצגת הפרשה הבאה (${parashaEvent.hebrew || parashaEvent.title}):`;
+        noticeEl.style.display = 'block';
+      }
+      console.log('[Parasha] Holiday week detected:', holidayName, '→ next parasha in', daysAhead, 'days');
+    }
+
     const heName = parashaEvent.hebrew || parashaEvent.title || '';
-    console.log('[Parasha] Hebcal parasha:', heName);
-    nameEl.textContent = heName;
+    console.log('[Parasha] Hebcal parasha:', heName, isFutureParasha ? '(next week)' : '');
+    nameEl.textContent = heName + (isFutureParasha ? ' (שבוע הבא)' : '');
 
     // Match to our ALL_PARASHIOT list
     const clean = heName.replace(/פרשת\s*/,'').trim();
-    // Exact match first, then word-boundary includes (prevents "צו" matching "תצוה")
     const matchP = ALL_PARASHIOT.find(p => clean === p.he)
       || ALL_PARASHIOT.find(p => heName === p.he || heName === 'פרשת ' + p.he)
       || ALL_PARASHIOT.find(p => clean.length >= 3 && p.he.startsWith(clean) && p.he.length <= clean.length + 2);
@@ -182,7 +247,7 @@ async function loadParasha() {
 
     document.getElementById('parasha-select').value = matchP.ref;
 
-    // Get aliyot from Sefaria calendar (bust cache with timestamp)
+    // Get aliyot from Sefaria calendar
     const cal = await fetchWithDelay(`https://www.sefaria.org/api/calendars?diaspora=0&_=${Date.now()}`);
     const calItem = (cal?.calendar_items || []).find(i =>
       (i.title?.en || '').toLowerCase().includes('parashat')
@@ -190,14 +255,20 @@ async function loadParasha() {
     aliyot = calItem?.extraDetails?.aliyot || [];
     console.log('[Parasha] found:', heName, 'ref:', matchP.ref, 'aliyot:', aliyot.length);
 
-    tabsEl.innerHTML = '<div class="aliya-tab active" onclick="showAliya(\'all\', this)">הכל</div>';
-    ['א','ב','ג','ד','ה','ו','ז','מפטיר'].forEach((name, i) => {
-      if (aliyot[i]) tabsEl.innerHTML +=
-        `<div class="aliya-tab" onclick="showAliya(${i}, this)">${name}</div>`;
-    });
+    const aliyaNames = ['א','ב','ג','ד','ה','ו','ז','מפטיר'];
+    tabsEl.innerHTML = aliyaNames.map((name, i) => {
+      if (!aliyot[i]) return '';
+      return `<div class="aliya-tab${i === 0 ? ' active' : ''}" onclick="showAliya(${i}, this)">${name}</div>`;
+    }).join('') + '<div class="aliya-tab" onclick="showAliya(\'all\', this)">הכל</div>';
 
     currentParashaRef = matchP.ref;
-    await loadAliyaText(currentParashaRef);
+    // Default to first aliya for faster loading
+    if (aliyot[0]) {
+      currentAliya = 0;
+      await loadAliyaText(aliyot[0]);
+    } else {
+      await loadAliyaText(currentParashaRef);
+    }
     loadingEl.style.display = 'none';
     updateDoneButton('parasha', currentParashaRef);
   } catch(e) {
@@ -213,8 +284,8 @@ async function loadAliyaText(ref) {
   loadingEl.style.display = 'block';
   loadingEl.textContent = 'טוען...';
   document.getElementById('parasha-content').innerHTML = '';
-  parashaVerses = []; rashiVerses = [];
-  rashiLoaded = false;
+  parashaVerses = []; rashiVerses = []; onkelosVerses = [];
+  rashiLoaded = false; onkelosLoaded = false;
 
   try {
     console.log('[Parasha] loading text for ref:', ref);
@@ -223,10 +294,12 @@ async function loadAliyaText(ref) {
     console.log(`[Parasha] got ${parashaVerses.length} verses`);
     if (!parashaVerses.length) throw new Error('no Hebrew verses returned');
 
-    // Pre-load Rashi in background
+    // Pre-load Rashi and Onkelos in background
     loadRashiForRef(ref);
+    loadOnkelosForRef(ref);
 
     loadingEl.style.display = 'none';
+    _updateAliyaNav();
     renderParasha();
   } catch(e) {
     console.error('[Parasha] loadAliyaText error:', e);
@@ -338,6 +411,58 @@ async function loadRashiForRef(torahRef) {
   const cnt = rashiVerses.filter(Boolean).length;
   console.log('[Rashi] ✅', cnt, '/', parashaVerses.length, 'verses with Rashi');
   if (parashaView === 'rashi') renderParasha();
+}
+
+let _onkelosLoading = false;
+async function loadOnkelosForRef(torahRef) {
+  if (_onkelosLoading) return;
+  _onkelosLoading = true;
+  onkelosVerses = new Array(parashaVerses.length).fill('');
+
+  const m = torahRef.match(/^([^0-9]+)\s+(\d+):(\d+)(?:-(\d+):(\d+)|-(\d+))?$/);
+  if (!m) { _onkelosLoading = false; return; }
+
+  const book    = m[1].trim();
+  const startCh = parseInt(m[2]), startV = parseInt(m[3]);
+  const endCh   = m[4] ? parseInt(m[4]) : startCh;
+  const endV    = m[5] ? parseInt(m[5]) : (m[6] ? parseInt(m[6]) : startV);
+
+  // Map Sefaria book names to Onkelos refs
+  const ONKELOS_BOOK = {
+    'Genesis': 'Onkelos_Genesis', 'Exodus': 'Onkelos_Exodus',
+    'Leviticus': 'Onkelos_Leviticus', 'Numbers': 'Onkelos_Numbers',
+    'Deuteronomy': 'Onkelos_Deuteronomy',
+  };
+  const onkelosBook = ONKELOS_BOOK[book];
+  if (!onkelosBook) { _onkelosLoading = false; return; }
+
+  console.log('[Onkelos] loading:', onkelosBook, startCh+':'+startV, '–', endCh+':'+endV);
+
+  let idx = 0;
+  for (let ch = startCh; ch <= endCh; ch++) {
+    try {
+      await new Promise(r => setTimeout(r, 200));
+      const ref = `${onkelosBook}.${ch}`;
+      const url = `https://www.sefaria.org/api/texts/${encodeURI(ref)}?lang=he&commentary=0&context=0`;
+      const resp = await fetch(url);
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      const verses = heFlat(data);
+      const firstV = ch === startCh ? startV : 1;
+      const lastV  = ch === endCh ? Math.min(endV, verses.length) : verses.length;
+      for (let v = firstV; v <= lastV; v++) {
+        if (idx >= parashaVerses.length) break;
+        onkelosVerses[idx++] = verses[v - 1] || '';
+      }
+    } catch(e) {
+      console.warn('[Onkelos] ch', ch, e.message);
+    }
+  }
+
+  onkelosLoaded = true;
+  _onkelosLoading = false;
+  console.log('[Onkelos] ✅ loaded', onkelosVerses.filter(Boolean).length, 'verses');
+  if (parashaView === 'onkelos') renderParasha();
 }
 
 async function showAliya(index, btn) {

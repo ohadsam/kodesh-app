@@ -141,8 +141,13 @@ function getSiddurSections(nusach, prayer) {
     { label:"אשרי / ובא לציון",
       ref: r("The_Morning_Prayers,_Ashrei_U'va_L'Tzion", null, null) },
     { label:'מזמור של יום',
-      ref: r('The_Morning_Prayers,_Psalm_of_the_Day', null,
-             'Weekday_Shacharit,_Song_of_the_Day') },
+      // Each day of week has its own psalm: Sun=24, Mon=48, Tue=82, Wed=94, Thu=81, Fri=93, Sat=92
+      ref: (() => {
+        const dow = (window._siddurCal || {}).dow ?? new Date().getDay();
+        const PSALM_BY_DOW = [24, 48, 82, 94, 81, 93, 92];
+        const psalmNum = PSALM_BY_DOW[dow] || 24;
+        return `Psalms.${psalmNum}`;
+      })() },
     { label:'ברכי נפשי',          ref: r('The_Morning_Prayers,_My_Soul_Bless', null, null) },
     { label:'עלינו',
       ref: r('The_Morning_Prayers,_Aleinu', null, 'Weekday_Shacharit,_Alenu') },
@@ -312,6 +317,7 @@ function initSiddur() {
     isTorahReading:   dow === 1 || dow === 4, // ב' וה'
     isSunday:         dow === 0,
     isShabbat:        dow === 6,
+    dow,   // raw day of week (0=Sun…6=Sat) for psalm selection etc.
     // ── computed ──
     isYomTov: todayEvents.some(t => /יום טוב|Yom Tov|Rosh Hashana|Yom Kippur|Sukkot|Pesach|Shavuot|שמחת|פסח|שבועות|ראש השנה|יום כיפור/i.test(t)),
     get skipTachanun() {
@@ -587,7 +593,6 @@ async function loadSiddur() {
       }
       contentEl.innerHTML = html || '<span style="color:var(--muted)">(אין טקסט)</span>';
       // Apply static seasonal inserts (labels + green blocks) based on calendar
-      if (typeof postProcessInserts === 'function') postProcessInserts(contentEl);
     } catch(e) {
       contentEl.innerHTML = `<span style="color:var(--muted)">⚠️ ${e.message}</span>`;
       console.warn('[Siddur] failed:', s.label, e.message);
