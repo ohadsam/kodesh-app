@@ -179,10 +179,34 @@ async function loadSpecificParasha(ref) {
   if (!ref) return;
   const p = ALL_PARASHIOT.find(x => x.ref === ref);
   if (p) document.getElementById('parasha-name').textContent = p.he;
-  aliyot = []; // clear aliyot when loading specific parasha
-  document.getElementById('aliya-tabs').innerHTML = '<div class="aliya-tab active" onclick="showAliya(\'all\', this)">הכל</div>';
+  const tabsEl = document.getElementById('aliya-tabs');
+
+  // Fetch aliyot from Sefaria for the selected parasha
+  try {
+    const cal = await fetchWithDelay(`https://www.sefaria.org/api/calendars?diaspora=0&_=${Date.now()}`);
+    const calItem = (cal?.calendar_items || []).find(i =>
+      (i.title?.en || '').toLowerCase().includes('parashat') &&
+      (i.ref || '').includes(ref.split(' ')[0]) // rough book match
+    ) || (cal?.calendar_items || []).find(i =>
+      (i.title?.en || '').toLowerCase().includes('parashat')
+    );
+    aliyot = calItem?.extraDetails?.aliyot || [];
+  } catch(_) { aliyot = []; }
+
   currentParashaRef = ref;
-  await loadAliyaText(ref);
+  currentAliya = aliyot.length > 0 ? 0 : 'all';
+
+  const aliyaNames = ['א','ב','ג','ד','ה','ו','ז','מפטיר'];
+  tabsEl.innerHTML = aliyaNames.map((name, i) => {
+    if (!aliyot[i]) return '';
+    return `<div class="aliya-tab${i === 0 ? ' active' : ''}" onclick="showAliya(${i}, this)">${name}</div>`;
+  }).join('') + `<div class="aliya-tab${aliyot.length === 0 ? ' active' : ''}" onclick="showAliya('all', this)">הכל</div>`;
+
+  if (aliyot[0]) {
+    await loadAliyaText(aliyot[0]);
+  } else {
+    await loadAliyaText(ref);
+  }
 }
 
 let _parashaLoading = false;
@@ -247,12 +271,31 @@ async function loadParasha() {
 
     document.getElementById('parasha-select').value = matchP.ref;
 
-    // Get aliyot from Sefaria calendar
-    const cal = await fetchWithDelay(`https://www.sefaria.org/api/calendars?diaspora=0&_=${Date.now()}`);
-    const calItem = (cal?.calendar_items || []).find(i =>
-      (i.title?.en || '').toLowerCase().includes('parashat')
-    );
-    aliyot = calItem?.extraDetails?.aliyot || [];
+    // Get aliyot: prefer Hebcal leyning data (reliable for current AND future parasha)
+    // Hebcal leyning keys: "1","2"..."7","M" (maftir)
+    const leyning = parashaEvent.leyning || {};
+    const hebcalAliyot = ['1','2','3','4','5','6','7','M']
+      .map(k => leyning[k])
+      .filter(Boolean)
+      .map(r => r.replace(/\s+/g,'').replace(/,/g,'-'))  // normalize "Leviticus 9:1-9:16"
+      .map(r => r.replace(/(\w)\s+(\d)/g, '$1 $2'));      // ensure space between book and chapter
+
+    if (hebcalAliyot.length >= 3) {
+      aliyot = hebcalAliyot;
+      console.log('[Parasha] using Hebcal aliyot:', aliyot.length, aliyot[0]);
+    } else {
+      // Fallback: Sefaria calendar (but only if NOT a holiday/future parasha)
+      if (!isFutureParasha) {
+        const cal = await fetchWithDelay(`https://www.sefaria.org/api/calendars?diaspora=0&_=${Date.now()}`);
+        const calItem = (cal?.calendar_items || []).find(i =>
+          (i.title?.en || '').toLowerCase().includes('parashat')
+        );
+        aliyot = calItem?.extraDetails?.aliyot || [];
+      } else {
+        aliyot = [];
+      }
+      console.log('[Parasha] using Sefaria aliyot:', aliyot.length);
+    }
     console.log('[Parasha] found:', heName, 'ref:', matchP.ref, 'aliyot:', aliyot.length);
 
     const aliyaNames = ['א','ב','ג','ד','ה','ו','ז','מפטיר'];

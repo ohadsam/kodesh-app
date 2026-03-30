@@ -142,10 +142,23 @@ function getSiddurSections(nusach, prayer) {
       ref: r("The_Morning_Prayers,_Ashrei_U'va_L'Tzion", null, null) },
     { label:'מזמור של יום',
       // Each day of week has its own psalm: Sun=24, Mon=48, Tue=82, Wed=94, Thu=81, Fri=93, Sat=92
+      // With intro text as said in shul
       ref: (() => {
         const dow = (window._siddurCal || {}).dow ?? new Date().getDay();
         const PSALM_BY_DOW = [24, 48, 82, 94, 81, 93, 92];
         const psalmNum = PSALM_BY_DOW[dow] || 24;
+        const DAY_INTRO = [
+          'הַיּוֹם יוֹם רִאשׁוֹן בַּשַּׁבָּת, שֶׁבּוֹ הָיוּ הַלְוִיִּם אוֹמְרִים בְּבֵית הַמִּקְדָּשׁ:',
+          'הַיּוֹם יוֹם שֵׁנִי בַּשַּׁבָּת, שֶׁבּוֹ הָיוּ הַלְוִיִּם אוֹמְרִים בְּבֵית הַמִּקְדָּשׁ:',
+          'הַיּוֹם יוֹם שְׁלִישִׁי בַּשַּׁבָּת, שֶׁבּוֹ הָיוּ הַלְוִיִּם אוֹמְרִים בְּבֵית הַמִּקְדָּשׁ:',
+          'הַיּוֹם יוֹם רְבִיעִי בַּשַּׁבָּת, שֶׁבּוֹ הָיוּ הַלְוִיִּם אוֹמְרִים בְּבֵית הַמִּקְדָּשׁ:',
+          'הַיּוֹם יוֹם חֲמִישִׁי בַּשַּׁבָּת, שֶׁבּוֹ הָיוּ הַלְוִיִּם אוֹמְרִים בְּבֵית הַמִּקְדָּשׁ:',
+          'הַיּוֹם יוֹם שִׁשִּׁי בַּשַּׁבָּת, שֶׁבּוֹ הָיוּ הַלְוִיִּם אוֹמְרִים בְּבֵית הַמִּקְדָּשׁ:',
+          'הַיּוֹם יוֹם שַׁבָּת קֹדֶשׁ, שֶׁבּוֹ הָיוּ הַלְוִיִּם אוֹמְרִים בְּבֵית הַמִּקְדָּשׁ:',
+        ];
+        // Store intro for rendering after fetch
+        window._psalmOfDayIntro = DAY_INTRO[dow] || '';
+        window._psalmOfDayNum  = psalmNum;
         return `Psalms.${psalmNum}`;
       })() },
     { label:'ברכי נפשי',          ref: r('The_Morning_Prayers,_My_Soul_Bless', null, null) },
@@ -396,7 +409,14 @@ function _renderParagraphs(paragraphs, isAdd) {
              `font-style:normal;font-family:'Heebo',sans-serif;color:var(--gold-dim);` +
              `letter-spacing:.5px;border-bottom:1px solid var(--border);padding-bottom:2px">${lbl}</p>`;
     }
-    return `<p style="${baseStyle}">${p}</p>`;
+
+    // For addition sections: strip inline color overrides from muted spans so everything stays green
+    let content = p;
+    if (isAdd) {
+      content = p.replace(/<span style="color:var\(--muted\)[^"]*">/g,
+        '<span style="color:var(--addition);font-style:italic;font-size:.92em;opacity:.85">');
+    }
+    return `<p style="${baseStyle}">${content}</p>`;
   }).join('');
 }
 
@@ -457,7 +477,13 @@ async function _fetchSectionHtml(s, _unused, yaalehOccasion) {
 
   const paragraphs = buildParagraphs(flat);
   if (typeof _logParagraphs === 'function') _logParagraphs(s.label, paragraphs);
-  const html = _renderParagraphs(paragraphs, !!s.isAddition);
+  // Prepend שיר של יום intro text
+  const introHtml = (s.label === 'מזמור של יום' && window._psalmOfDayIntro)
+    ? `<p style="display:block;margin:0 0 12px 0;font-family:'Frank Ruhl Libre',serif;` +
+      `font-size:calc(var(--font-size)*.9);color:var(--muted);font-style:italic;line-height:1.8">` +
+      window._psalmOfDayIntro + `</p>`
+    : '';
+  const html = introHtml + _renderParagraphs(paragraphs, !!s.isAddition);
   _putCache(s.ref, html);
   console.log('[Siddur] 🌐 fetched-network:', s.label, '→', paragraphs.length, 'paragraphs,', flat.length, 'verses');
   return html;
@@ -547,12 +573,12 @@ async function loadSiddur() {
       </div>`;
     }
 
-    // Regular section: thin separator between sections, NO extra gap
+    // Regular section: clear separator with decent spacing
     const sep = idx > 0 && !prevIsAdd
-      ? '<hr style="border:none;border-top:1px solid var(--border);margin:4px 0 6px">' : '';
-    return `${sep}<div id="ss-${id}" style="margin-bottom:2px;">
+      ? '<hr style="border:none;border-top:1px solid var(--border);margin:10px 0 8px">' : '';
+    return `${sep}<div id="ss-${id}" style="margin-bottom:4px;">
       <div style="font-size:10px;font-weight:700;color:var(--gold-dim);
-        margin-bottom:2px;padding-top:2px;font-family:'Heebo',sans-serif">${s.label}</div>
+        margin-bottom:3px;padding-top:2px;font-family:'Heebo',sans-serif;letter-spacing:.3px">${s.label}</div>
       <div id="sc-${id}">טוען...</div>
     </div>`;
   }).join('');
