@@ -19,7 +19,7 @@
        Kills any cached service worker and forces a fresh load when version changes. -->
   <script>
     (function() {
-      var V = '5.4';
+      var V = '5.5';
       var stored = localStorage.getItem('app_version');
       if (stored !== V && 'serviceWorker' in navigator) {
         // Unregister ALL workers synchronously (returns promise, fire-and-forget is fine)
@@ -48,7 +48,7 @@
   <div style="font-family:'Frank Ruhl Libre',serif;font-size:26px;color:var(--cream);font-weight:700">לימוד יומי</div>
   <p>מכין את הלמידה של היום...</p>
   <div class="spinner"></div>
-  <p id="splash-version" style="font-size:11px;color:var(--muted);margin-top:4px">גרסה 5.4</p>
+  <p id="splash-version" style="font-size:11px;color:var(--muted);margin-top:4px">גרסה 5.5</p>
 </div>
 
 <!-- SETTINGS PANEL -->
@@ -161,7 +161,7 @@
     <!-- Version & Copyright - INSIDE settings-inner -->
     <div style="text-align:center;padding:18px 0 8px;border-top:1px solid var(--border);margin-top:8px">
       <div style="font-size:13px;font-weight:600;color:var(--gold-dim);margin-bottom:4px">📖 לימוד יומי</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 5.4</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 5.5</div>
       <div style="font-size:11px;color:var(--muted)">© כל הזכויות שמורות לאוהד סמט</div>
     </div>
   </div>
@@ -810,7 +810,7 @@
     💡 לכיול המצפן: הזז את הטלפון בתנועת ∞ (שמונה שוכב) מספר פעמים
   </div>
   <div style="text-align:center;color:var(--muted);font-size:11px;padding:12px 0 4px">
-    גרסה 5.4 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
+    גרסה 5.5 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
   </div>
 </div>
 
@@ -866,17 +866,17 @@
      JavaScript modules (load order matters)
      v4.3 – querystring busts browser/SW cache
      ═══════════════════════════════════════ -->
-<script src="js/network-log.js?v=5.4"></script>
-<script src="js/utils.js?v=5.4"></script>
-<script src="js/settings.js?v=5.4"></script>
-<script src="js/app.js?v=5.4"></script>
-<script src="js/tehilim.js?v=5.4"></script>
-<script src="js/calendar.js?v=5.4"></script>
-<script src="js/content.js?v=5.4"></script>
-<script src="js/tefilot.js?v=5.4"></script>
-<script src="js/siddur-inserts.js?v=5.4"></script>
-<script src="js/siddur.js?v=5.4"></script>
-<script src="js/misc.js?v=5.4"></script>
-<script src="js/init.js?v=5.4"></script>
+<script src="js/network-log.js?v=5.5"></script>
+<script src="js/utils.js?v=5.5"></script>
+<script src="js/settings.js?v=5.5"></script>
+<script src="js/app.js?v=5.5"></script>
+<script src="js/tehilim.js?v=5.5"></script>
+<script src="js/calendar.js?v=5.5"></script>
+<script src="js/content.js?v=5.5"></script>
+<script src="js/tefilot.js?v=5.5"></script>
+<script src="js/siddur-inserts.js?v=5.5"></script>
+<script src="js/siddur.js?v=5.5"></script>
+<script src="js/misc.js?v=5.5"></script>
+<script src="js/init.js?v=5.5"></script>
 </body>
 </html>
