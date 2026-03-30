@@ -19,7 +19,7 @@
        Kills any cached service worker and forces a fresh load when version changes. -->
   <script>
     (function() {
-      var V = '5.2';
+      var V = '5.4';
       var stored = localStorage.getItem('app_version');
       if (stored !== V && 'serviceWorker' in navigator) {
         // Unregister ALL workers synchronously (returns promise, fire-and-forget is fine)
@@ -48,7 +48,7 @@
   <div style="font-family:'Frank Ruhl Libre',serif;font-size:26px;color:var(--cream);font-weight:700">לימוד יומי</div>
   <p>מכין את הלמידה של היום...</p>
   <div class="spinner"></div>
-  <p id="splash-version" style="font-size:11px;color:var(--muted);margin-top:4px">גרסה 5.2</p>
+  <p id="splash-version" style="font-size:11px;color:var(--muted);margin-top:4px">גרסה 5.4</p>
 </div>
 
 <!-- SETTINGS PANEL -->
@@ -161,7 +161,7 @@
     <!-- Version & Copyright - INSIDE settings-inner -->
     <div style="text-align:center;padding:18px 0 8px;border-top:1px solid var(--border);margin-top:8px">
       <div style="font-size:13px;font-weight:600;color:var(--gold-dim);margin-bottom:4px">📖 לימוד יומי</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 5.2</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 5.4</div>
       <div style="font-size:11px;color:var(--muted)">© כל הזכויות שמורות לאוהד סמט</div>
     </div>
   </div>
@@ -192,6 +192,7 @@
   <button class="tab" onclick="showTab('tefilot')" id="t-tefilot"><span class="icon">🤲</span>תפילות</button>
   <button class="tab" onclick="showTab('qibla')" id="t-qibla"><span class="icon">🧭</span>מצפן</button>
   <button class="tab" onclick="showTab('logs')" id="t-logs"><span class="icon">🐛</span>לוגים</button>
+  <button class="tab" onclick="showTab('network')" id="t-network"><span class="icon">🌐</span>רשת</button>
 </div>
 
 <!-- ─── PAGE: CALENDAR ─────────────────────── -->
@@ -480,10 +481,13 @@
       <div class="aliya-tab active" onclick="showAliya('all', this)">הכל</div>
     </div>
     <!-- View mode toggle -->
-    <div style="display:flex;gap:8px;margin-bottom:14px">
+    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
       <button id="view-text-btn" class="aliya-tab active" onclick="setParashaView('text')">📖 פסוקים בלבד</button>
-      <button id="view-rashi-btn" class="aliya-tab" onclick="setParashaView('rashi')">🖊 פסוקים + רש"י</button>
+      <button id="view-rashi-btn" class="aliya-tab" onclick="setParashaView('rashi')">🖊 עם רש"י</button>
+      <button id="view-onkelos-btn" class="aliya-tab" onclick="setParashaView('onkelos')">🔤 עם אונקלוס</button>
     </div>
+    <!-- Aliya prev/next navigation -->
+    <div id="aliya-nav" style="display:flex;justify-content:space-between;gap:8px;margin-bottom:10px"></div>
     <!-- Rashi progress bar -->
     <div id="rashi-progress-wrap">
       <span class="rp-icon">🖊</span>
@@ -491,6 +495,7 @@
       <span id="rashi-progress-lbl">טוען רש"י...</span>
     </div>
     <div id="parasha-loading" style="color:var(--muted);font-size:13px;font-style:italic">טוען פרשת השבוע...</div>
+    <div id="parasha-notice" style="display:none;background:rgba(201,165,74,.1);border:1px solid var(--gold-dim);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--gold);margin-bottom:10px;line-height:1.6"></div>
     <div id="parasha-content"></div>
     <div class="source-link">
       מקור: <a href="https://www.sefaria.org" target="_blank">Sefaria</a> |
@@ -805,7 +810,7 @@
     💡 לכיול המצפן: הזז את הטלפון בתנועת ∞ (שמונה שוכב) מספר פעמים
   </div>
   <div style="text-align:center;color:var(--muted);font-size:11px;padding:12px 0 4px">
-    גרסה 5.2 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
+    גרסה 5.4 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
   </div>
 </div>
 
@@ -824,6 +829,21 @@
   </div>
 </div>
 
+<!-- ─── PAGE: NETWORK LOG ──────────────────── -->
+<div class="page" id="page-network">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <div style="font-family:'Frank Ruhl Libre',serif;font-size:15px;color:var(--gold);font-weight:700">🌐 קריאות רשת</div>
+    <div style="display:flex;gap:8px">
+      <button onclick="clearNetworkLog()" style="background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:5px 12px;border-radius:8px;font-size:11px;cursor:pointer;font-family:'Heebo',sans-serif">נקה</button>
+      <button onclick="copyNetworkLog()" style="background:var(--surface);border:1px solid var(--gold-dim);color:var(--gold);padding:5px 12px;border-radius:8px;font-size:11px;cursor:pointer;font-family:'Heebo',sans-serif">📋 העתק</button>
+    </div>
+  </div>
+  <div id="network-stats" style="font-size:11px;color:var(--muted);margin-bottom:10px"></div>
+  <div id="network-container" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;max-height:70vh;overflow-y:auto;direction:ltr">
+    <div style="color:var(--muted);font-size:12px;text-align:center;padding:20px">אין קריאות רשת עדיין</div>
+  </div>
+</div>
+
 <!-- BOTTOM NAV -->
 <div id="bottom-nav">
   <button class="bnav-btn active" onclick="showTab('calendar')" id="bn-calendar"><span class="bicon">📅</span>לוח</button>
@@ -839,22 +859,24 @@
   <button class="bnav-btn" onclick="showTab('tefilot')" id="bn-tefilot"><span class="bicon">🤲</span>תפילות</button>
   <button class="bnav-btn" onclick="showTab('qibla')" id="bn-qibla"><span class="bicon">🧭</span>מצפן</button>
   <button class="bnav-btn" onclick="showTab('logs')" id="bn-logs"><span class="bicon">🐛</span>לוגים</button>
+  <button class="bnav-btn" onclick="showTab('network')" id="bn-network"><span class="bicon">🌐</span>רשת</button>
 </div>
 
 <!-- ═══════════════════════════════════════
      JavaScript modules (load order matters)
      v4.3 – querystring busts browser/SW cache
      ═══════════════════════════════════════ -->
-<script src="js/utils.js?v=5.2"></script>
-<script src="js/settings.js?v=5.2"></script>
-<script src="js/app.js?v=5.2"></script>
-<script src="js/tehilim.js?v=5.2"></script>
-<script src="js/calendar.js?v=5.2"></script>
-<script src="js/content.js?v=5.2"></script>
-<script src="js/tefilot.js?v=5.2"></script>
-<script src="js/siddur-inserts.js?v=5.2"></script>
-<script src="js/siddur.js?v=5.2"></script>
-<script src="js/misc.js?v=5.2"></script>
-<script src="js/init.js?v=5.2"></script>
+<script src="js/network-log.js?v=5.4"></script>
+<script src="js/utils.js?v=5.4"></script>
+<script src="js/settings.js?v=5.4"></script>
+<script src="js/app.js?v=5.4"></script>
+<script src="js/tehilim.js?v=5.4"></script>
+<script src="js/calendar.js?v=5.4"></script>
+<script src="js/content.js?v=5.4"></script>
+<script src="js/tefilot.js?v=5.4"></script>
+<script src="js/siddur-inserts.js?v=5.4"></script>
+<script src="js/siddur.js?v=5.4"></script>
+<script src="js/misc.js?v=5.4"></script>
+<script src="js/init.js?v=5.4"></script>
 </body>
 </html>
