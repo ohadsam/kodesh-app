@@ -16,27 +16,49 @@
   <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@300;400;500;700;900&family=Heebo:wght@300;400;500;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css?v=5.2" />
   <!-- INLINE version guard – runs SYNCHRONOUSLY before any SW can intercept.
-       Kills any cached service worker and forces a fresh load when version changes. -->
+       Kills any cached service worker and forces a fresh load when version changes.
+       NOTE: this is the ONLY version check. utils.js must NOT have another one. -->
   <script>
     (function() {
-      var V = '5.7';
+      var V = '5.9';
+      // Show version in splash immediately
+      var sv = document.getElementById('splash-version');
+      if (sv) sv.textContent = 'גרסה ' + V;
+
       var stored = localStorage.getItem('app_version');
-      if (stored !== V && 'serviceWorker' in navigator) {
-        // Unregister ALL workers synchronously (returns promise, fire-and-forget is fine)
-        navigator.serviceWorker.getRegistrations().then(function(regs) {
-          var ps = regs.map(function(r){ return r.unregister(); });
-          return Promise.all(ps);
-        }).then(function() {
-          return 'caches' in window ? caches.keys().then(function(keys) {
+      if (stored === V) return; // already up to date – do nothing
+
+      // Version mismatch: clear SW + caches, then reload once
+      if (sv) sv.textContent = 'גרסה ' + V + ' – מנקה...';
+
+      // Set the version FIRST so reload doesn't loop
+      localStorage.setItem('app_version', V);
+
+      var doReload = function() {
+        var url = location.href.split('?')[0] + '?v=' + V + '&t=' + Date.now();
+        location.replace(url);
+      };
+
+      var p1 = ('serviceWorker' in navigator)
+        ? navigator.serviceWorker.getRegistrations().then(function(regs) {
+            return Promise.all(regs.map(function(r){ return r.unregister(); }));
+          })
+        : Promise.resolve();
+
+      var p2 = ('caches' in window)
+        ? caches.keys().then(function(keys) {
             return Promise.all(keys.map(function(k){ return caches.delete(k); }));
-          }) : Promise.resolve();
-        }).then(function() {
-          localStorage.setItem('app_version', V);
-          // Reload with cache-busting query param
-          var url = location.href.split('?')[0] + '?v=' + V + '&t=' + Date.now();
-          location.replace(url);
-        });
-      }
+          })
+        : Promise.resolve();
+
+      // Safety timeout: reload even if promises hang (e.g. SW unregister takes too long)
+      var reloaded = false;
+      var safeReload = function() {
+        if (!reloaded) { reloaded = true; doReload(); }
+      };
+      setTimeout(safeReload, 3000);
+
+      Promise.all([p1, p2]).then(safeReload).catch(safeReload);
     })();
   </script>
 </head>
@@ -48,7 +70,7 @@
   <div style="font-family:'Frank Ruhl Libre',serif;font-size:26px;color:var(--cream);font-weight:700">לימוד יומי</div>
   <p>מכין את הלמידה של היום...</p>
   <div class="spinner"></div>
-  <p id="splash-version" style="font-size:11px;color:var(--muted);margin-top:4px">גרסה 5.7</p>
+  <p id="splash-version" style="font-size:11px;color:var(--muted);margin-top:4px">גרסה 5.9</p>
 </div>
 
 <!-- SETTINGS PANEL -->
@@ -161,7 +183,7 @@
     <!-- Version & Copyright - INSIDE settings-inner -->
     <div style="text-align:center;padding:18px 0 8px;border-top:1px solid var(--border);margin-top:8px">
       <div style="font-size:13px;font-weight:600;color:var(--gold-dim);margin-bottom:4px">📖 לימוד יומי</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 5.7</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 5.9</div>
       <div style="font-size:11px;color:var(--muted)">© כל הזכויות שמורות לאוהד סמט</div>
     </div>
   </div>
@@ -812,7 +834,7 @@
     💡 לכיול המצפן: הזז את הטלפון בתנועת ∞ (שמונה שוכב) מספר פעמים
   </div>
   <div style="text-align:center;color:var(--muted);font-size:11px;padding:12px 0 4px">
-    גרסה 5.7 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
+    גרסה 5.9 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
   </div>
 </div>
 
@@ -868,17 +890,17 @@
      JavaScript modules (load order matters)
      v4.3 – querystring busts browser/SW cache
      ═══════════════════════════════════════ -->
-<script src="js/network-log.js?v=5.7"></script>
-<script src="js/utils.js?v=5.7"></script>
-<script src="js/settings.js?v=5.7"></script>
-<script src="js/app.js?v=5.7"></script>
-<script src="js/tehilim.js?v=5.7"></script>
-<script src="js/calendar.js?v=5.7"></script>
-<script src="js/content.js?v=5.7"></script>
-<script src="js/tefilot.js?v=5.7"></script>
-<script src="js/siddur-inserts.js?v=5.7"></script>
-<script src="js/siddur.js?v=5.7"></script>
-<script src="js/misc.js?v=5.7"></script>
-<script src="js/init.js?v=5.7"></script>
+<script src="js/network-log.js?v=5.9"></script>
+<script src="js/utils.js?v=5.9"></script>
+<script src="js/settings.js?v=5.9"></script>
+<script src="js/app.js?v=5.9"></script>
+<script src="js/tehilim.js?v=5.9"></script>
+<script src="js/calendar.js?v=5.9"></script>
+<script src="js/content.js?v=5.9"></script>
+<script src="js/tefilot.js?v=5.9"></script>
+<script src="js/siddur-inserts.js?v=5.9"></script>
+<script src="js/siddur.js?v=5.9"></script>
+<script src="js/misc.js?v=5.9"></script>
+<script src="js/init.js?v=5.9"></script>
 </body>
 </html>
