@@ -19,7 +19,7 @@
        Kills any cached service worker and forces a fresh load when version changes. -->
   <script>
     (function() {
-      var V = '5.6';
+      var V = '5.7';
       var stored = localStorage.getItem('app_version');
       if (stored !== V && 'serviceWorker' in navigator) {
         // Unregister ALL workers synchronously (returns promise, fire-and-forget is fine)
@@ -48,7 +48,7 @@
   <div style="font-family:'Frank Ruhl Libre',serif;font-size:26px;color:var(--cream);font-weight:700">לימוד יומי</div>
   <p>מכין את הלמידה של היום...</p>
   <div class="spinner"></div>
-  <p id="splash-version" style="font-size:11px;color:var(--muted);margin-top:4px">גרסה 5.6</p>
+  <p id="splash-version" style="font-size:11px;color:var(--muted);margin-top:4px">גרסה 5.7</p>
 </div>
 
 <!-- SETTINGS PANEL -->
@@ -161,7 +161,7 @@
     <!-- Version & Copyright - INSIDE settings-inner -->
     <div style="text-align:center;padding:18px 0 8px;border-top:1px solid var(--border);margin-top:8px">
       <div style="font-size:13px;font-weight:600;color:var(--gold-dim);margin-bottom:4px">📖 לימוד יומי</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 5.6</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 5.7</div>
       <div style="font-size:11px;color:var(--muted)">© כל הזכויות שמורות לאוהד סמט</div>
     </div>
   </div>
@@ -497,6 +497,8 @@
     <div id="parasha-loading" style="color:var(--muted);font-size:13px;font-style:italic">טוען פרשת השבוע...</div>
     <div id="parasha-notice" style="display:none;background:rgba(201,165,74,.1);border:1px solid var(--gold-dim);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--gold);margin-bottom:10px;line-height:1.6"></div>
     <div id="parasha-content"></div>
+    <!-- Bottom aliya navigation -->
+    <div id="aliya-nav-bottom" style="display:flex;justify-content:space-between;gap:8px;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)"></div>
     <div class="source-link">
       מקור: <a href="https://www.sefaria.org" target="_blank">Sefaria</a> |
       <a href="https://www.sefaria.org/Rashi_on_Torah" target="_blank">רש"י על התורה</a>
@@ -810,7 +812,7 @@
     💡 לכיול המצפן: הזז את הטלפון בתנועת ∞ (שמונה שוכב) מספר פעמים
   </div>
   <div style="text-align:center;color:var(--muted);font-size:11px;padding:12px 0 4px">
-    גרסה 5.6 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
+    גרסה 5.7 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
   </div>
 </div>
 
@@ -866,17 +868,17 @@
      JavaScript modules (load order matters)
      v4.3 – querystring busts browser/SW cache
      ═══════════════════════════════════════ -->
-<script src="js/network-log.js?v=5.6"></script>
-<script src="js/utils.js?v=5.6"></script>
-<script src="js/settings.js?v=5.6"></script>
-<script src="js/app.js?v=5.6"></script>
-<script src="js/tehilim.js?v=5.6"></script>
-<script src="js/calendar.js?v=5.6"></script>
-<script src="js/content.js?v=5.6"></script>
-<script src="js/tefilot.js?v=5.6"></script>
-<script src="js/siddur-inserts.js?v=5.6"></script>
-<script src="js/siddur.js?v=5.6"></script>
-<script src="js/misc.js?v=5.6"></script>
-<script src="js/init.js?v=5.6"></script>
+<script src="js/network-log.js?v=5.7"></script>
+<script src="js/utils.js?v=5.7"></script>
+<script src="js/settings.js?v=5.7"></script>
+<script src="js/app.js?v=5.7"></script>
+<script src="js/tehilim.js?v=5.7"></script>
+<script src="js/calendar.js?v=5.7"></script>
+<script src="js/content.js?v=5.7"></script>
+<script src="js/tefilot.js?v=5.7"></script>
+<script src="js/siddur-inserts.js?v=5.7"></script>
+<script src="js/siddur.js?v=5.7"></script>
+<script src="js/misc.js?v=5.7"></script>
+<script src="js/init.js?v=5.7"></script>
 </body>
 </html>
