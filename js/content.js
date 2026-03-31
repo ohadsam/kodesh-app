@@ -68,7 +68,14 @@ function setParashaView(mode) {
 }
 
 function _updateAliyaNav() {
-  const nav = document.getElementById('aliya-nav');
+  _renderAliyaNav(document.getElementById('aliya-nav'));
+}
+
+function _updateAliyaNavBottom() {
+  _renderAliyaNav(document.getElementById('aliya-nav-bottom'));
+}
+
+function _renderAliyaNav(nav) {
   if (!nav || !aliyot.length) return;
   const idx = typeof currentAliya === 'number' ? currentAliya : -1;
   const hasPrev = idx > 0;
@@ -180,21 +187,35 @@ async function loadSpecificParasha(ref) {
   const p = ALL_PARASHIOT.find(x => x.ref === ref);
   if (p) document.getElementById('parasha-name').textContent = p.he;
   const tabsEl = document.getElementById('aliya-tabs');
+  aliyot = [];
 
-  // Fetch aliyot from Sefaria for the selected parasha
+  // Find aliyot from Hebcal for this specific parasha using 60-day window
   try {
-    const cal = await fetchWithDelay(`https://www.sefaria.org/api/calendars?diaspora=0&_=${Date.now()}`);
-    const calItem = (cal?.calendar_items || []).find(i =>
-      (i.title?.en || '').toLowerCase().includes('parashat') &&
-      (i.ref || '').includes(ref.split(' ')[0]) // rough book match
-    ) || (cal?.calendar_items || []).find(i =>
-      (i.title?.en || '').toLowerCase().includes('parashat')
+    const ds  = formatDate(getTargetDate());
+    const ds2 = formatDate(new Date(getTargetDate().getTime() + 60 * 86400000));
+    const hbData = await fetchWithDelay(`https://www.hebcal.com/hebcal?v=1&cfg=json&s=on&start=${ds}&end=${ds2}`);
+    const items = hbData?.items || [];
+    // Find the parashat event whose ref matches (by Hebrew name)
+    const heParasha = p?.he || '';
+    const matchEvent = items.find(i =>
+      i.category === 'parashat' && (
+        (i.hebrew || '').includes(heParasha) || heParasha.includes((i.hebrew||'').replace(/פרשת\s*/,''))
+      )
     );
-    aliyot = calItem?.extraDetails?.aliyot || [];
-  } catch(_) { aliyot = []; }
+    if (matchEvent?.leyning) {
+      aliyot = ['1','2','3','4','5','6','7','M']
+        .map(k => matchEvent.leyning[k])
+        .filter(Boolean)
+        .map(r => r.trim());
+      console.log('[Parasha] specific aliyot from Hebcal:', aliyot.length, aliyot[0]);
+    }
+  } catch(e) {
+    console.warn('[Parasha] could not fetch specific aliyot:', e.message);
+  }
 
   currentParashaRef = ref;
   currentAliya = aliyot.length > 0 ? 0 : 'all';
+  _currentAliyaRef = aliyot[0] || ref;
 
   const aliyaNames = ['א','ב','ג','ד','ה','ו','ז','מפטיר'];
   tabsEl.innerHTML = aliyaNames.map((name, i) => {
@@ -321,6 +342,8 @@ async function loadParasha() {
   }
 }
 
+let _currentAliyaRef = null;  // tracks which ref Rashi/Onkelos are loading for
+
 async function loadAliyaText(ref) {
   const loadingEl = document.getElementById('parasha-loading');
   loadingEl.style.display = 'block';
@@ -328,20 +351,25 @@ async function loadAliyaText(ref) {
   document.getElementById('parasha-content').innerHTML = '';
   parashaVerses = []; rashiVerses = []; onkelosVerses = [];
   rashiLoaded = false; onkelosLoaded = false;
+  _rashiLoading = false;   // cancel any in-progress Rashi load
+  _onkelosLoading = false; // cancel any in-progress Onkelos load
+  _currentAliyaRef = ref;  // track so callbacks can check if still relevant
 
   try {
     console.log('[Parasha] loading text for ref:', ref);
     const data = await sefariaText(ref);
+    if (_currentAliyaRef !== ref) return; // aliya changed while loading
     parashaVerses = heFlat(data);
     console.log(`[Parasha] got ${parashaVerses.length} verses`);
     if (!parashaVerses.length) throw new Error('no Hebrew verses returned');
 
-    // Pre-load Rashi and Onkelos in background
+    // Pre-load Rashi and Onkelos in background (they check _currentAliyaRef)
     loadRashiForRef(ref);
     loadOnkelosForRef(ref);
 
     loadingEl.style.display = 'none';
     _updateAliyaNav();
+    _updateAliyaNavBottom(); // update bottom nav too
     renderParasha();
   } catch(e) {
     console.error('[Parasha] loadAliyaText error:', e);
@@ -450,6 +478,10 @@ async function loadRashiForRef(torahRef) {
 
   rashiLoaded    = true;
   _rashiLoading  = false;
+  if (_currentAliyaRef !== torahRef) {
+    console.log('[Rashi] discarding - aliya changed while loading');
+    return;
+  }
   const cnt = rashiVerses.filter(Boolean).length;
   console.log('[Rashi] ✅', cnt, '/', parashaVerses.length, 'verses with Rashi');
   if (parashaView === 'rashi') renderParasha();
@@ -503,6 +535,10 @@ async function loadOnkelosForRef(torahRef) {
 
   onkelosLoaded = true;
   _onkelosLoading = false;
+  if (_currentAliyaRef !== torahRef) {
+    console.log('[Onkelos] discarding - aliya changed while loading');
+    return;
+  }
   console.log('[Onkelos] ✅ loaded', onkelosVerses.filter(Boolean).length, 'verses');
   if (parashaView === 'onkelos') renderParasha();
 }

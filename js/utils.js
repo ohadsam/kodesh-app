@@ -92,7 +92,7 @@ let currentAliya = 'all';
 let rashiLoaded = false;
 let rashiVisible = false;
 
-const APP_VERSION  = '5.6';
+const APP_VERSION  = '5.7';
 const STORAGE_KEY  = 'kodesh_app_v1';
 const SIDDUR_CACHE_KEY = 'siddur_cache_v';
 
@@ -302,13 +302,21 @@ function buildParagraphs(flat) {
     /^והיה אם/,
     /^ויאמר/,
     /^אני מאמין/,
-    // Amida bracha titles embedded in text (appear as labels before next bracha)
+    // Amida bracha titles embedded in text
     /^עבודה רצה/,
     /^מודים אנחנו/,
     /^שים שלום/,
     /^אלהינו ואלהי אבותינו/,
     /^יעלה ויבוא/,
+    // Psalm structure
+    /^הללויה/,
+    /^הללו/,
+    /^למנצח/,
+    /^מזמור/,
+    /^שיר/,
   ];
+
+  const MAX_WORDS_PER_PARA = 80; // flush if current buffer exceeds this
 
   // Flush AFTER this pattern (marks end of a bracha)
   const BRACHA_END = /ברוך אתה י[יה]/;
@@ -362,6 +370,9 @@ function buildParagraphs(flat) {
 
     if (BREAK_BEFORE.some(r => r.test(plain))) flush();
     current.push(v);
+    // Flush if buffer is getting too long (prevents 500-word single paragraphs)
+    const currentWordCount = current.join(' ').replace(/<[^>]+>/g,'').split(/\s+/).filter(Boolean).length;
+    if (currentWordCount >= MAX_WORDS_PER_PARA) flush();
     if (BRACHA_END.test(plain)) flush();
   }
   flush();
