@@ -96,36 +96,9 @@ const APP_VERSION  = '5.9';
 const STORAGE_KEY  = 'kodesh_app_v1';
 const SIDDUR_CACHE_KEY = 'siddur_cache_v';
 
-// ── Startup: show version in splash + force-clear SW and caches on version change ──
-(function() {
-  // Show version immediately in splash screen
-  const splashV = document.getElementById('splash-version');
-  if (splashV) splashV.textContent = 'גרסה ' + APP_VERSION;
-
-  const savedVer = localStorage.getItem('app_version');
-  if (savedVer !== APP_VERSION) {
-    console.log('[Cache] New version', APP_VERSION, '← was', savedVer);
-    if (splashV) splashV.textContent = 'גרסה ' + APP_VERSION + ' – מנקה cache...';
-
-    const doReload = () => {
-      localStorage.setItem('app_version', APP_VERSION);
-      console.log('[Cache] Reloading with fresh files...');
-      // Add nocache param to bust any HTTP cache too
-      const url = window.location.href.split('?')[0] + '?nocache=' + APP_VERSION;
-      window.location.replace(url);
-    };
-    const sw = navigator.serviceWorker;
-    const p1 = sw ? sw.getRegistrations().then(regs => {
-      console.log('[Cache] Unregistering', regs.length, 'SW(s)');
-      return Promise.all(regs.map(r => r.unregister()));
-    }) : Promise.resolve();
-    const p2 = ('caches' in window) ? caches.keys().then(keys => {
-      console.log('[Cache] Deleting caches:', keys);
-      return Promise.all(keys.map(k => caches.delete(k)));
-    }) : Promise.resolve();
-    Promise.all([p1, p2]).then(doReload);
-  }
-})();
+// Version is displayed in splash by the inline HEAD script in index.html
+// Cache clearing on version change is also handled there (runs before SW can intercept)
+// Do NOT add a second version check here – it causes an infinite reload loop!
 
 let appState = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
 
