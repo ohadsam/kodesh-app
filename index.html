@@ -20,7 +20,7 @@
        NOTE: this is the ONLY version check. utils.js must NOT have another one. -->
   <script>
     (function() {
-      var V = '5.10';
+      var V = '5.11';
       // Show version in splash immediately
       var sv = document.getElementById('splash-version');
       if (sv) sv.textContent = 'גרסה ' + V;
@@ -70,7 +70,7 @@
   <div style="font-family:'Frank Ruhl Libre',serif;font-size:26px;color:var(--cream);font-weight:700">לימוד יומי</div>
   <p>מכין את הלמידה של היום...</p>
   <div class="spinner"></div>
-  <p id="splash-version" style="font-size:11px;color:var(--muted);margin-top:4px">גרסה 5.10</p>
+  <p id="splash-version" style="font-size:11px;color:var(--muted);margin-top:4px">גרסה 5.11</p>
 </div>
 
 <!-- SETTINGS PANEL -->
@@ -183,7 +183,7 @@
     <!-- Version & Copyright - INSIDE settings-inner -->
     <div style="text-align:center;padding:18px 0 8px;border-top:1px solid var(--border);margin-top:8px">
       <div style="font-size:13px;font-weight:600;color:var(--gold-dim);margin-bottom:4px">📖 לימוד יומי</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 5.10</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 5.11</div>
       <div style="font-size:11px;color:var(--muted)">© כל הזכויות שמורות לאוהד סמט</div>
     </div>
   </div>
@@ -281,6 +281,8 @@
       <div class="zman-item"><div class="label">צאת הכוכבים</div><div class="time" id="z-tzeit">--:--</div></div>
       <div class="zman-item"><div class="label">הדלקת נרות</div><div class="time" id="z-candles">--:--</div></div>
       <div class="zman-item" id="z-havdalah-row" style="display:none"><div class="label">צאת שבת / יו"ט</div><div class="time" id="z-havdalah">--:--</div></div>
+      <!-- Special day zmanim (fasts, erev pesach etc) – shown only when relevant -->
+      <div id="z-special-rows"></div>
     </div>
     <div class="source-link">
       מקור: <a href="https://www.hebcal.com/zmanim" target="_blank">Hebcal Zmanim API</a>
@@ -507,6 +509,7 @@
       <button id="view-text-btn" class="aliya-tab active" onclick="setParashaView('text')">📖 פסוקים בלבד</button>
       <button id="view-rashi-btn" class="aliya-tab" onclick="setParashaView('rashi')">🖊 עם רש"י</button>
       <button id="view-onkelos-btn" class="aliya-tab" onclick="setParashaView('onkelos')">🔤 עם אונקלוס</button>
+      <button id="view-haftara-btn" class="aliya-tab" onclick="setParashaView('haftara')">📜 הפטרה</button>
     </div>
     <!-- Aliya prev/next navigation -->
     <div id="aliya-nav" style="display:flex;justify-content:space-between;gap:8px;margin-bottom:10px"></div>
@@ -834,7 +837,7 @@
     💡 לכיול המצפן: הזז את הטלפון בתנועת ∞ (שמונה שוכב) מספר פעמים
   </div>
   <div style="text-align:center;color:var(--muted);font-size:11px;padding:12px 0 4px">
-    גרסה 5.10 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
+    גרסה 5.11 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
   </div>
 </div>
 
@@ -890,17 +893,17 @@
      JavaScript modules (load order matters)
      v4.3 – querystring busts browser/SW cache
      ═══════════════════════════════════════ -->
-<script src="js/network-log.js?v=5.10"></script>
-<script src="js/utils.js?v=5.10"></script>
-<script src="js/settings.js?v=5.10"></script>
-<script src="js/app.js?v=5.10"></script>
-<script src="js/tehilim.js?v=5.10"></script>
-<script src="js/calendar.js?v=5.10"></script>
-<script src="js/content.js?v=5.10"></script>
-<script src="js/tefilot.js?v=5.10"></script>
-<script src="js/siddur-inserts.js?v=5.10"></script>
-<script src="js/siddur.js?v=5.10"></script>
-<script src="js/misc.js?v=5.10"></script>
-<script src="js/init.js?v=5.10"></script>
+<script src="js/network-log.js?v=5.11"></script>
+<script src="js/utils.js?v=5.11"></script>
+<script src="js/settings.js?v=5.11"></script>
+<script src="js/app.js?v=5.11"></script>
+<script src="js/tehilim.js?v=5.11"></script>
+<script src="js/calendar.js?v=5.11"></script>
+<script src="js/content.js?v=5.11"></script>
+<script src="js/tefilot.js?v=5.11"></script>
+<script src="js/siddur-inserts.js?v=5.11"></script>
+<script src="js/siddur.js?v=5.11"></script>
+<script src="js/misc.js?v=5.11"></script>
+<script src="js/init.js?v=5.11"></script>
 </body>
 </html>
