@@ -20,7 +20,7 @@
        NOTE: this is the ONLY version check. utils.js must NOT have another one. -->
   <script>
     (function() {
-      var V = '5.11';
+      var V = '5.12';
       // Show version in splash immediately
       var sv = document.getElementById('splash-version');
       if (sv) sv.textContent = 'גרסה ' + V;
@@ -70,7 +70,7 @@
   <div style="font-family:'Frank Ruhl Libre',serif;font-size:26px;color:var(--cream);font-weight:700">לימוד יומי</div>
   <p>מכין את הלמידה של היום...</p>
   <div class="spinner"></div>
-  <p id="splash-version" style="font-size:11px;color:var(--muted);margin-top:4px">גרסה 5.11</p>
+  <p id="splash-version" style="font-size:11px;color:var(--muted);margin-top:4px">גרסה 5.12</p>
 </div>
 
 <!-- SETTINGS PANEL -->
@@ -183,7 +183,7 @@
     <!-- Version & Copyright - INSIDE settings-inner -->
     <div style="text-align:center;padding:18px 0 8px;border-top:1px solid var(--border);margin-top:8px">
       <div style="font-size:13px;font-weight:600;color:var(--gold-dim);margin-bottom:4px">📖 לימוד יומי</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 5.11</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 5.12</div>
       <div style="font-size:11px;color:var(--muted)">© כל הזכויות שמורות לאוהד סמט</div>
     </div>
   </div>
@@ -212,6 +212,7 @@
   <button class="tab" onclick="showTab('parasha')" id="t-parasha"><span class="icon">📜</span>פרשה</button>
   <button class="tab" onclick="showTab('igeret')" id="t-igeret"><span class="icon">✉️</span>אגרת</button>
   <button class="tab" onclick="showTab('tefilot')" id="t-tefilot"><span class="icon">🤲</span>תפילות</button>
+  <button class="tab" onclick="showTab('brachot')" id="t-brachot"><span class="icon">✨</span>ברכות</button>
   <button class="tab" onclick="showTab('qibla')" id="t-qibla"><span class="icon">🧭</span>מצפן</button>
   <button class="tab" onclick="showTab('logs')" id="t-logs"><span class="icon">🐛</span>לוגים</button>
   <button class="tab" onclick="showTab('network')" id="t-network"><span class="icon">🌐</span>רשת</button>
@@ -668,7 +669,62 @@
   </div>
 </div>
 
-<!-- ─── PAGE: QIBLA ────────────────────────── -->
+<!-- ─── PAGE: BRACHOT ──────────────────── -->
+<div class="page" id="page-brachot">
+  <!-- Nusach selector -->
+  <div class="card" style="padding:10px 14px;margin-bottom:12px">
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-weight:600">נוסח</div>
+    <div style="display:flex;gap:8px" id="brachot-nusach-buttons">
+      <button id="bn2-sfard"    class="aliya-tab active"  onclick="setBrachotNusach('sfard');appState.brachaNusach='sfard';saveState()">ספרד</button>
+      <button id="bn2-ashkenaz" class="aliya-tab"         onclick="setBrachotNusach('ashkenaz');appState.brachaNusach='ashkenaz';saveState()">אשכנז</button>
+      <button id="bn2-mizrach"  class="aliya-tab"         onclick="setBrachotNusach('mizrach');appState.brachaNusach='mizrach';saveState()">עדות המזרח</button>
+    </div>
+  </div>
+
+  <!-- Bracha selector -->
+  <div class="card" style="padding:12px 14px;margin-bottom:12px">
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;font-weight:600">בחר ברכה</div>
+    <div style="display:flex;flex-direction:column;gap:6px" id="bracha-buttons">
+      <!-- ברכות אחרי אכילה -->
+      <div style="font-size:10px;color:var(--gold-dim);font-weight:700;margin-top:4px">ברכות אחרי אכילה</div>
+      <button id="bb-birkat_hamazon" class="aliya-tab bracha-btn" onclick="showBracha('birkat_hamazon')">📖 ברכת המזון</button>
+      <button id="bb-mezonot"        class="aliya-tab bracha-btn" onclick="showBracha('mezonot')">על המחיה (מזונות)</button>
+      <button id="bb-borei_nefashot" class="aliya-tab bracha-btn" onclick="showBracha('borei_nefashot')">בורא נפשות</button>
+      <!-- ברכות לפני אכילה -->
+      <div style="font-size:10px;color:var(--gold-dim);font-weight:700;margin-top:8px">ברכות לפני שתייה / אכילה</div>
+      <button id="bb-shehakol"       class="aliya-tab bracha-btn" onclick="showBracha('shehakol')">שהכל נהיה בדברו</button>
+      <!-- ברכות מיוחדות -->
+      <div style="font-size:10px;color:var(--gold-dim);font-weight:700;margin-top:8px">ברכות מיוחדות</div>
+      <button id="bb-kiddush_levana" class="aliya-tab bracha-btn" onclick="showBracha('kiddush_levana')">🌙 ברכת הלבנה</button>
+      <button id="bb-birkat_ilanot"  class="aliya-tab bracha-btn" onclick="showBracha('birkat_ilanot')">🌸 ברכת האילנות</button>
+      <!-- ברכות תופעות טבע -->
+      <div style="font-size:10px;color:var(--gold-dim);font-weight:700;margin-top:8px">ברכות על תופעות טבע</div>
+      <button id="bb-raam"           class="aliya-tab bracha-btn" onclick="showBracha('raam')">⛈️ ברכה על רעם</button>
+      <button id="bb-barak"          class="aliya-tab bracha-btn" onclick="showBracha('barak')">⚡ ברכה על ברק</button>
+      <button id="bb-keshet"         class="aliya-tab bracha-btn" onclick="showBracha('keshet')">🌈 ברכה על קשת</button>
+      <button id="bb-nof"            class="aliya-tab bracha-btn" onclick="showBracha('nof')">🏔️ ברכה על נופים מיוחדים</button>
+      <!-- ברכות על אנשים -->
+      <div style="font-size:10px;color:var(--gold-dim);font-weight:700;margin-top:8px">ברכות על אנשים</div>
+      <button id="bb-chacham"        class="aliya-tab bracha-btn" onclick="showBracha('chacham')">📚 חכמי ישראל</button>
+      <button id="bb-chacham_umot"   class="aliya-tab bracha-btn" onclick="showBracha('chacham_umot')">🔬 חכמי אומות העולם</button>
+      <button id="bb-melachim"       class="aliya-tab bracha-btn" onclick="showBracha('melachim')">👑 מלכים / ראשי מדינה</button>
+    </div>
+  </div>
+
+  <!-- Bracha display -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title"><span class="emoji">✨</span><span id="bracha-title">ברכה</span></div>
+        <div class="card-subtitle" id="bracha-source"></div>
+      </div>
+      <div id="done-brachot"></div>
+    </div>
+    <div id="bracha-content" class="content-text igeret-text" style="min-height:120px">
+      בחר ברכה מהרשימה למעלה
+    </div>
+  </div>
+</div>
 <div class="page" id="page-qibla">
 
   <!-- Status bar -->
@@ -837,7 +893,7 @@
     💡 לכיול המצפן: הזז את הטלפון בתנועת ∞ (שמונה שוכב) מספר פעמים
   </div>
   <div style="text-align:center;color:var(--muted);font-size:11px;padding:12px 0 4px">
-    גרסה 5.11 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
+    גרסה 5.12 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
   </div>
 </div>
 
@@ -884,6 +940,7 @@
   <button class="bnav-btn" onclick="showTab('parasha')" id="bn-parasha"><span class="bicon">📜</span>פרשה</button>
   <button class="bnav-btn" onclick="showTab('igeret')" id="bn-igeret"><span class="bicon">✉️</span>אגרת</button>
   <button class="bnav-btn" onclick="showTab('tefilot')" id="bn-tefilot"><span class="bicon">🤲</span>תפילות</button>
+  <button class="bnav-btn" onclick="showTab('brachot')" id="bn-brachot"><span class="bicon">✨</span>ברכות</button>
   <button class="bnav-btn" onclick="showTab('qibla')" id="bn-qibla"><span class="bicon">🧭</span>מצפן</button>
   <button class="bnav-btn" onclick="showTab('logs')" id="bn-logs"><span class="bicon">🐛</span>לוגים</button>
   <button class="bnav-btn" onclick="showTab('network')" id="bn-network"><span class="bicon">🌐</span>רשת</button>
@@ -893,17 +950,18 @@
      JavaScript modules (load order matters)
      v4.3 – querystring busts browser/SW cache
      ═══════════════════════════════════════ -->
-<script src="js/network-log.js?v=5.11"></script>
-<script src="js/utils.js?v=5.11"></script>
-<script src="js/settings.js?v=5.11"></script>
-<script src="js/app.js?v=5.11"></script>
-<script src="js/tehilim.js?v=5.11"></script>
-<script src="js/calendar.js?v=5.11"></script>
-<script src="js/content.js?v=5.11"></script>
-<script src="js/tefilot.js?v=5.11"></script>
-<script src="js/siddur-inserts.js?v=5.11"></script>
-<script src="js/siddur.js?v=5.11"></script>
-<script src="js/misc.js?v=5.11"></script>
-<script src="js/init.js?v=5.11"></script>
+<script src="js/network-log.js?v=5.12"></script>
+<script src="js/utils.js?v=5.12"></script>
+<script src="js/settings.js?v=5.12"></script>
+<script src="js/app.js?v=5.12"></script>
+<script src="js/tehilim.js?v=5.12"></script>
+<script src="js/calendar.js?v=5.12"></script>
+<script src="js/content.js?v=5.12"></script>
+<script src="js/tefilot.js?v=5.12"></script>
+<script src="js/siddur-inserts.js?v=5.12"></script>
+<script src="js/siddur.js?v=5.12"></script>
+<script src="js/brachot.js?v=5.12"></script>
+<script src="js/misc.js?v=5.12"></script>
+<script src="js/init.js?v=5.12"></script>
 </body>
 </html>
