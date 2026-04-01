@@ -13,6 +13,7 @@ const ALL_TABS = [
   { id: 'parasha',  label: '📜 פרשת השבוע'                    },
   { id: 'igeret',   label: '✉️ אגרת הרמב"ן'                   },
   { id: 'tefilot',  label: '🤲 תפילות נוספות'                  },
+  { id: 'brachot',  label: '✨ ברכות'                           },
   { id: 'qibla',    label: '🧭 מצפן תפילה'                    },
   { id: 'logs',     label: '🐛 לוגי מערכת',   defaultHidden: true },
   { id: 'network',  label: '🌐 קריאות רשת',   defaultHidden: true },

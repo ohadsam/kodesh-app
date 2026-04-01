@@ -47,6 +47,7 @@ function loadTab(name) {
   if (name === 'lashon')    loadLashon();
   if (name === 'igeret')    loadIgeret();
   if (name === 'tefilot')   initTefilot();
+  if (name === 'brachot')   loadBrachot();
   if (name === 'daf')       loadDafYomi();
   if (name === 'mishna')    loadMishnaYomi();
   if (name === '929')       loadTanach929();
