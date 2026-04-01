@@ -56,7 +56,10 @@ let parashaVerses = [];   // current Torah verses
 let rashiVerses   = [];   // current Rashi verses (parallel array)
 let onkelosVerses = [];   // current Onkelos verses (parallel array)
 let onkelosLoaded = false;
-let parashaView   = 'text'; // 'text' | 'rashi' | 'onkelos'
+let haftaraLoaded = false;
+let haftaraVerses = [];  // haftara verses
+let _haftaraRef   = null; // Sefaria ref for haftara
+let parashaView   = 'text'; // 'text' | 'rashi' | 'onkelos' | 'haftara'
 let currentParashaRef = null;
 
 function setParashaView(mode) {
@@ -64,6 +67,7 @@ function setParashaView(mode) {
   document.getElementById('view-text-btn').classList.toggle('active',    mode === 'text');
   document.getElementById('view-rashi-btn').classList.toggle('active',   mode === 'rashi');
   document.getElementById('view-onkelos-btn').classList.toggle('active', mode === 'onkelos');
+  document.getElementById('view-haftara-btn').classList.toggle('active', mode === 'haftara');
   renderParasha();
 }
 
@@ -140,6 +144,20 @@ function renderParasha() {
           <span style="font-family:'Frank Ruhl Libre',serif;font-size:calc(var(--font-size)*.88);color:var(--text);line-height:1.7;font-style:italic">${o}</span></div>` : ''}
       </div>`;
     }).join('');
+  } else if (parashaView === 'haftara') {
+    if (!haftaraLoaded) {
+      el.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center">⏳ טוען הפטרה...</div>';
+      return;
+    }
+    if (!haftaraVerses.length) {
+      el.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center">אין נתוני הפטרה</div>';
+      return;
+    }
+    el.innerHTML = `<div style="font-size:11px;color:var(--gold);margin-bottom:10px;font-family:'Heebo',sans-serif">
+      📜 הפטרה – ${_haftaraRef || ''}</div>` +
+      haftaraVerses.map((v,i) =>
+        `<div style="margin-bottom:8px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span><span style="font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);line-height:1.85">${v}</span></div>`
+      ).join('');
   }
 }
 
@@ -254,12 +272,16 @@ async function loadSpecificParasha(ref) {
   if (!ref) return;
   const p = ALL_PARASHIOT.find(x => x.ref === ref);
   if (p) document.getElementById('parasha-name').textContent = p.he;
-  const tabsEl = document.getElementById('aliya-tabs');
+  const tabsEl   = document.getElementById('aliya-tabs');
+  // Hide holiday notice when user manually selects a different parasha
+  const noticeEl = document.getElementById('parasha-notice');
+  if (noticeEl) noticeEl.style.display = 'none';
+  haftaraLoaded = false; haftaraVerses = []; _haftaraRef = null;
 
   // 1. Try static lookup first (instant, always works)
   const staticAliyot = PARASHA_ALIYOT[ref];
   if (staticAliyot) {
-    aliyot = staticAliyot.slice(0, 7); // first 7 = aliyot 1-7 (index 7 = maftir, skip for tabs)
+    aliyot = staticAliyot.slice(0, 7);
     console.log('[Parasha] static aliyot for', ref, '→', aliyot.length);
   } else {
     // 2. Fallback: try Hebcal 60-day window
@@ -276,6 +298,8 @@ async function loadSpecificParasha(ref) {
       );
       if (matchEvent?.leyning) {
         aliyot = ['1','2','3','4','5','6','7'].map(k => matchEvent.leyning[k]).filter(Boolean).map(r => r.trim());
+        // Load haftara in background
+        if (matchEvent.leyning.haftara) _kickoffHaftara(matchEvent.leyning.haftara);
       }
     } catch(e) { console.warn('[Parasha] Hebcal fallback failed:', e.message); }
   }
@@ -349,19 +373,26 @@ async function loadParasha() {
 
     document.getElementById('parasha-select').value = matchP.ref;
 
-    // Get aliyot: prefer Hebcal leyning data (reliable for current AND future parasha)
-    // Hebcal leyning format: {"1":"Leviticus 9:1-9:16", "2":..., "M":...}
+    // Detect combined parshiot (e.g. "Parashat Vayakhel-Pekudei")
+    // Hebcal title: "Parashat Vayakhel-Pekudei" / Hebrew: "פרשת ויקהל-פקודי"
+    const isCombined = (parashaEvent.title || '').includes('-') || (heName || '').includes('-');
+    if (isCombined) {
+      console.log('[Parasha] Combined parsha detected:', heName);
+      // nameEl already has the full combined name from Hebcal
+    }
+
+    // Handle combined parshiot: Hebcal returns correct aliyot for the combined reading
+    // Hebcal leyning format: {"1":"Leviticus 9:1-9:16", "2":..., "M":..., "haftara":"..."}
     const leyning = parashaEvent.leyning || {};
     const hebcalAliyot = ['1','2','3','4','5','6','7','M']
       .map(k => leyning[k])
       .filter(Boolean)
-      .map(r => r.trim());  // just trim, preserve spaces (book name NEEDS space before chapter)
+      .map(r => r.trim());
 
     if (hebcalAliyot.length >= 3) {
       aliyot = hebcalAliyot;
       console.log('[Parasha] using Hebcal aliyot:', aliyot.length, aliyot[0]);
     } else {
-      // Fallback: Sefaria calendar (but only if NOT a holiday/future parasha)
       if (!isFutureParasha) {
         const cal = await fetchWithDelay(`https://www.sefaria.org/api/calendars?diaspora=0&_=${Date.now()}`);
         const calItem = (cal?.calendar_items || []).find(i =>
@@ -375,11 +406,15 @@ async function loadParasha() {
     }
     console.log('[Parasha] found:', heName, 'ref:', matchP.ref, 'aliyot:', aliyot.length, aliyot[0] || '');
 
-    // Also fallback to static table if Hebcal gave nothing
+    // Fallback to static table if nothing found
     if (!aliyot.length && PARASHA_ALIYOT[matchP.ref]) {
       aliyot = PARASHA_ALIYOT[matchP.ref].slice(0, 7);
       console.log('[Parasha] static aliyot fallback:', aliyot.length);
     }
+
+    // Start haftara loading in background
+    haftaraLoaded = false; haftaraVerses = []; _haftaraRef = null;
+    if (leyning.haftara) _kickoffHaftara(leyning.haftara);
 
     _buildAliyaTabs(tabsEl, aliyot);
 
@@ -397,6 +432,31 @@ async function loadParasha() {
 }
 
 let _currentAliyaRef = null;  // tracks which ref Rashi/Onkelos are loading for
+
+// ── Haftara loading ─────────────────────────────────────────────────────────
+// haftaraRef from Hebcal is like "I Kings 18:46-19:21"
+// Sefaria ref uses same format, so we can fetch directly
+async function _kickoffHaftara(haftaraRef) {
+  if (!haftaraRef) return;
+  _haftaraRef = haftaraRef;
+  haftaraLoaded = false;
+  haftaraVerses = [];
+  console.log('[Haftara] loading:', haftaraRef);
+  try {
+    const data = await sefariaText(haftaraRef, 200);
+    const flat = heFlat(data);
+    if (flat.length) {
+      haftaraVerses = flat;
+      console.log('[Haftara] ✅', flat.length, 'verses');
+    } else {
+      console.warn('[Haftara] empty response for', haftaraRef);
+    }
+  } catch(e) {
+    console.warn('[Haftara] failed:', e.message);
+  }
+  haftaraLoaded = true;
+  if (parashaView === 'haftara') renderParasha();
+}
 
 async function loadAliyaText(ref) {
   const loadingEl = document.getElementById('parasha-loading');

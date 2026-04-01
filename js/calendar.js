@@ -124,9 +124,39 @@ async function loadZmanim(ds) {
     console.log('[Zmanim] tzeit=sunset+13.5min:', fmtT(tzeitVal));
     console.log('[Zmanim] GRA shema:', z.sofZmanShma, '| GRA tfilla:', z.sofZmanTfilla, '| all keys:', Object.keys(z).join(','));
     // Cache for auto-reminders
-    appState._lastZmanim = z;  // includes tzeit42min, tzeit7083deg, tzeit85deg, sunset, chatzot
+    appState._lastZmanim = z;
     saveState();
     scheduleZmanimRemindersForToday();
+
+    // ── Special day zmanim ──────────────────────────────────────────
+    const specialRows = document.getElementById('z-special-rows');
+    if (specialRows) {
+      const specials = [];
+
+      // Erev Pesach chametz times (Hebcal zmanim returns these automatically)
+      if (z.sofZmanAchilatChametz) {
+        specials.push({ label: '⏰ סוף זמן אכילת חמץ', time: z.sofZmanAchilatChametz });
+      }
+      if (z.sofZmanBiurChametz) {
+        specials.push({ label: '🔥 סוף זמן ביעור חמץ', time: z.sofZmanBiurChametz });
+      }
+
+      // Fast day times: check candle/event data for fast begin/end
+      // These come from the c=on Hebcal query already fired above
+      // We'll store them and render from loadEvents via a shared flag
+
+      if (specials.length) {
+        specialRows.innerHTML = specials.map(s =>
+          `<div class="zman-item" style="border-top:1px solid rgba(201,165,74,.2);margin-top:4px">
+            <div class="label" style="color:var(--gold)">${s.label}</div>
+            <div class="time" style="color:var(--gold)">${fmtT(s.time)}</div>
+          </div>`
+        ).join('');
+      } else {
+        specialRows.innerHTML = '';
+      }
+    }
+
     // candle lighting
     const evData = await fetchWithDelay(
       `https://www.hebcal.com/hebcal?v=1&cfg=json&maj=on&min=on&nx=on&start=${ds}&end=${ds}&c=on&geo=pos&latitude=${userLat.toFixed(6)}&longitude=${userLon.toFixed(6)}&elevation=${elev}&tzid=Asia/Jerusalem&i=1&b=18&m=42`, 400
@@ -178,6 +208,31 @@ async function loadEvents(ds) {
           <div class="event-sub">${e.title}${e.date ? ' · '+e.date : ''}</div>
         </div>
       </div>`).join('');
+
+    // ── Fast day times: fetch with candles=on to get fast begin/end ──
+    const isFastDay = items.some(e => /fast|צום|tisha|asara|tzom|17.tam/i.test(e.title || ''));
+    if (isFastDay) {
+      try {
+        const elev = Math.max(0, userElev || 0);
+        const fastData = await fetchWithDelay(
+          `https://www.hebcal.com/hebcal?v=1&cfg=json&maj=on&min=on&nx=on&mf=on&ss=on&start=${ds}&end=${ds}&c=on&geo=pos&latitude=${userLat.toFixed(6)}&longitude=${userLon.toFixed(6)}&elevation=${elev}&tzid=Asia/Jerusalem&i=1&b=18&m=42`, 300
+        );
+        const fastItems = fastData?.items || [];
+        const fastBegin = fastItems.find(e => /fast.begins|begins/i.test(e.title));
+        const fastEnd   = fastItems.find(e => /fast.ends|ends/i.test(e.title));
+        const specialRows = document.getElementById('z-special-rows');
+        if (specialRows && (fastBegin || fastEnd)) {
+          function fmtT(iso) {
+            if (!iso) return '--:--';
+            return new Date(iso).toLocaleTimeString('he-IL', {hour:'2-digit',minute:'2-digit',hour12:false});
+          }
+          let fastHtml = specialRows.innerHTML;
+          if (fastBegin) fastHtml += `<div class="zman-item" style="border-top:1px solid rgba(201,165,74,.2);margin-top:4px"><div class="label" style="color:var(--gold)">🙏 תחילת הצום</div><div class="time" style="color:var(--gold)">${fmtT(fastBegin.date)}</div></div>`;
+          if (fastEnd)   fastHtml += `<div class="zman-item"><div class="label" style="color:var(--gold)">✅ סיום הצום</div><div class="time" style="color:var(--gold)">${fmtT(fastEnd.date)}</div></div>`;
+          specialRows.innerHTML = fastHtml;
+        }
+      } catch(e) { console.warn('[Events] fast times fetch failed:', e.message); }
+    }
 
     // Save events for siddur conditional logic
     storeTodayEventsForSiddur(items);
