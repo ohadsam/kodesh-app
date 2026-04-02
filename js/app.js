@@ -109,6 +109,11 @@ async function loadHebrewDate() {
     document.getElementById('topbar-heb').textContent = hd;
     document.getElementById('hal-heb').textContent = hd;
     document.getElementById('lash-heb').textContent = hd;
+    // Cache for omer calculation
+    appState._lastHebrewDate = { hm: data.hm, hd: data.hd, hy: data.hy };
+    saveState();
+    // Schedule omer reminder if enabled
+    if (typeof scheduleOmerReminder === 'function') scheduleOmerReminder();
     const tehilimEl = document.getElementById('tehilim-day-info');
     if (tehilimEl) {
       const day = data.hd;

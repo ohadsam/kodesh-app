@@ -132,26 +132,26 @@ async function loadZmanim(ds) {
     const specialRows = document.getElementById('z-special-rows');
     if (specialRows) {
       const specials = [];
-
-      // Erev Pesach chametz times (Hebcal zmanim returns these automatically)
+      // Erev Pesach chametz times
+      // Hebcal field names (verified): sofZmanAchilatChametz, sofZmanBiurChametz
       if (z.sofZmanAchilatChametz) {
         specials.push({ label: '⏰ סוף זמן אכילת חמץ', time: z.sofZmanAchilatChametz });
       }
       if (z.sofZmanBiurChametz) {
         specials.push({ label: '🔥 סוף זמן ביעור חמץ', time: z.sofZmanBiurChametz });
       }
-
-      // Fast day times: check candle/event data for fast begin/end
-      // These come from the c=on Hebcal query already fired above
-      // We'll store them and render from loadEvents via a shared flag
+      // Log all z fields for debugging
+      const chametzFields = Object.keys(z).filter(k => /chametz|biur|achila/i.test(k));
+      if (chametzFields.length) console.log('[Zmanim] chametz fields:', chametzFields, chametzFields.map(k=>z[k]));
 
       if (specials.length) {
-        specialRows.innerHTML = specials.map(s =>
-          `<div class="zman-item" style="border-top:1px solid rgba(201,165,74,.2);margin-top:4px">
-            <div class="label" style="color:var(--gold)">${s.label}</div>
-            <div class="time" style="color:var(--gold)">${fmtT(s.time)}</div>
-          </div>`
-        ).join('');
+        specialRows.innerHTML = `<div style="margin:6px 0 2px;font-size:10px;font-weight:700;color:var(--gold);font-family:'Heebo',sans-serif;letter-spacing:.3px">ערב פסח</div>` +
+          specials.map(s =>
+            `<div class="zman-item" style="background:rgba(201,165,74,.06)">
+              <div class="label" style="color:var(--gold)">${s.label}</div>
+              <div class="time" style="color:var(--gold)">${fmtT(s.time)}</div>
+            </div>`
+          ).join('');
       } else {
         specialRows.innerHTML = '';
       }

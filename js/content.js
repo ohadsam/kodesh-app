@@ -438,18 +438,25 @@ let _currentAliyaRef = null;  // tracks which ref Rashi/Onkelos are loading for
 // Sefaria ref uses same format, so we can fetch directly
 async function _kickoffHaftara(haftaraRef) {
   if (!haftaraRef) return;
-  _haftaraRef = haftaraRef;
+  // Normalize: Hebcal may return "I Kings 18:46 - 19:21" with spaces around dash
+  const normalRef = haftaraRef.replace(/\s*-\s*/g, '-').trim();
+  _haftaraRef = normalRef;
   haftaraLoaded = false;
   haftaraVerses = [];
-  console.log('[Haftara] loading:', haftaraRef);
+  console.log('[Haftara] loading:', normalRef);
   try {
-    const data = await sefariaText(haftaraRef, 200);
+    const data = await sefariaText(normalRef, 200);
     const flat = heFlat(data);
     if (flat.length) {
       haftaraVerses = flat;
       console.log('[Haftara] ✅', flat.length, 'verses');
     } else {
-      console.warn('[Haftara] empty response for', haftaraRef);
+      // Sefaria might not know the ref format – try fetching without verse range
+      const bookOnly = normalRef.replace(/:\d+-.*$/, '');
+      console.warn('[Haftara] empty, trying book-only:', bookOnly);
+      const data2 = await sefariaText(bookOnly, 200);
+      haftaraVerses = heFlat(data2);
+      if (haftaraVerses.length) console.log('[Haftara] ✅ book fallback', haftaraVerses.length);
     }
   } catch(e) {
     console.warn('[Haftara] failed:', e.message);

@@ -101,6 +101,9 @@ function loadSettingsState() {
   const igeretDay = (appState.reminders?.igeret?.day ?? 5).toString(); // default Friday
   const dayEl = document.getElementById('rem-igeret-day');
   if (dayEl) dayEl.value = igeretDay;
+
+  // Restore omer reminder settings
+  if (typeof restoreOmerSettings === 'function') restoreOmerSettings();
 }
 function saveReminder(key, time) {
   if (!appState.reminders) appState.reminders = {};
@@ -124,7 +127,8 @@ function scheduleReminder(key) {
     if (perm !== 'granted') return;
     const names = {
       halacha: 'הלכה יומית', tehilim: 'תהילים',
-      lashon: 'לשון הרע', parasha: 'פרשת השבוע', igeret: 'אגרת הרמב"ן'
+      lashon: 'לשון הרע', parasha: 'פרשת השבוע',
+      igeret: 'אגרת הרמב"ן', omer: 'ספירת העומר'
     };
     const r = appState.reminders?.[key] || {};
     const [h,m] = (r.time || '08:00').split(':').map(Number);
