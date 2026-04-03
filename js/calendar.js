@@ -133,16 +133,47 @@ async function loadZmanim(ds) {
     if (specialRows) {
       const specials = [];
       // Erev Pesach chametz times
-      // Hebcal field names (verified): sofZmanAchilatChametz, sofZmanBiurChametz
+      // Hebcal API field names: sofZmanAchilatChametz, sofZmanBiurChametz
+      // These only appear on 14 Nisan (Erev Pesach)
       if (z.sofZmanAchilatChametz) {
         specials.push({ label: '⏰ סוף זמן אכילת חמץ', time: z.sofZmanAchilatChametz });
       }
       if (z.sofZmanBiurChametz) {
         specials.push({ label: '🔥 סוף זמן ביעור חמץ', time: z.sofZmanBiurChametz });
       }
-      // Log all z fields for debugging
+
+      // Also check alternative field names (Hebcal API versions vary)
+      const altAchila = z['sofZmanAchilatChametzGRA'] || z['sofZmanAchilatChametzMGA'];
+      const altBiur   = z['sofZmanBiurChametzGRA'] || z['sofZmanBiurChametzMGA'];
+      if (!z.sofZmanAchilatChametz && altAchila) {
+        specials.push({ label: '⏰ סוף זמן אכילת חמץ', time: altAchila });
+      }
+      if (!z.sofZmanBiurChametz && altBiur) {
+        specials.push({ label: '🔥 סוף זמן ביעור חמץ', time: altBiur });
+      }
+
+      // Log all z fields for debugging chametz detection
+      console.log('[Zmanim] all fields:', Object.keys(z).join(', '));
       const chametzFields = Object.keys(z).filter(k => /chametz|biur|achila/i.test(k));
       if (chametzFields.length) console.log('[Zmanim] chametz fields:', chametzFields, chametzFields.map(k=>z[k]));
+
+      // If still no chametz times, check if this date is Erev Pesach from Hebrew date
+      // 14 Nisan = Erev Pesach → compute approximate times from sunrise
+      if (!specials.length && appState._lastHebrewDate) {
+        const hd = appState._lastHebrewDate;
+        if (hd.hm === 'Nisan' && hd.hd === 14 && z.sunrise) {
+          // Sof zman achilat chametz = end of 4th hour (GRA shaot zmaniyot)
+          // Sof zman biur chametz = end of 5th hour
+          const sunrise = new Date(z.sunrise).getTime();
+          const sunset  = z.sunset ? new Date(z.sunset).getTime() : sunrise + 12*3600000;
+          const hourLen = (sunset - sunrise) / 12;
+          const achilaTime = new Date(sunrise + hourLen * 4);
+          const biurTime   = new Date(sunrise + hourLen * 5);
+          specials.push({ label: '⏰ סוף זמן אכילת חמץ (גר"א)', time: achilaTime.toISOString() });
+          specials.push({ label: '🔥 סוף זמן ביעור חמץ (גר"א)', time: biurTime.toISOString() });
+          console.log('[Zmanim] computed chametz times from sunrise for 14 Nisan');
+        }
+      }
 
       if (specials.length) {
         specialRows.innerHTML = `<div style="margin:6px 0 2px;font-size:10px;font-weight:700;color:var(--gold);font-family:'Heebo',sans-serif;letter-spacing:.3px">ערב פסח</div>` +

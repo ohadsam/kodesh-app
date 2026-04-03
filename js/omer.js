@@ -132,8 +132,20 @@ function getOmerDayForDisplay() {
 }
 
 // ── Render omer modal ───────────────────────────────────────────────
-function showOmerNow() {
+async function showOmerNow() {
   closeSettings();
+  // Ensure Hebrew date is available
+  if (!appState?._lastHebrewDate) {
+    try {
+      const ds = formatDate(getTargetDate());
+      const data = await fetchWithDelay(`https://www.hebcal.com/converter?cfg=json&date=${ds}&g2h=1&strict=1`, 100);
+      if (data) {
+        appState._lastHebrewDate = { hm: data.hm, hd: data.hd, hy: data.hy };
+        saveState();
+      }
+    } catch(e) { console.warn('[Omer] failed to fetch Hebrew date:', e.message); }
+  }
+
   const day = getOmerDayForDisplay();
   const modal = document.getElementById('omer-modal');
   const titleEl = document.getElementById('omer-day-title');

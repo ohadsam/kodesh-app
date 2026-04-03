@@ -442,6 +442,10 @@ function _renderParagraphs(paragraphs, isAdd) {
                     `font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);` +
                     `color:${pColor};font-style:${pStyle};font-weight:${pWeight}`;
 
+  // Determine current season for filtering seasonal inserts
+  const isWinter = typeof _isWinterSeason === 'function' ? _isWinterSeason() : (new Date().getMonth()+1 >= 10 || new Date().getMonth()+1 <= 4);
+  const cal = window._siddurCal || {};
+
   return paragraphs.map(p => {
     // Seasonal insert: \uE002 label \uE003 content \uE004
     if (p.startsWith('\uE002')) {
@@ -450,6 +454,21 @@ function _renderParagraphs(paragraphs, isAdd) {
       const label   = labelEnd   > 0 ? p.slice(1, labelEnd) : '';
       const content = contentEnd > 0 ? p.slice(labelEnd + 1, contentEnd) : p.slice(labelEnd + 1);
       if (!content.trim()) return '';
+
+      // Filter by season: hide wrong-season inserts
+      const plainContent = content.replace(/<[^>]+>/g, '').replace(/[\u0591-\u05C7]/g, '');
+      if (label === 'חורף' && !isWinter) return ''; // hide winter inserts in summer
+      if (label === 'קיץ'  &&  isWinter) return ''; // hide summer inserts in winter
+      // Hide ר"ח inserts when not R"C/Moed
+      if (label === 'ר"ח' && !cal.isRoshChodesh && !cal.isCholHamoed && !cal.isYomTov) return '';
+      // Holiday-specific inserts
+      if (/פסח/.test(label) && !cal.isCholHamoed && !cal.isYomTov) return '';
+      if (/שבועות/.test(label) && !cal.isYomTov) return '';
+      if (/סוכות/.test(label) && !cal.isCholHamoed && !cal.isYomTov) return '';
+      if (/חנוכה/.test(label) && !cal.isChanuka) return '';
+      if (/פורים/.test(label) && !cal.isPurim) return '';
+      if (/שבת/.test(label) && !cal.isShabbat) return '';
+
       const labelHtml = label
         ? `<span style="display:block;font-size:9px;font-family:'Heebo',sans-serif;` +
           `color:var(--addition);font-style:normal;font-weight:700;letter-spacing:.4px;` +

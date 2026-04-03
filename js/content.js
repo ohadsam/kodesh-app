@@ -635,17 +635,65 @@ async function loadRashiForRef(torahRef) {
     let success = false;
     for (let attempt = 0; attempt < 3 && !success; attempt++) {
       try {
-        if (attempt > 0) await new Promise(r => setTimeout(r, 1500 * attempt)); // backoff on retry
+        if (attempt > 0) await new Promise(r => setTimeout(r, 2000 * attempt));
         else await new Promise(r => setTimeout(r, 300));
+
+        // Strategy 1: Try Rashi-specific endpoint (much smaller response)
+        // Sefaria: "Rashi on Genesis 1" returns just Rashi, not all commentaries
+        const rashiRef = `Rashi on ${book} ${ch}`;
+        let rashiData = null;
+        try {
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 20000); // 20s timeout
+          const rashiUrl = `https://www.sefaria.org/api/texts/${encodeURI(rashiRef)}?lang=he&commentary=0&context=0`;
+          console.log('[Rashi] trying direct:', rashiRef);
+          const rashiResp = await fetch(rashiUrl, { signal: ctrl.signal });
+          clearTimeout(timer);
+          if (rashiResp.ok) {
+            rashiData = await rashiResp.json();
+          }
+        } catch(e2) {
+          console.warn('[Rashi] direct endpoint failed for ch', ch, ':', e2.message);
+        }
+
+        if (rashiData && rashiData.he) {
+          // Direct Rashi endpoint: data.he is array of arrays (per verse)
+          const heArr = rashiData.he;
+          chapterLengths[ch] = Array.isArray(heArr) ? heArr.length : 0;
+          const chapLen = chapterLengths[ch];
+          for (let v = 0; v < chapLen; v++) {
+            const vNum = v + 1;
+            const cCh = ch;
+            if (cCh === startCh && vNum < startV) continue;
+            if (cCh === endCh   && vNum > endV)   continue;
+            const key = `${cCh}:${vNum}`;
+            let verseRashi = heArr[v];
+            if (!verseRashi) continue;
+            // heArr[v] can be array of strings or string
+            const texts = Array.isArray(verseRashi) ? verseRashi.flat().filter(Boolean) : [verseRashi];
+            const cleaned = texts.map(t => t.replace(/<(?!\/?(?:b|i|strong)\b)[^>]+>/gi,'').trim()).filter(Boolean);
+            if (cleaned.length) {
+              if (!verseMap.has(key)) verseMap.set(key, []);
+              verseMap.get(key).push(...cleaned);
+            }
+          }
+          console.log('[Rashi] ch', ch, 'direct OK, len:', chapLen, '| entries:', [...verseMap.keys()].filter(k => k.startsWith(ch+':')).length);
+          success = true;
+          continue;
+        }
+
+        // Strategy 2 fallback: commentary=1 with timeout
+        const ctrl2 = new AbortController();
+        const timer2 = setTimeout(() => ctrl2.abort(), 25000);
         const url = `https://www.sefaria.org/api/texts/${encodeURI(book + ' ' + ch)}?lang=he&commentary=1&context=0`;
-        const resp = await fetch(url);
+        const resp = await fetch(url, { signal: ctrl2.signal });
+        clearTimeout(timer2);
         if (!resp.ok) {
           console.warn('[Rashi] ch', ch, 'attempt', attempt+1, 'HTTP', resp.status);
           continue;
         }
         const data = await resp.json();
 
-        // Record real chapter length to prevent index drift
         chapterLengths[ch] = Array.isArray(data.he) ? data.he.length : 999;
         const chapLen = chapterLengths[ch];
 
@@ -655,9 +703,8 @@ async function loadRashiForRef(torahRef) {
             const vm = (c.ref||'').match(/(\d+):(\d+)/);
             if (!vm) return;
             const cCh = parseInt(vm[1]), cV = parseInt(vm[2]);
-            // Strict range check: must be exactly the chapter we fetched
-            if (cCh !== ch) return;                     // ignore commentary that bled in from other chapters
-            if (cV < 1 || cV > chapLen) return;         // ignore out-of-range verses
+            if (cCh !== ch) return;
+            if (cV < 1 || cV > chapLen) return;
             if (cCh === startCh && cV < startV) return;
             if (cCh === endCh   && cV > endV)   return;
             const key = `${cCh}:${cV}`;
