@@ -83,13 +83,17 @@ function buildOmerText(day) {
 // ── Calculate today's omer day ──────────────────────────────────────
 function getOmerDay() {
   // Pesach = 15 Nisan. Count starts 16 Nisan (day 1).
-  // Use the Hebrew date from appState if available, else compute
-  // We use the Hebcal converter result cached in appState
+  // Use the Hebrew date from appState if available
   const hDate = appState?._lastHebrewDate;
   if (!hDate) return null;
 
-  const month = hDate.hm; // "Nisan", "Iyar", "Sivan"
-  const day   = hDate.hd;
+  let month = hDate.hm; // "Nisan", "Iyar", "Sivan"
+  let day   = hDate.hd;
+
+  // IMPORTANT: Hebcal converter returns the DAYTIME Hebrew date.
+  // After sunset, the Hebrew date has already advanced.
+  // But getOmerDayForDisplay() handles the +1 advancement after tzet.
+  // So here we just compute based on the raw Hebrew date.
 
   let omerDay = null;
   if (month === 'Nisan' && day >= 16) omerDay = day - 15;
@@ -107,13 +111,23 @@ function getOmerDayForDisplay() {
   const now = new Date();
 
   let day = getOmerDay();
-  if (!day) return null;
 
   // After tzet → advance to next day's count
   if (tzet && now >= tzet) {
+    if (day === null) {
+      // We might be on Nisan 15 evening → first night of omer = day 1
+      const hDate = appState?._lastHebrewDate;
+      if (hDate && hDate.hm === 'Nisan' && hDate.hd === 15) {
+        return 1;
+      }
+      return null;
+    }
     day = day + 1;
     if (day > 49) return null;
   }
+
+  // During the day: if we're in the omer period, show today's count
+  // (counted previous evening, displayed during the day)
   return day;
 }
 

@@ -298,10 +298,15 @@ async function loadSpecificParasha(ref) {
       );
       if (matchEvent?.leyning) {
         aliyot = ['1','2','3','4','5','6','7'].map(k => matchEvent.leyning[k]).filter(Boolean).map(r => r.trim());
-        // Load haftara in background
+        // Load haftara from Hebcal
         if (matchEvent.leyning.haftara) _kickoffHaftara(matchEvent.leyning.haftara);
       }
     } catch(e) { console.warn('[Parasha] Hebcal fallback failed:', e.message); }
+  }
+
+  // Always try to load haftara (static table fallback if Hebcal didn't provide one)
+  if (!_haftaraRef && HAFTARA_REFS[ref]) {
+    _kickoffHaftara(HAFTARA_REFS[ref]);
   }
 
   currentParashaRef = ref;
@@ -414,7 +419,11 @@ async function loadParasha() {
 
     // Start haftara loading in background
     haftaraLoaded = false; haftaraVerses = []; _haftaraRef = null;
-    if (leyning.haftara) _kickoffHaftara(leyning.haftara);
+    if (leyning.haftara) {
+      _kickoffHaftara(leyning.haftara);
+    } else if (HAFTARA_REFS[matchP.ref]) {
+      _kickoffHaftara(HAFTARA_REFS[matchP.ref]);
+    }
 
     _buildAliyaTabs(tabsEl, aliyot);
 
@@ -436,6 +445,65 @@ let _currentAliyaRef = null;  // tracks which ref Rashi/Onkelos are loading for
 // ── Haftara loading ─────────────────────────────────────────────────────────
 // haftaraRef from Hebcal is like "I Kings 18:46-19:21"
 // Sefaria ref uses same format, so we can fetch directly
+
+// Static haftara refs for all 54 parshiot (Ashkenaz minhag, Israel)
+const HAFTARA_REFS = {
+  'Genesis 1:1-6:8':       'Isaiah 42:5-43:10',
+  'Genesis 6:9-11:32':     'Isaiah 54:1-55:5',
+  'Genesis 12:1-17:27':    'Isaiah 40:27-41:16',
+  'Genesis 18:1-22:24':    'II Kings 4:1-4:37',
+  'Genesis 23:1-25:18':    'I Kings 1:1-1:31',
+  'Genesis 25:19-28:9':    'Malachi 1:1-2:7',
+  'Genesis 28:10-32:3':    'Hosea 12:13-14:10',
+  'Genesis 32:4-36:43':    'Obadiah 1:1-1:21',
+  'Genesis 37:1-40:23':    'Amos 2:6-3:8',
+  'Genesis 41:1-44:17':    'I Kings 3:15-4:1',
+  'Genesis 44:18-47:27':   'Ezekiel 37:15-37:28',
+  'Genesis 47:28-50:26':   'I Kings 2:1-2:12',
+  'Exodus 1:1-6:1':        'Isaiah 27:6-28:13',
+  'Exodus 6:2-9:35':       'Ezekiel 28:25-29:21',
+  'Exodus 10:1-13:16':     'Jeremiah 46:13-46:28',
+  'Exodus 13:17-17:16':    'Judges 4:4-5:31',
+  'Exodus 18:1-20:23':     'Isaiah 6:1-7:6',
+  'Exodus 21:1-24:18':     'Jeremiah 34:8-34:22',
+  'Exodus 25:1-27:19':     'I Kings 5:26-6:13',
+  'Exodus 27:20-30:10':    'Ezekiel 43:10-43:27',
+  'Exodus 30:11-34:35':    'I Kings 18:1-18:39',
+  'Exodus 35:1-38:20':     'I Kings 7:40-7:50',
+  'Exodus 38:21-40:38':    'I Kings 7:51-8:21',
+  'Leviticus 1:1-5:26':    'Isaiah 43:21-44:23',
+  'Leviticus 6:1-8:36':    'Jeremiah 7:21-8:3',
+  'Leviticus 9:1-11:47':   'II Samuel 6:1-7:17',
+  'Leviticus 12:1-13:59':  'II Kings 4:42-5:19',
+  'Leviticus 14:1-15:33':  'II Kings 7:3-7:20',
+  'Leviticus 16:1-18:30':  'Ezekiel 22:1-22:19',
+  'Leviticus 19:1-20:27':  'Amos 9:7-9:15',
+  'Leviticus 21:1-24:23':  'Ezekiel 44:15-44:31',
+  'Leviticus 25:1-26:2':   'Jeremiah 32:6-32:27',
+  'Leviticus 26:3-27:34':  'Jeremiah 16:19-17:14',
+  'Numbers 1:1-4:20':      'Hosea 2:1-2:22',
+  'Numbers 4:21-7:89':     'Judges 13:2-13:25',
+  'Numbers 8:1-12:16':     'Zechariah 2:14-4:7',
+  'Numbers 13:1-15:41':    'Joshua 2:1-2:24',
+  'Numbers 16:1-18:32':    'I Samuel 11:14-12:22',
+  'Numbers 19:1-22:1':     'Judges 11:1-11:33',
+  'Numbers 22:2-25:9':     'Micah 5:6-6:8',
+  'Numbers 25:10-30:1':    'I Kings 18:46-19:21',
+  'Numbers 30:2-32:42':    'Jeremiah 1:1-2:3',
+  'Numbers 33:1-36:13':    'Jeremiah 2:4-2:28',
+  'Deuteronomy 1:1-3:22':  'Isaiah 1:1-1:27',
+  'Deuteronomy 3:23-7:11': 'Isaiah 40:1-40:26',
+  'Deuteronomy 7:12-11:25':'Isaiah 49:14-51:3',
+  'Deuteronomy 11:26-16:17':'Isaiah 54:11-55:5',
+  'Deuteronomy 16:18-21:9':'Isaiah 51:12-52:12',
+  'Deuteronomy 21:10-25:19':'Isaiah 54:1-54:10',
+  'Deuteronomy 26:1-29:8': 'Isaiah 60:1-60:22',
+  'Deuteronomy 29:9-30:20':'Isaiah 61:10-63:9',
+  'Deuteronomy 31:1-31:30':'Hosea 14:2-14:10',
+  'Deuteronomy 32:1-32:52':'II Samuel 22:1-22:51',
+  'Deuteronomy 33:1-34:12':'Joshua 1:1-1:18',
+};
+
 async function _kickoffHaftara(haftaraRef) {
   if (!haftaraRef) return;
   // Normalize: Hebcal may return "I Kings 18:46 - 19:21" with spaces around dash
@@ -451,12 +519,41 @@ async function _kickoffHaftara(haftaraRef) {
       haftaraVerses = flat;
       console.log('[Haftara] ✅', flat.length, 'verses');
     } else {
-      // Sefaria might not know the ref format – try fetching without verse range
-      const bookOnly = normalRef.replace(/:\d+-.*$/, '');
-      console.warn('[Haftara] empty, trying book-only:', bookOnly);
-      const data2 = await sefariaText(bookOnly, 200);
-      haftaraVerses = heFlat(data2);
-      if (haftaraVerses.length) console.log('[Haftara] ✅ book fallback', haftaraVerses.length);
+      // Try splitting multi-chapter refs: "I Kings 18:46-19:21" → fetch each chapter
+      const multiMatch = normalRef.match(/^(.+?)\s+(\d+):(\d+)-(\d+):(\d+)$/);
+      if (multiMatch) {
+        const [, book, ch1, v1, ch2, v2] = multiMatch;
+        console.log('[Haftara] trying split chapters:', book, ch1, v1, ch2, v2);
+        const allVerses = [];
+        for (let ch = parseInt(ch1); ch <= parseInt(ch2); ch++) {
+          const startV = ch === parseInt(ch1) ? parseInt(v1) : 1;
+          const endV   = ch === parseInt(ch2) ? parseInt(v2) : 999;
+          const chRef  = `${book} ${ch}`;
+          try {
+            const chData = await sefariaText(chRef, 100);
+            const chFlat = heFlat(chData);
+            // Slice to requested verses (1-indexed)
+            const sliced = chFlat.slice(startV - 1, endV === 999 ? chFlat.length : endV);
+            allVerses.push(...sliced);
+          } catch(e2) { console.warn('[Haftara] chapter fetch failed:', chRef, e2.message); }
+        }
+        if (allVerses.length) {
+          haftaraVerses = allVerses;
+          console.log('[Haftara] ✅ multi-chapter fallback:', allVerses.length, 'verses');
+        }
+      }
+      if (!haftaraVerses.length) {
+        // Last resort: try the first chapter ref only
+        const bookOnly = normalRef.replace(/\s+\d+:.*$/, '');
+        const chMatch = normalRef.match(/(\d+):/);
+        if (chMatch) {
+          const singleChRef = `${bookOnly} ${chMatch[1]}`;
+          console.warn('[Haftara] trying single chapter:', singleChRef);
+          const data2 = await sefariaText(singleChRef, 200);
+          haftaraVerses = heFlat(data2);
+          if (haftaraVerses.length) console.log('[Haftara] ✅ single chapter fallback:', haftaraVerses.length);
+        }
+      }
     }
   } catch(e) {
     console.warn('[Haftara] failed:', e.message);

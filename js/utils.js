@@ -92,7 +92,7 @@ let currentAliya = 'all';
 let rashiLoaded = false;
 let rashiVisible = false;
 
-const APP_VERSION  = '5.13';
+const APP_VERSION  = '5.14';
 const STORAGE_KEY  = 'kodesh_app_v1';
 const SIDDUR_CACHE_KEY = 'siddur_cache_v';
 
@@ -263,7 +263,8 @@ function _seasonalLabel(text) {
 }
 
 function buildParagraphs(flat) {
-  const stripD = s => s.replace(/[\u0591-\u05C7]/g, '');
+  // stripD removes cantillation but preserves sof-pasuk as ':'
+  const stripD = s => s.replace(/\u05C3/g, ':').replace(/[\u0591-\u05C7]/g, '');
 
   // Break paragraph BEFORE these patterns
   const BREAK_BEFORE = [
@@ -275,24 +276,80 @@ function buildParagraphs(flat) {
     /^והיה אם/,
     /^ויאמר/,
     /^אני מאמין/,
-    // Amida bracha titles embedded in text
+    // Amida bracha openers
     /^עבודה רצה/,
     /^מודים אנחנו/,
     /^שים שלום/,
     /^אלהינו ואלהי אבותינו/,
     /^יעלה ויבוא/,
-    // Psalm structure
+    /^על הנסים/,
+    /^רצה והחליצנו/,
+    /^אתה חונן/,
+    /^השיבנו/,
+    /^סלח לנו/,
+    /^ראה נא/,
+    /^רפאנו/,
+    /^ברך עלינו/,
+    /^תקע בשופר/,
+    /^השיבה שופטינו/,
+    /^למשומדים/,
+    /^על הצדיקים/,
+    /^ולירושלים/,
+    /^את צמח/,
+    /^שמע קולנו/,
+    // Psalm / poetry structure
     /^הללויה/,
     /^הללו/,
     /^למנצח/,
     /^מזמור/,
+    /^שיר המעלות/,
     /^שיר/,
+    /^אשרי יושבי/,
+    /^אשרי העם/,
+    /^אשרי האיש/,
+    // Kaddish / kedusha / common prayers
+    /^יתגדל/,
+    /^יהא שמה/,
+    /^יתברך/,
+    /^עלינו לשבח/,
+    /^על כן נקוה/,
+    /^ואנחנו כורעים/,
+    /^קדוש קדוש/,
+    /^נקדישך/,
+    /^כתר יתנו/,
+    // Tachanun / selichot
+    /^אבינו מלכנו/,
+    /^רחום וחנון/,
+    /^שומר ישראל/,
+    /^ויעבר/,
+    /^אל מלך יושב/,
+    /^אל ארך אפים/,
+    // ובא לציון / אשרי
+    /^ובא לציון/,
+    /^ואני זאת בריתי/,
+    /^ואתה קדוש/,
+    // Common section starters
+    /^ברוך שאמר/,
+    /^ישתבח/,
+    /^יוצר אור/,
+    /^אהבת עולם/,
+    /^אהבה רבה/,
+    /^אמת ויציב/,
+    /^אמת ואמונה/,
+    /^השכיבנו/,
+    /^ברכו את/,
+    /^וידבר/,
+    /^צדקתך/,
   ];
 
-  const MAX_WORDS_PER_PARA = 80; // flush if current buffer exceeds this
+  const MAX_WORDS_PER_PARA = 45; // flush if current buffer exceeds this
 
   // Flush AFTER this pattern (marks end of a bracha)
   const BRACHA_END = /ברוך אתה י[יה]/;
+
+  // Sof-pasuk: verse ending with ':' (Hebrew sof-pasuk mark or colon)
+  // This is the natural verse boundary in Tanakh text
+  const SOF_PASUK = /[:]\s*$/;
 
   const paragraphs = [];
   let current = [];
@@ -304,29 +361,27 @@ function buildParagraphs(flat) {
   };
 
   for (let v of flat) {
+    // Convert sof-pasuk to colon BEFORE other processing
+    v = v.replace(/\u05C3/g, ':');
     // Normalize whitespace but preserve \uE001 markers
     v = v.replace(/\n/g, ' ').replace(/ +/g, ' ').trim();
 
     // ── Handle seasonal markers ────────────────────────────────────────
     if (v.includes('\uE001')) {
-      // Split the verse into text segments and seasonal segments
       const segs = v.split('\uE001');
-      // segs: [text, seasonal, text, seasonal, text, ...]
-      // odd indices = seasonal content, even indices = regular text
       segs.forEach((seg, idx) => {
         seg = seg.trim();
         if (!seg) return;
         if (idx % 2 === 1) {
-          // Seasonal segment: flush, then add as its own paragraph
           flush();
           const label = _seasonalLabel(seg);
           paragraphs.push('\uE002' + label + '\uE003' + seg + '\uE004');
         } else {
-          // Regular text segment
           const plain = stripD(seg.replace(/<[^>]+>/g, ''));
           if (BREAK_BEFORE.some(r => r.test(plain))) flush();
           current.push(seg);
           if (BRACHA_END.test(plain)) flush();
+          else if (SOF_PASUK.test(plain)) flush();
         }
       });
       continue;
@@ -343,10 +398,18 @@ function buildParagraphs(flat) {
 
     if (BREAK_BEFORE.some(r => r.test(plain))) flush();
     current.push(v);
-    // Flush if buffer is getting too long (prevents 500-word single paragraphs)
-    const currentWordCount = current.join(' ').replace(/<[^>]+>/g,'').split(/\s+/).filter(Boolean).length;
-    if (currentWordCount >= MAX_WORDS_PER_PARA) flush();
-    if (BRACHA_END.test(plain)) flush();
+
+    // Flush priority: bracha end > sof-pasuk > word count
+    if (BRACHA_END.test(plain)) {
+      flush();
+    } else if (SOF_PASUK.test(plain)) {
+      // Sof-pasuk (end of biblical verse) = natural paragraph break
+      flush();
+    } else {
+      // Flush if buffer is getting too long
+      const currentWordCount = current.join(' ').replace(/<[^>]+>/g,'').split(/\s+/).filter(Boolean).length;
+      if (currentWordCount >= MAX_WORDS_PER_PARA) flush();
+    }
   }
   flush();
   return paragraphs;
