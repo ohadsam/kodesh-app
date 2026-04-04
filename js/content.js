@@ -657,27 +657,35 @@ async function loadRashiForRef(torahRef) {
         }
 
         if (rashiData && rashiData.he) {
-          // Direct Rashi endpoint: data.he is array of arrays (per verse)
+          // Direct Rashi endpoint: data.he[verseIdx] = array of Rashi comments for that verse
+          // NOTE: We also need the Torah chapter length for correct verse mapping later.
+          // Fetch Torah chapter length separately if not already known.
           const heArr = rashiData.he;
+          // For "Rashi on Book Ch", heArr.length = number of verses in Torah chapter
+          // (Sefaria pads with empty arrays for verses without Rashi)
           chapterLengths[ch] = Array.isArray(heArr) ? heArr.length : 0;
           const chapLen = chapterLengths[ch];
+          let chEntries = 0;
           for (let v = 0; v < chapLen; v++) {
             const vNum = v + 1;
-            const cCh = ch;
-            if (cCh === startCh && vNum < startV) continue;
-            if (cCh === endCh   && vNum > endV)   continue;
-            const key = `${cCh}:${vNum}`;
+            if (ch === startCh && vNum < startV) continue;
+            if (ch === endCh   && vNum > endV)   continue;
+            const key = `${ch}:${vNum}`;
             let verseRashi = heArr[v];
             if (!verseRashi) continue;
-            // heArr[v] can be array of strings or string
-            const texts = Array.isArray(verseRashi) ? verseRashi.flat().filter(Boolean) : [verseRashi];
-            const cleaned = texts.map(t => t.replace(/<(?!\/?(?:b|i|strong)\b)[^>]+>/gi,'').trim()).filter(Boolean);
+            // heArr[v] can be: array of HTML strings, nested array, or single string
+            const rawTexts = Array.isArray(verseRashi) ? verseRashi.flat(Infinity).filter(Boolean) : [verseRashi];
+            if (!rawTexts.length) continue;
+            const cleaned = rawTexts.map(t => 
+              typeof t === 'string' ? t.replace(/<(?!\/?(?:b|i|strong)\b)[^>]+>/gi,'').trim() : ''
+            ).filter(Boolean);
             if (cleaned.length) {
               if (!verseMap.has(key)) verseMap.set(key, []);
-              verseMap.get(key).push(...cleaned);
+              verseMap.get(key).push(cleaned.join('<br><br>'));
+              chEntries++;
             }
           }
-          console.log('[Rashi] ch', ch, 'direct OK, len:', chapLen, '| entries:', [...verseMap.keys()].filter(k => k.startsWith(ch+':')).length);
+          console.log('[Rashi] ch', ch, 'direct OK, chapLen:', chapLen, '| entries:', chEntries, '| total:', verseMap.size);
           success = true;
           continue;
         }
@@ -731,15 +739,18 @@ async function loadRashiForRef(torahRef) {
   for (let ch = startCh; ch <= endCh; ch++) {
     const firstV   = (ch === startCh) ? startV : 1;
     const actualLast = (ch === endCh)
-      ? Math.min(endV, chapterLengths[ch] || 999)
+      ? Math.min(endV, chapterLengths[ch] || endV)
       : (chapterLengths[ch] || 999);
     for (let v = firstV; v <= actualLast; v++) {
       if (idx >= parashaVerses.length) break;
       const key = `${ch}:${v}`;
-      if (verseMap.has(key)) rashiVerses[idx] = verseMap.get(key).join('<br><br>');
+      if (verseMap.has(key)) {
+        rashiVerses[idx] = verseMap.get(key).join('<br><br>');
+      }
       idx++;
     }
   }
+  console.log('[Rashi] mapping done: idx reached', idx, '| parashaVerses:', parashaVerses.length, '| chapterLengths:', JSON.stringify(chapterLengths));
 
   rashiLoaded    = true;
   _rashiLoading  = false;
@@ -908,10 +919,15 @@ async function loadIgeret() {
 // ═══════════════════════════════════════════
 // DAF YOMI (Babylonian Talmud)
 // ═══════════════════════════════════════════
+let _dafRef = null;
+let _dafView = 'text'; // 'text' | 'rashi' | 'steinsaltz'
+let _dafFlat = [];
+
 async function loadDafYomi() {
   const el     = document.getElementById('daf-content');
   const subEl  = document.getElementById('daf-subtitle');
   el.className = 'content-text loading'; el.textContent = 'טוען דף יומי...';
+  _dafView = 'text';
   try {
     console.log('[DafYomi] fetching calendar...');
     const cal  = await fetchWithDelay('https://www.sefaria.org/api/calendars?diaspora=0');
@@ -920,31 +936,91 @@ async function loadDafYomi() {
       (i.title?.he || '').includes('דף')
     );
     if (!item) throw new Error('לא נמצא דף יומי בלוח');
+    _dafRef = item.ref;
     console.log('[DafYomi] ref:', item.ref, 'he:', item.heRef);
     subEl.textContent = item.heRef || item.ref;
 
     const data = await sefariaText(item.ref, 400);
-    const flat = heFlat(data);
-    if (!flat.length) throw new Error('אין טקסט עברי');
-    el.className = 'content-text';
-    el.innerHTML = flat.map((v,i) =>
-      `<div style="margin-bottom:8px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}</div>`
-    ).join('');
+    _dafFlat = heFlat(data);
+    if (!_dafFlat.length) throw new Error('אין טקסט עברי');
+
+    // Add commentary buttons
+    _renderDafButtons();
+    _renderDafContent();
     updateDoneButton('daf', item.ref);
-    console.log(`[DafYomi] OK – ${flat.length} sections`);
+    console.log(`[DafYomi] OK – ${_dafFlat.length} sections`);
   } catch(e) {
     console.error('[DafYomi] error:', e);
     el.textContent = 'שגיאה בטעינת הדף: ' + e.message;
   }
 }
 
+function _renderDafButtons() {
+  const btnWrap = document.getElementById('daf-view-buttons');
+  if (!btnWrap) return;
+  btnWrap.innerHTML = `
+    <div class="aliya-tab ${_dafView==='text'?'active':''}" onclick="switchDafView('text')">📖 גמרא</div>
+    <div class="aliya-tab ${_dafView==='rashi'?'active':''}" onclick="switchDafView('rashi')">📝 רש"י</div>
+    <div class="aliya-tab ${_dafView==='steinsaltz'?'active':''}" onclick="switchDafView('steinsaltz')">📚 שטיינזלץ</div>
+  `;
+}
+
+async function switchDafView(view) {
+  _dafView = view;
+  _renderDafButtons();
+  const el = document.getElementById('daf-content');
+  if (view === 'text') { _renderDafContent(); return; }
+
+  if (!_dafRef) return;
+  el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px">⏳ טוען פירוש...</div>';
+
+  try {
+    let commentaryRef;
+    if (view === 'rashi') {
+      commentaryRef = `Rashi on ${_dafRef}`;
+    } else {
+      commentaryRef = `Steinsaltz on ${_dafRef}`;
+    }
+    console.log(`[DafYomi] loading commentary: ${commentaryRef}`);
+    const data = await sefariaText(commentaryRef, 300);
+    const flat = heFlat(data).filter(Boolean);
+    if (!flat.length) throw new Error('אין פירוש זמין');
+
+    el.className = 'content-text';
+    const label = view === 'rashi' ? 'רש"י' : 'שטיינזלץ';
+    el.innerHTML = flat.map((v,i) =>
+      `<div style="margin-bottom:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04)">
+        <span style="color:var(--gold-dim);font-size:11px">${i+1} </span>
+        <span style="line-height:1.85">${v}</span>
+      </div>`
+    ).join('');
+    console.log(`[DafYomi] ${label} loaded: ${flat.length} entries`);
+  } catch(e) {
+    console.warn('[DafYomi] commentary error:', e.message);
+    el.innerHTML = `<div style="color:var(--muted);text-align:center;padding:20px">⚠️ ${e.message}<br><small>ייתכן שאין ${view === 'rashi' ? 'רש"י' : 'שטיינזלץ'} לדף זה בספריא</small></div>`;
+  }
+}
+
+function _renderDafContent() {
+  const el = document.getElementById('daf-content');
+  el.className = 'content-text';
+  el.innerHTML = _dafFlat.map((v,i) =>
+    `<div style="margin-bottom:8px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}</div>`
+  ).join('');
+}
+
 // ═══════════════════════════════════════════
 // MISHNA YOMI
 // ═══════════════════════════════════════════
+let _mishnaRef = null;
+let _mishnaView = 'text'; // 'text' | 'bartenura' | 'steinsaltz'
+let _mishnaFlat = [];
+
 async function loadMishnaYomi() {
   const el    = document.getElementById('mishna-content');
   const subEl = document.getElementById('mishna-subtitle');
   el.className = 'content-text loading'; el.textContent = 'טוען משנה יומי...';
+  _mishnaView = 'text';
   try {
     console.log('[MishnaYomi] fetching calendar...');
     const cal  = await fetchWithDelay('https://www.sefaria.org/api/calendars?diaspora=0');
@@ -954,22 +1030,76 @@ async function loadMishnaYomi() {
       (i.title?.he || '').includes('משנה יומי')
     );
     if (!item) throw new Error('לא נמצאה משנה יומי בלוח');
+    _mishnaRef = item.ref;
     console.log('[MishnaYomi] ref:', item.ref, 'he:', item.heRef);
     subEl.textContent = item.heRef || item.ref;
 
     const data = await sefariaText(item.ref, 400);
-    const flat = heFlat(data);
-    if (!flat.length) throw new Error('אין טקסט עברי');
-    el.className = 'content-text';
-    el.innerHTML = flat.map((v,i) =>
-      `<div style="margin-bottom:8px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}</div>`
-    ).join('');
+    _mishnaFlat = heFlat(data);
+    if (!_mishnaFlat.length) throw new Error('אין טקסט עברי');
+
+    _renderMishnaButtons();
+    _renderMishnaContent();
     updateDoneButton('mishna', item.ref);
-    console.log(`[MishnaYomi] OK – ${flat.length} mishnayot`);
+    console.log(`[MishnaYomi] OK – ${_mishnaFlat.length} mishnayot`);
   } catch(e) {
     console.error('[MishnaYomi] error:', e);
     el.textContent = 'שגיאה בטעינה: ' + e.message;
   }
+}
+
+function _renderMishnaButtons() {
+  const btnWrap = document.getElementById('mishna-view-buttons');
+  if (!btnWrap) return;
+  btnWrap.innerHTML = `
+    <div class="aliya-tab ${_mishnaView==='text'?'active':''}" onclick="switchMishnaView('text')">📖 משנה</div>
+    <div class="aliya-tab ${_mishnaView==='bartenura'?'active':''}" onclick="switchMishnaView('bartenura')">📝 ברטנורא</div>
+    <div class="aliya-tab ${_mishnaView==='steinsaltz'?'active':''}" onclick="switchMishnaView('steinsaltz')">📚 שטיינזלץ</div>
+  `;
+}
+
+async function switchMishnaView(view) {
+  _mishnaView = view;
+  _renderMishnaButtons();
+  const el = document.getElementById('mishna-content');
+  if (view === 'text') { _renderMishnaContent(); return; }
+
+  if (!_mishnaRef) return;
+  el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px">⏳ טוען פירוש...</div>';
+
+  try {
+    let commentaryRef;
+    if (view === 'bartenura') {
+      commentaryRef = `Bartenura on ${_mishnaRef}`;
+    } else {
+      commentaryRef = `Steinsaltz on ${_mishnaRef}`;
+    }
+    console.log(`[MishnaYomi] loading commentary: ${commentaryRef}`);
+    const data = await sefariaText(commentaryRef, 300);
+    const flat = heFlat(data).filter(Boolean);
+    if (!flat.length) throw new Error('אין פירוש זמין');
+
+    el.className = 'content-text';
+    const label = view === 'bartenura' ? 'ברטנורא' : 'שטיינזלץ';
+    el.innerHTML = flat.map((v,i) =>
+      `<div style="margin-bottom:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04)">
+        <span style="color:var(--gold-dim);font-size:11px">${i+1} </span>
+        <span style="line-height:1.85">${v}</span>
+      </div>`
+    ).join('');
+    console.log(`[MishnaYomi] ${label} loaded: ${flat.length} entries`);
+  } catch(e) {
+    console.warn('[MishnaYomi] commentary error:', e.message);
+    el.innerHTML = `<div style="color:var(--muted);text-align:center;padding:20px">⚠️ ${e.message}<br><small>ייתכן שאין ${view === 'bartenura' ? 'ברטנורא' : 'שטיינזלץ'} למשנה זו בספריא</small></div>`;
+  }
+}
+
+function _renderMishnaContent() {
+  const el = document.getElementById('mishna-content');
+  el.className = 'content-text';
+  el.innerHTML = _mishnaFlat.map((v,i) =>
+    `<div style="margin-bottom:8px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}</div>`
+  ).join('');
 }
 
 // ═══════════════════════════════════════════

@@ -94,7 +94,68 @@ function updateAllDates() {
   document.getElementById('hal-date').textContent = display;
   document.getElementById('lash-date').textContent = display;
   document.getElementById('topbar-greg').textContent = currentOffset === 0 ? 'היום' : display;
+  // Update drawer dates
+  const drawerGreg = document.getElementById('drawer-greg');
+  const drawerHeb  = document.getElementById('drawer-heb');
+  if (drawerGreg) drawerGreg.textContent = display;
+  // Update offset badge
+  const badge = document.getElementById('topbar-offset-badge');
+  if (badge) {
+    if (currentOffset !== 0) {
+      badge.textContent = currentOffset > 0 ? `+${currentOffset}` : String(currentOffset);
+      badge.style.display = 'block';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+  // Drawer today button
+  const dtBtn = document.getElementById('drawer-today-btn');
+  if (dtBtn) dtBtn.classList.toggle('hidden', currentOffset === 0);
+
   loadHebrewDate();
+}
+
+function toggleDateNav() {
+  const drawer = document.getElementById('date-nav-drawer');
+  if (!drawer) return;
+  const isOpen = drawer.style.display !== 'none';
+  drawer.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) {
+    // Update drawer dates
+    const d = getTargetDate();
+    const display = formatDisplayDate(d);
+    const drawerGreg = document.getElementById('drawer-greg');
+    const drawerHeb  = document.getElementById('drawer-heb');
+    if (drawerGreg) drawerGreg.textContent = display;
+    if (drawerHeb)  drawerHeb.textContent = document.getElementById('topbar-heb')?.textContent || '';
+  }
+}
+
+// ═══════════════════════════════════════════
+// TAB SCROLL SYNC
+// ═══════════════════════════════════════════
+function initTabScrollSync() {
+  const topTabs = document.getElementById('tabs');
+  const bottomNav = document.getElementById('bottom-nav');
+  if (!topTabs || !bottomNav) return;
+
+  let syncing = false;
+  topTabs.addEventListener('scroll', () => {
+    if (syncing) return;
+    syncing = true;
+    // Sync bottom nav scroll ratio
+    const ratio = topTabs.scrollLeft / (topTabs.scrollWidth - topTabs.clientWidth || 1);
+    bottomNav.scrollLeft = ratio * (bottomNav.scrollWidth - bottomNav.clientWidth);
+    requestAnimationFrame(() => syncing = false);
+  }, { passive: true });
+
+  bottomNav.addEventListener('scroll', () => {
+    if (syncing) return;
+    syncing = true;
+    const ratio = bottomNav.scrollLeft / (bottomNav.scrollWidth - bottomNav.clientWidth || 1);
+    topTabs.scrollLeft = ratio * (topTabs.scrollWidth - topTabs.clientWidth);
+    requestAnimationFrame(() => syncing = false);
+  }, { passive: true });
 }
 
 async function loadHebrewDate() {
@@ -109,6 +170,8 @@ async function loadHebrewDate() {
     document.getElementById('topbar-heb').textContent = hd;
     document.getElementById('hal-heb').textContent = hd;
     document.getElementById('lash-heb').textContent = hd;
+    const drawerHeb = document.getElementById('drawer-heb');
+    if (drawerHeb) drawerHeb.textContent = hd;
     // Cache for omer calculation
     appState._lastHebrewDate = { hm: data.hm, hd: data.hd, hy: data.hy };
     saveState();

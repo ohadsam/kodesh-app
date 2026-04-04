@@ -254,6 +254,14 @@ function getSiddurSections(nusach, prayer) {
     yaaleh,
     { label:'על הנסים – חנוכה ✨', ref:null, staticText:AL_HANISSIM_CHANUKA, isAddition:true, condition:'isChanuka' },
     { label:'על הנסים – פורים ✨', ref:null, staticText:AL_HANISSIM_PURIM,   isAddition:true, condition:'isPurim' },
+    { label:'ספירת העומר ✨',     ref:null, isAddition:true, condition:'isOmer',
+      staticText: (() => {
+        // Dynamic omer text based on current day
+        const day = typeof getOmerDayForDisplay === 'function' ? getOmerDayForDisplay() : null;
+        if (!day) return 'ספירת העומר – יש לספור לאחר צאת הכוכבים';
+        const sections = typeof buildOmerText === 'function' ? buildOmerText(day) : [];
+        return sections.map(s => s.text || '').filter(Boolean).join('\n\n');
+      })() },
     { label:'עלינו',
       ref: r('Maariv,_Aleinu', null, 'Weekday_Arvit,_Alenu') },
     { label:'קדיש יתום',          ref:null, staticText:KADDISH_YATOM },
@@ -309,9 +317,9 @@ const SIDDUR_CONDITIONS = {
   noTachanun:          () => (window._siddurCal||{}).skipTachanun,
   isRoshChodesh:       () => (window._siddurCal||{}).isRoshChodesh,
   isCholHamoed:        () => (window._siddurCal||{}).isCholHamoed,
-  isRoshChodeshOrMoed: () => (window._siddurCal||{}).isRoshChodesh || (window._siddurCal||{}).isCholHamoed,
-  isHallelDay:         () => (window._siddurCal||{}).isRoshChodesh || (window._siddurCal||{}).isChanuka || (window._siddurCal||{}).isCholHamoed,
-  isTorahReadingDay:   () => (window._siddurCal||{}).isTorahReading || (window._siddurCal||{}).isRoshChodesh,
+  isRoshChodeshOrMoed: () => (window._siddurCal||{}).isRoshChodesh || (window._siddurCal||{}).isCholHamoed || (window._siddurCal||{}).isYomTov,
+  isHallelDay:         () => (window._siddurCal||{}).isRoshChodesh || (window._siddurCal||{}).isChanuka || (window._siddurCal||{}).isCholHamoed || (window._siddurCal||{}).isYomTov,
+  isTorahReadingDay:   () => (window._siddurCal||{}).isTorahReading || (window._siddurCal||{}).isRoshChodesh || (window._siddurCal||{}).isCholHamoed || (window._siddurCal||{}).isYomTov,
   isAvinuMalkeinu:     () => (window._siddurCal||{}).isAvinuMalkeinu,
   isOmer:              () => (window._siddurCal||{}).isOmer,
   isChanuka:           () => (window._siddurCal||{}).isChanuka,
@@ -349,10 +357,33 @@ function shouldShowSection(s) {
   return s.conditionType === 'skip' ? !result : !!result;
 }
 
-function initSiddur() {
+async function initSiddur() {
   const dbg = document.getElementById('siddur-debug');
   if (dbg) dbg.textContent = '🔄 initSiddur נקרא... ' + new Date().toLocaleTimeString();
   console.log('[Siddur] initSiddur called, siddurLoading=', siddurLoading);
+
+  // Ensure we have today's events and Hebrew date for calendar detection
+  const ds = formatDate(getTargetDate());
+  if (!appState._todayEventTitles || !appState._todayEventTitles.length || appState._todayEventsDate !== ds) {
+    try {
+      console.log('[Siddur] fetching today events for', ds);
+      const data = await fetchWithDelay(
+        `https://www.hebcal.com/hebcal?v=1&cfg=json&maj=on&min=on&nx=on&mf=on&ss=on&start=${ds}&end=${ds}&c=off&i=1`, 100
+      );
+      const items = (data?.items || []).filter(e => e.category !== 'candles' && e.category !== 'havdalah');
+      appState._todayEventTitles = items.map(i => i.title || i.hebrew || '');
+      appState._todayEventsDate = ds;
+      saveState();
+      console.log('[Siddur] fetched', items.length, 'events:', appState._todayEventTitles.join(', '));
+    } catch(e) { console.warn('[Siddur] events fetch failed:', e.message); }
+  }
+  if (!appState._lastHebrewDate) {
+    try {
+      const conv = await fetchWithDelay(`https://www.hebcal.com/converter?cfg=json&date=${ds}&g2h=1&strict=1`, 100);
+      if (conv) { appState._lastHebrewDate = { hm: conv.hm, hd: conv.hd, hy: conv.hy }; saveState(); }
+    } catch(e) {}
+  }
+
   // Calendar context for additions
   const todayEvents = appState._todayEventTitles || [];
   const now = new Date();

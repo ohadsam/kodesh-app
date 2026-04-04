@@ -14,6 +14,9 @@ async function init() {
     showTab('calendar');
     console.log('[init] showTab done');
 
+    // Initialize tab scroll sync
+    if (typeof initTabScrollSync === 'function') initTabScrollSync();
+
     // Register service worker
     if ('serviceWorker' in navigator) {
       try {

@@ -74,7 +74,7 @@ async function loadCalendar() {
     document.getElementById('zmanim-location').textContent = `📍 ${c.name}`;
   }
 
-  loadHebrewDate();
+  await loadHebrewDate();
   loadZmanim(ds);
   loadEvents(ds);
 }
@@ -158,20 +158,26 @@ async function loadZmanim(ds) {
       if (chametzFields.length) console.log('[Zmanim] chametz fields:', chametzFields, chametzFields.map(k=>z[k]));
 
       // If still no chametz times, check if this date is Erev Pesach from Hebrew date
-      // 14 Nisan = Erev Pesach → compute approximate times from sunrise
+      // 14 Nisan = Erev Pesach → compute times from Hebcal zmanim
       if (!specials.length && appState._lastHebrewDate) {
         const hd = appState._lastHebrewDate;
-        if (hd.hm === 'Nisan' && hd.hd === 14 && z.sunrise) {
-          // Sof zman achilat chametz = end of 4th hour (GRA shaot zmaniyot)
-          // Sof zman biur chametz = end of 5th hour
-          const sunrise = new Date(z.sunrise).getTime();
-          const sunset  = z.sunset ? new Date(z.sunset).getTime() : sunrise + 12*3600000;
-          const hourLen = (sunset - sunrise) / 12;
-          const achilaTime = new Date(sunrise + hourLen * 4);
-          const biurTime   = new Date(sunrise + hourLen * 5);
-          specials.push({ label: '⏰ סוף זמן אכילת חמץ (גר"א)', time: achilaTime.toISOString() });
-          specials.push({ label: '🔥 סוף זמן ביעור חמץ (גר"א)', time: biurTime.toISOString() });
-          console.log('[Zmanim] computed chametz times from sunrise for 14 Nisan');
+        if (hd.hm === 'Nisan' && hd.hd === 14 && z.sunrise && z.sunset) {
+          // GRA shaot zmaniyot: day = sunrise to sunset, divide by 12
+          // Sof zman achilat chametz = end of 4th shaah zmanit = sofZmanTfilla
+          // Sof zman biur chametz = end of 5th shaah zmanit
+          const sunriseMs = new Date(z.sunrise).getTime();
+          const sunsetMs  = new Date(z.sunset).getTime();
+          const shaaZmanit = (sunsetMs - sunriseMs) / 12;
+
+          // Use sofZmanTfilla if available (it's exactly 4 shaot after sunrise)
+          const achilaMsGRA = z.sofZmanTfilla
+            ? new Date(z.sofZmanTfilla).getTime()
+            : sunriseMs + shaaZmanit * 4;
+          const biurMsGRA = sunriseMs + shaaZmanit * 5;
+
+          specials.push({ label: '⏰ סוף זמן אכילת חמץ (גר"א)', time: new Date(achilaMsGRA).toISOString() });
+          specials.push({ label: '🔥 סוף זמן ביעור חמץ (גר"א)', time: new Date(biurMsGRA).toISOString() });
+          console.log('[Zmanim] computed chametz times for 14 Nisan: achila=', fmtT(new Date(achilaMsGRA).toISOString()), 'biur=', fmtT(new Date(biurMsGRA).toISOString()));
         }
       }
 
