@@ -75,12 +75,17 @@ body {
   color: var(--gold);
 }
 #topbar .date-chip {
+  position: relative;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 20px;
   padding: 4px 12px;
   font-size: 12px; color: var(--cream);
   text-align: center; line-height: 1.4;
+  transition: background .15s;
+}
+#topbar .date-chip:active {
+  background: rgba(201,165,74,.15);
 }
 #topbar .settings-btn {
   background: none; border: none; cursor: pointer;

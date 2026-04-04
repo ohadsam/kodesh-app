@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.15 (April 3, 2026)
+**Last updated:** v5.17 (April 4, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -99,7 +99,22 @@ Uses multi-ref fallback. If Sefaria changes API, may need new refs.
 
 ## Recently Fixed
 
-### v5.15 (April 3, 2026)
+### v5.17 (April 4, 2026)
+- ✅ Rashi: fixed direct endpoint parsing (flat(Infinity), chapterLengths tracking)
+- ✅ Siddur: initSiddur is async, fetches today events from Hebcal if missing
+- ✅ Siddur: Hallel/Torah reading/Yom Tov conditions now include isYomTov
+- ✅ Siddur: Omer section added to arvit with dynamic day text
+- ✅ Siddur: seasonal inserts filter by season (winter/summer visibility)
+- ✅ Chametz times: uses sofZmanTfilla as accurate base, await loadHebrewDate
+- ✅ Motzaei Shabbat: fixed missing words (למען תהילתך, מזוני רויחי)
+- ✅ Daf Yomi: added Rashi + Steinsaltz commentary toggle buttons
+- ✅ Mishna Yomi: added Bartenura + Steinsaltz commentary toggle buttons
+- ✅ Top/bottom tab nav scroll sync (scroll one, other follows)
+- ✅ Expandable date navigation drawer (tap date chip in topbar)
+- ✅ Date offset badge on topbar when not on today
+- ✅ Date drawer affects all screens (global day navigation)
+
+### v5.16 (April 3, 2026)
 - ✅ Rashi: uses direct "Rashi on Book Ch" endpoint (much faster, smaller response)
 - ✅ Rashi: AbortController timeout (20s) prevents hanging on slow Sefaria responses
 - ✅ Siddur seasonal inserts: filters by season (hides winter inserts in summer, vice versa)
