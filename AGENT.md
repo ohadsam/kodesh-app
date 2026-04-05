@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.18 (April 5, 2026)
+**Last updated:** v5.19 (April 5, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -98,6 +98,14 @@ Uses multi-ref fallback. If Sefaria changes API, may need new refs.
 ---
 
 ## Recently Fixed
+
+### v5.19 (April 5, 2026)
+- ✅ REGRESSION FIX: qibla page restored (page-qibla div was accidentally removed)
+- ✅ Rashi: fallback to commentary=1 when direct endpoint returns chapLen<5
+- ✅ Rashi: detect triple-nested array structure and flatten
+- ✅ Rabbi Sacks: fixed ref format (no book level, just parasha name)
+- ✅ Rabbi Sacks: fixed parasha name spellings (Chayei_Sarah, Vayeitze, Nasso, etc.)
+- ✅ Date-nav-drawer: removed sticky positioning to not interfere with siddur layout
 
 ### v5.18 (April 5, 2026)
 - ✅ Omer: fixed יום→ימים grammar (day 1 = "יום אחד", day 2+ = "X ימים")
