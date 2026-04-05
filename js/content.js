@@ -211,17 +211,17 @@ const ALL_PARASHIOT = [
 // Rabbi Sacks "Covenant and Conversation" Hebrew – parasha → Sefaria ref component
 const SACKS_REFS = {
   'בראשית':'Bereshit','נח':'Noach','לך לך':'Lech_Lecha','וירא':'Vayera',
-  'חיי שרה':'Chayei_Sara','תולדות':'Toldot','ויצא':'Vayetzei','וישלח':'Vayishlach',
+  'חיי שרה':'Chayei_Sarah','תולדות':'Toldot','ויצא':'Vayeitze','וישלח':'Vayishlach',
   'וישב':'Vayeshev','מקץ':'Miketz','ויגש':'Vayigash','ויחי':'Vayechi',
   'שמות':'Shemot','וארא':'Vaera','בא':'Bo','בשלח':'Beshalach',
   'יתרו':'Yitro','משפטים':'Mishpatim','תרומה':'Terumah','תצוה':'Tetzaveh',
   'כי תשא':'Ki_Tisa','ויקהל':'Vayakhel','פקודי':'Pekudei','ויקרא':'Vayikra',
   'צו':'Tzav','שמיני':'Shmini','תזריע':'Tazria','מצורע':'Metzora',
   'אחרי מות':'Achrei_Mot','קדושים':'Kedoshim','אמור':'Emor','בהר':'Behar',
-  'בחוקותי':'Bechukotai','במדבר':'Bamidbar','נשא':'Naso','בהעלותך':'Behaalotcha',
-  'שלח':'Shelach','קורח':'Korach','חקת':'Chukat','בלק':'Balak',
+  'בחוקותי':'Bechukotai','במדבר':'Bamidbar','נשא':'Nasso','בהעלותך':"Beha'alotcha",
+  'שלח':"Sh'lach",'קורח':'Korach','חקת':'Chukat','בלק':'Balak',
   'פינחס':'Pinchas','מטות':'Matot','מסעי':'Masei','דברים':'Devarim',
-  'ואתחנן':'Vaetchanan','עקב':'Eikev','ראה':'Reeh','שופטים':'Shoftim',
+  'ואתחנן':'Vaetchanan','עקב':'Eikev','ראה':'Re_eh','שופטים':'Shoftim',
   'כי תצא':'Ki_Teitzei','כי תבוא':'Ki_Tavo','נצבים':'Nitzavim','וילך':'Vayelech',
   'האזינו':'Haazinu','וזאת הברכה':'Vezot_Habracha',
 };
@@ -242,7 +242,7 @@ async function _loadSacksArticle() {
   const sacksName = SACKS_REFS[parasha.he];
   const book = _getSacksBook(parasha.ref);
   if (!sacksName || !book) { _sacksLoaded = true; _sacksContent = ''; renderParasha(); return; }
-  const sacksRef = `Covenant_and_Conversation;_Hebrew_Edition,_${book},_${sacksName}`;
+  const sacksRef = `Covenant_and_Conversation;_Hebrew_Edition,_${sacksName}`;
   console.log('[Sacks] loading:', sacksRef);
   try {
     const data = await sefariaText(sacksRef, 300);
@@ -723,37 +723,59 @@ async function loadRashiForRef(torahRef) {
         }
 
         if (rashiData && rashiData.he) {
-          // Direct Rashi endpoint: data.he[verseIdx] = array of Rashi comments for that verse
-          // NOTE: We also need the Torah chapter length for correct verse mapping later.
-          // Fetch Torah chapter length separately if not already known.
-          const heArr = rashiData.he;
-          // For "Rashi on Book Ch", heArr.length = number of verses in Torah chapter
-          // (Sefaria pads with empty arrays for verses without Rashi)
-          chapterLengths[ch] = Array.isArray(heArr) ? heArr.length : 0;
-          const chapLen = chapterLengths[ch];
-          let chEntries = 0;
-          for (let v = 0; v < chapLen; v++) {
-            const vNum = v + 1;
-            if (ch === startCh && vNum < startV) continue;
-            if (ch === endCh   && vNum > endV)   continue;
-            const key = `${ch}:${vNum}`;
-            let verseRashi = heArr[v];
-            if (!verseRashi) continue;
-            // heArr[v] can be: array of HTML strings, nested array, or single string
-            const rawTexts = Array.isArray(verseRashi) ? verseRashi.flat(Infinity).filter(Boolean) : [verseRashi];
-            if (!rawTexts.length) continue;
-            const cleaned = rawTexts.map(t => 
-              typeof t === 'string' ? t.replace(/<(?!\/?(?:b|i|strong)\b)[^>]+>/gi,'').trim() : ''
-            ).filter(Boolean);
-            if (cleaned.length) {
-              if (!verseMap.has(key)) verseMap.set(key, []);
-              verseMap.get(key).push(cleaned.join('<br><br>'));
-              chEntries++;
+          // Direct Rashi endpoint: data.he structure varies:
+          // Simple: data.he[verseIdx] = [comment1, comment2, ...]
+          // Nested: data.he = [[verse1_comments], [verse2_comments], ...] (extra nesting)
+          // Deep:   data.he = [[[comments]], [[comments]], ...] (double-nested per verse)
+          let heArr = rashiData.he;
+          
+          // Detect extra nesting: if heArr[0] is an array of arrays, we may need to unwrap
+          // The correct structure should be: heArr[verseIdx] = array of strings/HTML
+          // If heArr[0][0] is also an array, we have double nesting
+          if (Array.isArray(heArr) && heArr.length > 0) {
+            // Check if it's doubly nested (heArr is [[verse_comments...], ...] where verse_comments are arrays)
+            const sample = heArr[0];
+            if (Array.isArray(sample) && sample.length > 0 && Array.isArray(sample[0]) && 
+                typeof sample[0][0] !== 'string') {
+              // Triple nested - flatten one level
+              console.log('[Rashi] detected triple-nested structure, flattening');
+              heArr = heArr.flat(1);
             }
           }
-          console.log('[Rashi] ch', ch, 'direct OK, chapLen:', chapLen, '| entries:', chEntries, '| total:', verseMap.size);
-          success = true;
-          continue;
+          
+          chapterLengths[ch] = Array.isArray(heArr) ? heArr.length : 0;
+          const chapLen = chapterLengths[ch];
+          console.log('[Rashi] ch', ch, 'heArr structure: length=', chapLen, 'sample type:', typeof heArr[0], Array.isArray(heArr[0]) ? 'array('+heArr[0].length+')' : '');
+          
+          // If chapLen is suspiciously low (< 5 for a Torah chapter), the structure might be wrong
+          // Fall through to commentary=1 strategy
+          if (chapLen < 5) {
+            console.warn('[Rashi] ch', ch, 'chapLen too low (', chapLen, '), trying commentary=1 fallback');
+            // Don't set success - fall through to strategy 2
+          } else {
+            let chEntries = 0;
+            for (let v = 0; v < chapLen; v++) {
+              const vNum = v + 1;
+              if (ch === startCh && vNum < startV) continue;
+              if (ch === endCh   && vNum > endV)   continue;
+              const key = `${ch}:${vNum}`;
+              let verseRashi = heArr[v];
+              if (!verseRashi) continue;
+              const rawTexts = Array.isArray(verseRashi) ? verseRashi.flat(Infinity).filter(Boolean) : [verseRashi];
+              if (!rawTexts.length) continue;
+              const cleaned = rawTexts.map(t => 
+                typeof t === 'string' ? t.replace(/<(?!\/?(?:b|i|strong)\b)[^>]+>/gi,'').trim() : ''
+              ).filter(Boolean);
+              if (cleaned.length) {
+                if (!verseMap.has(key)) verseMap.set(key, []);
+                verseMap.get(key).push(cleaned.join('<br><br>'));
+                chEntries++;
+              }
+            }
+            console.log('[Rashi] ch', ch, 'direct OK, chapLen:', chapLen, '| entries:', chEntries, '| total:', verseMap.size);
+            success = true;
+            continue;
+          }
         }
 
         // Strategy 2 fallback: commentary=1 with timeout
