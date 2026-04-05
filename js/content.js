@@ -240,20 +240,33 @@ async function _loadSacksArticle() {
   const parasha = ALL_PARASHIOT.find(p => p.ref === currentParashaRef);
   if (!parasha) { _sacksLoaded = true; _sacksContent = ''; renderParasha(); return; }
   const sacksName = SACKS_REFS[parasha.he];
-  const book = _getSacksBook(parasha.ref);
-  if (!sacksName || !book) { _sacksLoaded = true; _sacksContent = ''; renderParasha(); return; }
-  const sacksRef = `Covenant_and_Conversation;_Hebrew_Edition,_${sacksName}`;
-  console.log('[Sacks] loading:', sacksRef);
-  try {
-    const data = await sefariaText(sacksRef, 300);
-    const flat = heFlat(data).filter(Boolean);
-    if (flat.length) {
-      _sacksContent = flat.map(v =>
-        `<p style="font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);line-height:2;color:var(--cream);margin-bottom:12px;text-align:justify">${v}</p>`
-      ).join('');
-      console.log('[Sacks] ✅', flat.length, 'paragraphs');
-    } else { _sacksContent = ''; }
-  } catch(e) { console.warn('[Sacks] failed:', e.message); _sacksContent = ''; }
+  if (!sacksName) { _sacksLoaded = true; _sacksContent = ''; renderParasha(); return; }
+  
+  // Try fetching articles 1, 2, 3 (Sefaria structures each parasha with numbered articles)
+  console.log('[Sacks] loading for parasha:', sacksName);
+  let allContent = [];
+  for (let article = 1; article <= 3; article++) {
+    const sacksRef = `Covenant_and_Conversation;_Hebrew_Edition,_${sacksName},_${article}`;
+    try {
+      const data = await sefariaText(sacksRef, 200);
+      const flat = heFlat(data).filter(Boolean);
+      if (flat.length) {
+        allContent.push(...flat);
+        console.log(`[Sacks] article ${article}: ${flat.length} paragraphs`);
+      }
+    } catch(e) {
+      console.log(`[Sacks] article ${article}: not found (${e.message})`);
+    }
+  }
+  
+  if (allContent.length) {
+    _sacksContent = allContent.map(v =>
+      `<p style="font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);line-height:2;color:var(--cream);margin-bottom:12px;text-align:justify">${v}</p>`
+    ).join('');
+    console.log('[Sacks] ✅ total', allContent.length, 'paragraphs');
+  } else {
+    _sacksContent = '';
+  }
   _sacksLoaded = true;
   if (parashaView === 'sacks') renderParasha();
 }
