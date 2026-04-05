@@ -92,7 +92,7 @@ let currentAliya = 'all';
 let rashiLoaded = false;
 let rashiVisible = false;
 
-const APP_VERSION  = '5.20';
+const APP_VERSION  = '5.21';
 const STORAGE_KEY  = 'kodesh_app_v1';
 const SIDDUR_CACHE_KEY = 'siddur_cache_v';
 
@@ -198,20 +198,61 @@ function heFlat(data) {
 function cleanSefariaHtml(str) {
   if (!str) return '';
 
-  // Only treat <small> as a seasonal block if it contains specific holiday/season keywords
-  // as the PRIMARY subject (at start or after ל/ב preposition), not incidentally (e.g. רחמן).
   function isSeasonalInsert(text) {
     const t = text.replace(/[\u0591-\u05C7<>]/g, '').trim();
     return (
-      // ר"ח or ראש חודש: must have quote/dot separator or be preceded by ל/ב
       /(?:^|[לב])(?:ר[".]ח|ראש.?ח)/.test(t) ||
-      // Holidays: at start or after ל/ב preposition
       /(?:^|[לב])(?:פסח|שבועות|סוכות|חנוכה|פורים|יו"ט)/.test(t) ||
-      // Seasons: בקיץ, בחרף, בחורף at start or after ב
       /(?:^|ב)(?:קיץ|חרף|חורף)/.test(t) ||
-      // Rain/dew variants typical in ברכת השנים
-      /^(?:טל|גשם|מטר)/.test(t)
+      /^(?:טל|גשם|מטר)/.test(t) ||
+      /עשי.ת|עשרת ימי|תשובה/.test(t) ||
+      /על הנסים/.test(t) ||
+      /זכרנו לחיים|מי כמוך אב|וכתוב לחיים|בספר חיים/.test(t)
     );
+  }
+
+  // Split a seasonal <small> text that contains multiple variants
+  // e.g. "בקיץ מוריד הטל בחורף משיב הרוח ומוריד הגשם"
+  // → two separate markers: [קיץ: מוריד הטל] [חורף: משיב הרוח ומוריד הגשם]
+  function splitSeasonalText(text) {
+    const t = text.replace(/[\u0591-\u05C7]/g, '').trim();
+    
+    // Pattern: "בקיץ X בחורף Y" or "בחורף X בקיץ Y"
+    const summerWinterMatch = t.match(/^(?:.*?)בקיץ\s+(.*?)\s*בחורף\s+(.*)$/);
+    if (summerWinterMatch) {
+      return [
+        '\uE001קיץ::' + summerWinterMatch[1].trim() + '\uE001',
+        '\uE001חורף::' + summerWinterMatch[2].trim() + '\uE001'
+      ].join('');
+    }
+    const winterSummerMatch = t.match(/^(?:.*?)בחורף\s+(.*?)\s*בקיץ\s+(.*)$/);
+    if (winterSummerMatch) {
+      return [
+        '\uE001חורף::' + winterSummerMatch[1].trim() + '\uE001',
+        '\uE001קיץ::' + winterSummerMatch[2].trim() + '\uE001'
+      ].join('');
+    }
+
+    // Pattern: contains both חנוכה and פורים (על הנסים)
+    if (/חנוכה/.test(t) && /פורים/.test(t)) {
+      return '\uE001חנוכה/פורים::' + text + '\uE001';
+    }
+    
+    // Pattern: עשי"ת inserts
+    if (/עשי.ת|עשרת ימי|תשובה/.test(t) && !/בעשי.ת/.test(t)) {
+      return '\uE001עשי"ת::' + text + '\uE001';
+    }
+    
+    // Single-season markers
+    if (/בקיץ/.test(t) || /^מוריד הטל$/.test(t) || /ותן ברכה/.test(t)) {
+      return '\uE001קיץ::' + text + '\uE001';
+    }
+    if (/בחורף/.test(t) || /משיב הרוח/.test(t) || /ותן טל ומטר/.test(t)) {
+      return '\uE001חורף::' + text + '\uE001';
+    }
+    
+    // Default: single marker with auto-label
+    return '\uE001' + text + '\uE001';
   }
 
   return str
@@ -221,10 +262,13 @@ function cleanSefariaHtml(str) {
     .replace(/<small[^>]*>(.*?)<\/small>/gi, (_, inner) => {
       const text = inner.replace(/<[^>]+>/g, '').trim();
       if (isSeasonalInsert(text)) {
-        // True seasonal insert → uE001 markers for block rendering
-        return '\uE001' + text + '\uE001';
+        return splitSeasonalText(text);
       }
-      // Non-seasonal (ברוך שם, בעשי"ת, parentheticals) → inline muted italic
+      // Non-seasonal (ברוך שם, parentheticals) → inline muted italic
+      // BUT check if it's a בעשי"ת instruction (keep as muted, don't mark as seasonal)
+      if (/^בעשי.ת\b/.test(text)) {
+        return `<span style="color:var(--muted);font-style:italic;font-size:.9em">${text}</span>`;
+      }
       return `<span style="color:var(--muted);font-style:italic;font-size:.9em">${text}</span>`;
     })
     .replace(/<br\s*\/?>/gi, '\n')
@@ -249,6 +293,10 @@ function splitVerseOnHeaders(v) {
 
 // Detect label for a seasonal insert
 function _seasonalLabel(text) {
+  // New format: "label::content" from splitSeasonalText
+  if (text.includes('::')) {
+    return text.split('::')[0].trim();
+  }
   const t = text.replace(/[\u0591-\u05C7]/g,'');
   if (/ר.?ח|ראש.?ח/.test(t))   return 'ר"ח';
   if (/פסח/.test(t))             return 'פסח';
@@ -257,9 +305,19 @@ function _seasonalLabel(text) {
   if (/חנוכה/.test(t))          return 'חנוכה';
   if (/פורים/.test(t))          return 'פורים';
   if (/שבת/.test(t))            return 'שבת';
-  if (/חורף|מטר|גשם/.test(t))  return 'חורף';
-  if (/קיץ|טל.?ברכ/.test(t))   return 'קיץ';
+  if (/על הנסים/.test(t))       return 'חנוכה/פורים';
+  if (/עשי.ת|תשובה/.test(t))   return 'עשי"ת';
+  if (/חורף|מטר|גשם|משיב הרוח/.test(t))  return 'חורף';
+  if (/קיץ|מוריד הטל|ותן ברכה/.test(t))  return 'קיץ';
   return '';
+}
+
+// Extract content from seasonal marker (strips label:: prefix if present)
+function _seasonalContent(text) {
+  if (text.includes('::')) {
+    return text.split('::').slice(1).join('::').trim();
+  }
+  return text;
 }
 
 function buildParagraphs(flat) {
@@ -375,7 +433,8 @@ function buildParagraphs(flat) {
         if (idx % 2 === 1) {
           flush();
           const label = _seasonalLabel(seg);
-          paragraphs.push('\uE002' + label + '\uE003' + seg + '\uE004');
+          const content = _seasonalContent(seg);
+          paragraphs.push('\uE002' + label + '\uE003' + content + '\uE004');
         } else {
           const plain = stripD(seg.replace(/<[^>]+>/g, ''));
           if (BREAK_BEFORE.some(r => r.test(plain))) flush();

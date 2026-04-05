@@ -140,17 +140,25 @@ function initTabScrollSync() {
   if (!topTabs || !bottomNav) return;
 
   let syncing = false;
+  let userScrolling = false;
+  let scrollTimeout = null;
+
+  // Only sync when user is actively touching/scrolling the tab bar
+  topTabs.addEventListener('touchstart', () => { userScrolling = true; }, { passive: true });
+  topTabs.addEventListener('touchend', () => { setTimeout(() => userScrolling = false, 300); }, { passive: true });
+  bottomNav.addEventListener('touchstart', () => { userScrolling = true; }, { passive: true });
+  bottomNav.addEventListener('touchend', () => { setTimeout(() => userScrolling = false, 300); }, { passive: true });
+
   topTabs.addEventListener('scroll', () => {
-    if (syncing) return;
+    if (syncing || !userScrolling) return;
     syncing = true;
-    // Sync bottom nav scroll ratio
     const ratio = topTabs.scrollLeft / (topTabs.scrollWidth - topTabs.clientWidth || 1);
     bottomNav.scrollLeft = ratio * (bottomNav.scrollWidth - bottomNav.clientWidth);
     requestAnimationFrame(() => syncing = false);
   }, { passive: true });
 
   bottomNav.addEventListener('scroll', () => {
-    if (syncing) return;
+    if (syncing || !userScrolling) return;
     syncing = true;
     const ratio = bottomNav.scrollLeft / (bottomNav.scrollWidth - bottomNav.clientWidth || 1);
     topTabs.scrollLeft = ratio * (topTabs.scrollWidth - topTabs.clientWidth);

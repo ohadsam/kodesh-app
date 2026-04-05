@@ -509,17 +509,25 @@ function _renderParagraphs(paragraphs, isAdd) {
 
       // Filter by season: hide wrong-season inserts
       const plainContent = content.replace(/<[^>]+>/g, '').replace(/[\u0591-\u05C7]/g, '');
-      if (label === 'חורף' && !isWinter) return ''; // hide winter inserts in summer
-      if (label === 'קיץ'  &&  isWinter) return ''; // hide summer inserts in winter
+      if (label === 'חורף' && !isWinter) return ''; // hide winter in summer
+      if (label === 'קיץ'  &&  isWinter) return ''; // hide summer in winter
       // Hide ר"ח inserts when not R"C/Moed
       if (label === 'ר"ח' && !cal.isRoshChodesh && !cal.isCholHamoed && !cal.isYomTov) return '';
       // Holiday-specific inserts
       if (/פסח/.test(label) && !cal.isCholHamoed && !cal.isYomTov) return '';
       if (/שבועות/.test(label) && !cal.isYomTov) return '';
       if (/סוכות/.test(label) && !cal.isCholHamoed && !cal.isYomTov) return '';
-      if (/חנוכה/.test(label) && !cal.isChanuka) return '';
-      if (/פורים/.test(label) && !cal.isPurim) return '';
-      if (/שבת/.test(label) && !cal.isShabbat) return '';
+      // חנוכה/פורים (על הנסים in Amida)
+      if (label === 'חנוכה/פורים' && !cal.isChanuka && !cal.isPurim) return '';
+      if (label === 'חנוכה' && !cal.isChanuka) return '';
+      if (label === 'פורים' && !cal.isPurim) return '';
+      if (label === 'שבת' && !cal.isShabbat) return '';
+      // עשי"ת – only during 1-10 Tishrei
+      if (label === 'עשי"ת') {
+        const hd = (typeof appState !== 'undefined') ? appState?._lastHebrewDate : null;
+        const isAseretYemei = hd && hd.hm === 'Tishrei' && hd.hd >= 1 && hd.hd <= 10;
+        if (!isAseretYemei) return '';
+      }
 
       const labelHtml = label
         ? `<span style="display:block;font-size:9px;font-family:'Heebo',sans-serif;` +
