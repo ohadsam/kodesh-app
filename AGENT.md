@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.17 (April 4, 2026)
+**Last updated:** v5.18 (April 5, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -98,6 +98,26 @@ Uses multi-ref fallback. If Sefaria changes API, may need new refs.
 ---
 
 ## Recently Fixed
+
+### v5.18 (April 5, 2026)
+- ✅ Omer: fixed יום→ימים grammar (day 1 = "יום אחד", day 2+ = "X ימים")
+- ✅ Winter/summer season: uses Hebrew date (Pesach ↔ Shmini Atzeret), not hardcoded months
+- ✅ Removed omer from shacharit (only in arvit per halacha)
+- ✅ Added מוסף לשלוש רגלים (Pesach + Sukkot) in shacharit
+- ✅ ברכי נפשי only shows on Rosh Chodesh
+- ✅ isShaloshRegalim, isYomHaatzmaut, isYomYerushalayim added to _siddurCal
+- ✅ R"C detection from Hebrew date (day 1 or 30)
+- ✅ Chol HaMoed detection from Hebrew date
+- ✅ Hallel condition includes Yom HaAtzmaut + Yom Yerushalayim
+- ✅ Removed ברכת המזון from siddur (exists in brachot tab)
+- ✅ Rashi mapping fix: uses endV directly, not chapterLengths from Rashi endpoint
+- ✅ Daf Yomi: Rashi shown inline (green, smaller, in parentheses within gemara text)
+- ✅ Mishna: Bartenura inline, removed Steinsaltz button (not available on Sefaria)
+- ✅ Motzaei Shabbat: fixed "למען תהילתך", "מזוני רויחי" text
+- ✅ ברכת הלבנה: complete nusach with all psukim (הללו שמש וירח, שיר למעלות fixed)
+- ✅ Rabbi Sacks on parasha: new "הרב זקס" button loads שיג ושיח from Sefaria
+- ✅ Brachot: auto-scroll to content on bracha selection
+- ✅ Brachot: floating nav buttons (⬆ scroll top + ☰ popup navigation)
 
 ### v5.17 (April 4, 2026)
 - ✅ Rashi: fixed direct endpoint parsing (flat(Infinity), chapterLengths tracking)
