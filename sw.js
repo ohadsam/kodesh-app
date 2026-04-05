@@ -1,4 +1,4 @@
-const APP_VERSION = '5.21';
+const APP_VERSION = '5.22';
 const CACHE = `kodesh-v${APP_VERSION}`;
 
 // Only cache fonts – never JS/CSS/HTML (served fresh from network always)
