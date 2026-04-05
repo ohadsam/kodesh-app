@@ -320,10 +320,20 @@ const BRACHOT = {
     title: 'ברכת הלבנה (קידוש לבנה)',
     source: 'בין ג׳ לט״ו בחודש, במוצאי שבת בחוץ, כשהלבנה נראית',
     shared: [
+      '(מסתכלים על הלבנה ואומרים:)',
+      '',
       'הַלְלוּיָהּ. הַלְלוּ אֶת יְהֹוָה מִן הַשָּׁמַיִם,',
       'הַלְלוּהוּ בַּמְּרוֹמִים.',
       'הַלְלוּהוּ כָל מַלְאָכָיו,',
       'הַלְלוּהוּ כָּל צְבָאָיו.',
+      'הַלְלוּהוּ שֶׁמֶשׁ וְיָרֵחַ,',
+      'הַלְלוּהוּ כָּל כּוֹכְבֵי אוֹר.',
+      'הַלְלוּהוּ שְׁמֵי הַשָּׁמָיִם,',
+      'וְהַמַּיִם אֲשֶׁר מֵעַל הַשָּׁמָיִם.',
+      'יְהַלְלוּ אֶת שֵׁם יְהֹוָה,',
+      'כִּי הוּא צִוָּה וְנִבְרָאוּ.',
+      'וַיַּעֲמִידֵם לָעַד לְעוֹלָם,',
+      'חָק נָתַן וְלֹא יַעֲבוֹר.',
       '',
       '(ברכת הלבנה:)',
       'בָּרוּךְ אַתָּה יְהֹוָה אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם,',
@@ -332,12 +342,10 @@ const BRACHOT = {
       'חֹק וּזְמַן נָתַן לָהֶם שֶׁלֹּא יְשַׁנּוּ אֶת תַּפְקִידָם.',
       'שָׂשִׂים וּשְׂמֵחִים לַעֲשׂוֹת רְצוֹן קוֹנָם.',
       'פּוֹעֵל אֱמֶת שֶׁפְּעֻלָּתוֹ אֱמֶת.',
-      '',
       'וְלַלְּבָנָה אָמַר שֶׁתִּתְחַדֵּשׁ,',
       'עֲטֶרֶת תִּפְאֶרֶת לַעֲמוּסֵי בָטֶן,',
       'שֶׁהֵם עֲתִידִים לְהִתְחַדֵּשׁ כְּמוֹתָהּ,',
       'וּלְפָאֵר לְיוֹצְרָם עַל שֵׁם כְּבוֹד מַלְכוּתוֹ.',
-      '',
       'בָּרוּךְ אַתָּה יְהֹוָה, מְחַדֵּשׁ חֳדָשִׁים.',
       '',
       '(אומרים ג׳ פעמים:)',
@@ -355,7 +363,6 @@ const BRACHOT = {
       '',
       '(אומרים ג׳ פעמים:)',
       'שָׁלוֹם עֲלֵיכֶם.',
-      '',
       '(משיבים ג׳ פעמים:)',
       'עֲלֵיכֶם שָׁלוֹם.',
       '',
@@ -363,12 +370,13 @@ const BRACHOT = {
       'סִימָן טוֹב וּמַזָּל טוֹב',
       'יְהֵא לָנוּ וּלְכָל יִשְׂרָאֵל. אָמֵן.',
       '',
-      'דָּוִד מֶלֶךְ יִשְׂרָאֵל חַי וְקַיָּם.',
+      'דָּוִד מֶלֶךְ יִשְׂרָאֵל חַי וְקַיָּם. (×3)',
       '',
       'קוֹל דּוֹדִי הִנֵּה זֶה בָּא,',
       'מְדַלֵּג עַל הֶהָרִים, מְקַפֵּץ עַל הַגְּבָעוֹת.',
       '',
-      'שִׁיר הַמַּעֲלוֹת, אֶשָּׂא עֵינַי אֶל הֶהָרִים, מֵאַיִן יָבֹא עֶזְרִי.',
+      '(שיר המעלות – תהילים קכ"א:)',
+      'שִׁיר לַמַּעֲלוֹת, אֶשָּׂא עֵינַי אֶל הֶהָרִים, מֵאַיִן יָבֹא עֶזְרִי.',
       'עֶזְרִי מֵעִם יְהֹוָה, עֹשֵׂה שָׁמַיִם וָאָרֶץ.',
       'אַל יִתֵּן לַמּוֹט רַגְלֶךָ, אַל יָנוּם שֹׁמְרֶךָ.',
       'הִנֵּה לֹא יָנוּם וְלֹא יִישָׁן שׁוֹמֵר יִשְׂרָאֵל.',
@@ -377,6 +385,7 @@ const BRACHOT = {
       'יְהֹוָה יִשְׁמָרְךָ מִכָּל רָע, יִשְׁמֹר אֶת נַפְשֶׁךָ.',
       'יְהֹוָה יִשְׁמָר צֵאתְךָ וּבוֹאֶךָ, מֵעַתָּה וְעַד עוֹלָם.',
       '',
+      '(הלל – תהילים ק"נ:)',
       'הַלְלוּיָהּ. הַלְלוּ אֵל בְּקָדְשׁוֹ, הַלְלוּהוּ בִּרְקִיעַ עֻזּוֹ.',
       'הַלְלוּהוּ בִגְבוּרֹתָיו, הַלְלוּהוּ כְּרֹב גֻּדְלוֹ.',
       'הַלְלוּהוּ בְּתֵקַע שׁוֹפָר, הַלְלוּהוּ בְּנֵבֶל וְכִנּוֹר.',
@@ -384,7 +393,14 @@ const BRACHOT = {
       'הַלְלוּהוּ בְּצִלְצְלֵי שָׁמַע, הַלְלוּהוּ בְּצִלְצְלֵי תְרוּעָה.',
       'כֹּל הַנְּשָׁמָה תְּהַלֵּל יָהּ, הַלְלוּיָהּ.',
       '',
-      'עָלֵינוּ לְשַׁבֵּחַ לַאֲדוֹן הַכֹּל...',
+      '(עלינו לשבח)',
+      'עָלֵינוּ לְשַׁבֵּחַ לַאֲדוֹן הַכֹּל, לָתֵת גְּדֻלָּה לְיוֹצֵר בְּרֵאשִׁית,',
+      'שֶׁלֹּא עָשָׂנוּ כְּגוֹיֵי הָאֲרָצוֹת, וְלֹא שָׂמָנוּ כְּמִשְׁפְּחוֹת הָאֲדָמָה.',
+      'שֶׁלֹּא שָׂם חֶלְקֵנוּ כָּהֶם, וְגוֹרָלֵנוּ כְּכָל הֲמוֹנָם.',
+      'וַאֲנַחְנוּ כּוֹרְעִים וּמִשְׁתַּחֲוִים וּמוֹדִים,',
+      'לִפְנֵי מֶלֶךְ מַלְכֵי הַמְּלָכִים הַקָּדוֹשׁ בָּרוּךְ הוּא.',
+      '',
+      'קַדִּישׁ יָתוֹם',
     ],
   },
 
@@ -511,6 +527,11 @@ async function showBracha(key) {
   if (titleEl)  titleEl.textContent  = b.title;
   if (sourceEl) sourceEl.textContent = b.source || '';
 
+  // Auto-scroll to the bracha content area
+  setTimeout(() => {
+    if (titleEl) titleEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+
   // ── Birkat HaMazon: load from Sefaria via siddur engine ───────────
   if (b.useSiddur) {
     contentEl.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px">⏳ טוען...</div>';
@@ -604,4 +625,50 @@ function loadBrachot() {
   if (btn) btn.classList.add('active');
   // Show first bracha by default
   if (!currentBracha) showBracha('birkat_hamazon');
+  // Init floating buttons scroll listener
+  _initBrachotFloatBtns();
+}
+
+function _initBrachotFloatBtns() {
+  const page = document.getElementById('page-brachot');
+  const topBtn = document.getElementById('brachot-float-top');
+  const navBtn = document.getElementById('brachot-float-nav');
+  if (!page || !topBtn) return;
+  function update() {
+    if (!page.classList.contains('active')) return;
+    const scrolled = (window.scrollY || page.scrollTop || 0) > 200;
+    topBtn.style.opacity = scrolled ? '1' : '0';
+    topBtn.style.pointerEvents = scrolled ? 'auto' : 'none';
+    if (navBtn) {
+      navBtn.style.opacity = scrolled ? '1' : '0';
+      navBtn.style.pointerEvents = scrolled ? 'auto' : 'none';
+    }
+  }
+  window.addEventListener('scroll', update, { passive: true });
+  page.addEventListener('scroll', update, { passive: true });
+}
+
+function openBrachotNavPopup() {
+  const overlay = document.getElementById('brachot-nav-overlay');
+  const popup = document.getElementById('brachot-nav-popup');
+  const list = document.getElementById('brachot-nav-list');
+  if (!popup || !list) return;
+  // Build list from BRACHOT keys
+  list.innerHTML = Object.keys(BRACHOT).map(key => {
+    const b = BRACHOT[key];
+    const isActive = key === currentBracha;
+    return `<button onclick="closeBrachotNavPopup();showBracha('${key}')" style="
+      display:block;width:100%;text-align:right;padding:9px 14px;background:${isActive?'rgba(201,165,74,.12)':'none'};
+      border:none;cursor:pointer;font-family:'Frank Ruhl Libre',serif;font-size:14px;
+      color:${isActive?'var(--gold)':'var(--cream)'};border-bottom:1px solid rgba(255,255,255,.05)">${b.title}</button>`;
+  }).join('');
+  if (overlay) overlay.style.display = 'block';
+  popup.style.display = 'block';
+}
+
+function closeBrachotNavPopup() {
+  const overlay = document.getElementById('brachot-nav-overlay');
+  const popup = document.getElementById('brachot-nav-popup');
+  if (overlay) overlay.style.display = 'none';
+  if (popup) popup.style.display = 'none';
 }

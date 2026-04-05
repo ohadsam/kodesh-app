@@ -106,7 +106,22 @@ function wrapSeasonalParagraphs(html, isAdd) {
 }
 
 function _isWinterSeason() {
-  // Israel: mashiv haruach Oct 22 – April 15 (approx)
-  const m = new Date().getMonth() + 1; // 1-12
-  return m >= 10 || m <= 4;
+  // Halachic rule: 
+  // מוריד הטל + ותן ברכה = Summer = from א' של פסח (15 Nisan) to שמחת תורה (22 Tishrei)
+  // משיב הרוח ומוריד הגשם = Winter = from שמחת תורה (22 Tishrei) to א' של פסח (15 Nisan)
+  // ותן טל ומטר = from 7 Cheshvan (Israel) to Pesach
+  const hDate = (typeof appState !== 'undefined') ? appState?._lastHebrewDate : null;
+  if (hDate) {
+    const m = hDate.hm, d = hDate.hd;
+    // Summer: Nisan 15 → Tishrei 21 (inclusive)
+    // Winter: Tishrei 22 → Nisan 14
+    if (m === 'Nisan' && d >= 15) return false; // summer starts 1st day Pesach
+    if (m === 'Iyar' || m === 'Sivan' || m === 'Tamuz' || m === 'Av' || m === 'Elul') return false;
+    if (m === 'Tishrei' && d <= 21) return false; // still summer until Shmini Atzeret
+    // Everything else is winter
+    return true;
+  }
+  // Fallback: approximate with Gregorian months
+  const gm = new Date().getMonth() + 1;
+  return gm >= 10 || gm <= 3;
 }

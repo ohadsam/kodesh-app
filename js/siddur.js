@@ -177,7 +177,7 @@ function getSiddurSections(nusach, prayer) {
              'Weekday_Shacharit,_Torah_Reading'),
       isAddition:true, condition:'isTorahReadingDay' },
     { label:'מוסף ר"ח ✨',        ref: r('Musaf_for_Rosh_Chodesh', null, null), isAddition:true, condition:'isRoshChodesh' },
-    { label:'ספירת העומר ✨',     ref: r('Counting_the_Omer', null, null), isAddition:true, condition:'isOmer' },
+    { label:'מוסף לשלוש רגלים ✨', ref: r('Musaf_for_Shalosh_Regalim', null, null), isAddition:true, condition:'isShaloshRegalim' },
     { label:'שירות חנוכה ✨',     ref: r('Chanukah_Service', null, null), isAddition:true, condition:'isChanuka' },
     { label:"אשרי / ובא לציון",
       ref: r("The_Morning_Prayers,_Ashrei_U'va_L'Tzion", null, null) },
@@ -205,7 +205,7 @@ function getSiddurSections(nusach, prayer) {
     { label:'הושיענו',
       ref: null,
       staticText: 'הוֹשִׁיעֵנוּ יְהֹוָה אֱלֹהֵינוּ וְקַבְּצֵנוּ מִן הַגּוֹיִם לְהוֹדוֹת לְשֵׁם קָדְשֶׁךָ לְהִשְׁתַּבֵּחַ בִּתְהִלָּתֶךָ:\n\nוּבָרוּךְ יְהֹוָה אֱלֹהֵי יִשְׂרָאֵל מִן הָעוֹלָם וְעַד הָעוֹלָם וְאָמַר כָּל הָעָם אָמֵן הַלְלוּיָהּ:' },
-    { label:'ברכי נפשי',          ref: r('The_Morning_Prayers,_My_Soul_Bless', null, null) },
+    { label:'ברכי נפשי ✨',       ref: r('The_Morning_Prayers,_My_Soul_Bless', null, null), isAddition:true, condition:'isRoshChodesh' },
     { label:'עלינו',
       ref: r('The_Morning_Prayers,_Aleinu', null, 'Weekday_Shacharit,_Alenu') },
     { label:'קדיש יתום',
@@ -267,17 +267,8 @@ function getSiddurSections(nusach, prayer) {
     { label:'קדיש יתום',          ref:null, staticText:KADDISH_YATOM },
   ];
 
-  if (prayer === 'birkat') return [
-    { label:'ברכת המזון',
-      // Mizrach has no birkat hamazon section → fallback to sfard
-      ref: n === 'ashkenaz'
-             ? `${ASHK},_Berachot,_Birkat_HaMazon`
-             : `${SFARD},_Birkas_Hamazon,_Birkas_Hamazon` },
-    { label:'רצה (שבת) ✨',       ref:null, staticText:RATZE_SHABBAT, isAddition:true, condition:'isShabbat' },
-    yaaleh, yaalehYT,
-    { label:'על הנסים – חנוכה ✨', ref:`${SFARD},_Birkas_Hamazon,_Al_Hanissim_for_Chanukah`, isAddition:true, condition:'isChanuka' },
-    { label:'על הנסים – פורים ✨', ref:`${SFARD},_Birkas_Hamazon,_Al_Hanissim_for_Purim`,   isAddition:true, condition:'isPurim' },
-  ];
+  // ברכת המזון moved to brachot tab
+  if (prayer === 'birkat') return [];
 
   if (prayer === 'layla') return [
     { label:'קריאת שמע על המיטה',
@@ -300,17 +291,18 @@ const SIDDUR_SECTIONS = {
 
 // Labels describing when each addition is said (shown above the section)
 const CONDITION_LABELS = {
-  isRoshChodeshOrMoed:  'נאמר בראש חודש ובחול המועד',
-  isRoshChodesh:        'נאמר בראש חודש',
+  isRoshChodeshOrMoed:  'נאמר בראש חודש, חול המועד ויום טוב',
+  isRoshChodesh:        'נאמר בראש חודש (ל\' וא\' לחודש)',
   isCholHamoed:         'נאמר בחול המועד',
   isYomTov:             'נאמר ביום טוב',
-  isHallelDay:          'נאמר בראש חודש, חנוכה וחול המועד',
-  isTorahReadingDay:    'נאמר בשני, חמישי וראש חודש',
+  isHallelDay:          'נאמר בר"ח, חנוכה, פסח, סוכות, יום העצמאות ויום ירושלים',
+  isTorahReadingDay:    'נאמר בשני, חמישי, ר"ח ויום טוב',
   isAvinuMalkeinu:      'נאמר בעשרת ימי תשובה ובתעניות',
-  isOmer:               'נאמר בימי ספירת העומר',
+  isOmer:               'נאמר בימי ספירת העומר (בערבית)',
   isChanuka:            'נאמר בחנוכה',
   isPurim:              'נאמר בפורים',
   isShabbat:            'נאמר בשבת',
+  isShaloshRegalim:     'נאמר בפסח וסוכות',
 };
 
 const SIDDUR_CONDITIONS = {
@@ -318,14 +310,21 @@ const SIDDUR_CONDITIONS = {
   isRoshChodesh:       () => (window._siddurCal||{}).isRoshChodesh,
   isCholHamoed:        () => (window._siddurCal||{}).isCholHamoed,
   isRoshChodeshOrMoed: () => (window._siddurCal||{}).isRoshChodesh || (window._siddurCal||{}).isCholHamoed || (window._siddurCal||{}).isYomTov,
-  isHallelDay:         () => (window._siddurCal||{}).isRoshChodesh || (window._siddurCal||{}).isChanuka || (window._siddurCal||{}).isCholHamoed || (window._siddurCal||{}).isYomTov,
-  isTorahReadingDay:   () => (window._siddurCal||{}).isTorahReading || (window._siddurCal||{}).isRoshChodesh || (window._siddurCal||{}).isCholHamoed || (window._siddurCal||{}).isYomTov,
+  isHallelDay:         () => {
+    const c = window._siddurCal||{};
+    return c.isRoshChodesh || c.isChanuka || c.isCholHamoed || c.isYomTov || c.isYomHaatzmaut || c.isYomYerushalayim;
+  },
+  isTorahReadingDay:   () => {
+    const c = window._siddurCal||{};
+    return c.isTorahReading || c.isRoshChodesh || c.isCholHamoed || c.isYomTov;
+  },
   isAvinuMalkeinu:     () => (window._siddurCal||{}).isAvinuMalkeinu,
   isOmer:              () => (window._siddurCal||{}).isOmer,
   isChanuka:           () => (window._siddurCal||{}).isChanuka,
   isPurim:             () => (window._siddurCal||{}).isPurim,
   isShabbat:           () => (window._siddurCal||{}).isShabbat,
   isYomTov:            () => (window._siddurCal||{}).isYomTov,
+  isShaloshRegalim:    () => (window._siddurCal||{}).isShaloshRegalim,
   isMizrach:           () => siddurNusach === 'mizrach',
 };
 
@@ -399,21 +398,43 @@ async function initSiddur() {
 
   // Compute isOmer from Hebrew date (more reliable than Hebcal events)
   let isOmerFromDate = false;
+  let isRoshChodeshFromDate = false;
+  let isShaloshRegalimFromDate = false;
+  let isYomTovFromDate = false;
   const hDate = appState?._lastHebrewDate;
   if (hDate) {
     const m = hDate.hm, d = hDate.hd;
     if ((m === 'Nisan' && d >= 16) || m === 'Iyar' || (m === 'Sivan' && d <= 5)) {
       isOmerFromDate = true;
     }
+    // ראש חודש: ל' של חודש קודם או א' של חודש חדש
+    if (d === 1 || d === 30) isRoshChodeshFromDate = true;
+    // שלוש רגלים: פסח (15-22 Nisan) + סוכות (15-22 Tishrei)
+    if ((m === 'Nisan' && d >= 15 && d <= 22) || (m === 'Tishrei' && d >= 15 && d <= 22)) {
+      isShaloshRegalimFromDate = true;
+    }
+    // שבועות (6-7 Sivan)
+    if (m === 'Sivan' && (d === 6 || d === 7)) isShaloshRegalimFromDate = true;
+    // יום טוב: first/last days of festivals
+    if ((m === 'Nisan' && (d === 15 || d === 21)) ||
+        (m === 'Tishrei' && (d === 1 || d === 2 || d === 10 || d === 15 || d === 22)) ||
+        (m === 'Sivan' && d === 6)) {
+      isYomTovFromDate = true;
+    }
   }
 
   window._siddurCal = {
-    // ── ימים מיוחדים מ-Hebcal events ──
-    isRoshChodesh:    todayEvents.some(t => /ראש חודש|Rosh Chodesh/i.test(t)),
-    isCholHamoed:     todayEvents.some(t => /חול המועד|Chol HaMoed/i.test(t)),
+    // ── ימים מיוחדים ──
+    isRoshChodesh:    isRoshChodeshFromDate || todayEvents.some(t => /ראש חודש|Rosh Chodesh/i.test(t)),
+    isCholHamoed:     todayEvents.some(t => /חול המועד|Chol HaMoed/i.test(t)) ||
+                      (hDate && ((hDate.hm === 'Nisan' && hDate.hd >= 16 && hDate.hd <= 20) ||
+                                 (hDate.hm === 'Tishrei' && hDate.hd >= 16 && hDate.hd <= 21))),
     isChanuka:        todayEvents.some(t => /חנוכה|Chanukah/i.test(t)),
     isPurim:          todayEvents.some(t => /פורים|Purim/i.test(t)),
     isOmer:           isOmerFromDate || todayEvents.some(t => /עומר|Omer/i.test(t)),
+    isShaloshRegalim: isShaloshRegalimFromDate,
+    isYomHaatzmaut:   todayEvents.some(t => /עצמאות|Independence/i.test(t)),
+    isYomYerushalayim:todayEvents.some(t => /ירושלים|Jerusalem Day/i.test(t)),
     // אבינו מלכנו: עשרת ימי תשובה, תעניות ציבור (לא בערב שבת)
     isAvinuMalkeinu:  todayEvents.some(t => /תשובה|Aseret Yemei|Yom Kippur|תענית|Ta.anit|Fast/i.test(t)) && dow !== 5,
     // ── ימי שבוע ──

@@ -24,11 +24,12 @@ function _omerCountStr(day) {
   const total = _omerDayHe(day);
   const weeks = Math.floor(day / 7);
   const rem   = day % 7;
-  const totalStr = `${total} יוֹם`;
-  if (weeks === 0) return `${totalStr} לָעֹמֶר`;
+  // יום for 1, ימים for 2+
+  const dayWord = day === 1 ? 'יוֹם אֶחָד' : `${total} יָמִים`;
+  if (weeks === 0) return `${dayWord} לָעֹמֶר`;
   const weekStr = _OMER_WEEKS[weeks];
-  if (rem === 0)  return `${totalStr} שֶׁהֵם ${weekStr} לָעֹמֶר`;
-  return `${totalStr} שֶׁהֵם ${weekStr} וְ${_OMER_DAYS_IN_WEEK[rem]} לָעֹמֶר`;
+  if (rem === 0)  return `${dayWord} שֶׁהֵם ${weekStr} לָעֹמֶר`;
+  return `${dayWord} שֶׁהֵם ${weekStr} וְ${_OMER_DAYS_IN_WEEK[rem]} לָעֹמֶר`;
 }
 
 // Kabbalistic attribute for each week/day (for יהי רצון)

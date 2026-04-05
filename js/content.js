@@ -59,8 +59,10 @@ let onkelosLoaded = false;
 let haftaraLoaded = false;
 let haftaraVerses = [];  // haftara verses
 let _haftaraRef   = null; // Sefaria ref for haftara
-let parashaView   = 'text'; // 'text' | 'rashi' | 'onkelos' | 'haftara'
+let parashaView   = 'text'; // 'text' | 'rashi' | 'onkelos' | 'haftara' | 'sacks'
 let currentParashaRef = null;
+let _sacksLoaded = false;
+let _sacksContent = '';
 
 function setParashaView(mode) {
   parashaView = mode;
@@ -68,6 +70,8 @@ function setParashaView(mode) {
   document.getElementById('view-rashi-btn').classList.toggle('active',   mode === 'rashi');
   document.getElementById('view-onkelos-btn').classList.toggle('active', mode === 'onkelos');
   document.getElementById('view-haftara-btn').classList.toggle('active', mode === 'haftara');
+  const sacksBtn = document.getElementById('view-sacks-btn');
+  if (sacksBtn) sacksBtn.classList.toggle('active', mode === 'sacks');
   renderParasha();
 }
 
@@ -158,6 +162,18 @@ function renderParasha() {
       haftaraVerses.map((v,i) =>
         `<div style="margin-bottom:8px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span><span style="font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);line-height:1.85">${v}</span></div>`
       ).join('');
+  } else if (parashaView === 'sacks') {
+    if (!_sacksLoaded) {
+      el.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center">⏳ טוען מאמר הרב זקס...</div>';
+      _loadSacksArticle();
+      return;
+    }
+    if (!_sacksContent) {
+      el.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center">לא נמצא מאמר הרב זקס לפרשה זו</div>';
+      return;
+    }
+    el.innerHTML = `<div style="font-size:12px;color:var(--gold);margin-bottom:10px;font-family:'Heebo',sans-serif;font-weight:700">
+      📝 הרב יונתן זקס – שיג ושיח</div>` + _sacksContent;
   }
 }
 
@@ -191,6 +207,56 @@ const ALL_PARASHIOT = [
   { he: 'נצבים', ref: 'Deuteronomy 29:9-30:20' }, { he: 'וילך', ref: 'Deuteronomy 31:1-31:30' },
   { he: 'האזינו', ref: 'Deuteronomy 32:1-32:52' }, { he: 'וזאת הברכה', ref: 'Deuteronomy 33:1-34:12' },
 ];
+
+// Rabbi Sacks "Covenant and Conversation" Hebrew – parasha → Sefaria ref component
+const SACKS_REFS = {
+  'בראשית':'Bereshit','נח':'Noach','לך לך':'Lech_Lecha','וירא':'Vayera',
+  'חיי שרה':'Chayei_Sara','תולדות':'Toldot','ויצא':'Vayetzei','וישלח':'Vayishlach',
+  'וישב':'Vayeshev','מקץ':'Miketz','ויגש':'Vayigash','ויחי':'Vayechi',
+  'שמות':'Shemot','וארא':'Vaera','בא':'Bo','בשלח':'Beshalach',
+  'יתרו':'Yitro','משפטים':'Mishpatim','תרומה':'Terumah','תצוה':'Tetzaveh',
+  'כי תשא':'Ki_Tisa','ויקהל':'Vayakhel','פקודי':'Pekudei','ויקרא':'Vayikra',
+  'צו':'Tzav','שמיני':'Shmini','תזריע':'Tazria','מצורע':'Metzora',
+  'אחרי מות':'Achrei_Mot','קדושים':'Kedoshim','אמור':'Emor','בהר':'Behar',
+  'בחוקותי':'Bechukotai','במדבר':'Bamidbar','נשא':'Naso','בהעלותך':'Behaalotcha',
+  'שלח':'Shelach','קורח':'Korach','חקת':'Chukat','בלק':'Balak',
+  'פינחס':'Pinchas','מטות':'Matot','מסעי':'Masei','דברים':'Devarim',
+  'ואתחנן':'Vaetchanan','עקב':'Eikev','ראה':'Reeh','שופטים':'Shoftim',
+  'כי תצא':'Ki_Teitzei','כי תבוא':'Ki_Tavo','נצבים':'Nitzavim','וילך':'Vayelech',
+  'האזינו':'Haazinu','וזאת הברכה':'Vezot_Habracha',
+};
+
+function _getSacksBook(ref) {
+  if (ref.startsWith('Genesis'))     return 'Genesis';
+  if (ref.startsWith('Exodus'))      return 'Exodus';
+  if (ref.startsWith('Leviticus'))   return 'Leviticus';
+  if (ref.startsWith('Numbers'))     return 'Numbers';
+  if (ref.startsWith('Deuteronomy')) return 'Deuteronomy';
+  return '';
+}
+
+async function _loadSacksArticle() {
+  if (!currentParashaRef) return;
+  const parasha = ALL_PARASHIOT.find(p => p.ref === currentParashaRef);
+  if (!parasha) { _sacksLoaded = true; _sacksContent = ''; renderParasha(); return; }
+  const sacksName = SACKS_REFS[parasha.he];
+  const book = _getSacksBook(parasha.ref);
+  if (!sacksName || !book) { _sacksLoaded = true; _sacksContent = ''; renderParasha(); return; }
+  const sacksRef = `Covenant_and_Conversation;_Hebrew_Edition,_${book},_${sacksName}`;
+  console.log('[Sacks] loading:', sacksRef);
+  try {
+    const data = await sefariaText(sacksRef, 300);
+    const flat = heFlat(data).filter(Boolean);
+    if (flat.length) {
+      _sacksContent = flat.map(v =>
+        `<p style="font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);line-height:2;color:var(--cream);margin-bottom:12px;text-align:justify">${v}</p>`
+      ).join('');
+      console.log('[Sacks] ✅', flat.length, 'paragraphs');
+    } else { _sacksContent = ''; }
+  } catch(e) { console.warn('[Sacks] failed:', e.message); _sacksContent = ''; }
+  _sacksLoaded = true;
+  if (parashaView === 'sacks') renderParasha();
+}
 
 // ── Static aliyot table for all 54 parshiot ─────────────────────────────────
 // Format: [aliya1..7, maftir] – used when Hebcal doesn't have upcoming data
@@ -276,7 +342,7 @@ async function loadSpecificParasha(ref) {
   // Hide holiday notice when user manually selects a different parasha
   const noticeEl = document.getElementById('parasha-notice');
   if (noticeEl) noticeEl.style.display = 'none';
-  haftaraLoaded = false; haftaraVerses = []; _haftaraRef = null;
+  haftaraLoaded = false; haftaraVerses = []; _haftaraRef = null; _sacksLoaded = false; _sacksContent = "";
 
   // 1. Try static lookup first (instant, always works)
   const staticAliyot = PARASHA_ALIYOT[ref];
@@ -418,7 +484,7 @@ async function loadParasha() {
     }
 
     // Start haftara loading in background
-    haftaraLoaded = false; haftaraVerses = []; _haftaraRef = null;
+    haftaraLoaded = false; haftaraVerses = []; _haftaraRef = null; _sacksLoaded = false; _sacksContent = "";
     if (leyning.haftara) {
       _kickoffHaftara(leyning.haftara);
     } else if (HAFTARA_REFS[matchP.ref]) {
@@ -733,15 +799,15 @@ async function loadRashiForRef(torahRef) {
 
   setRashiProgress(totalCh, '');
 
-  // Map Rashi to verse indices using exact chapter lengths
+  // Map Rashi to verse indices
+  // Don't rely on chapterLengths from Rashi endpoint (can differ from Torah)
+  // Instead, iterate exactly the verse range we need
   rashiVerses = new Array(parashaVerses.length).fill('');
   let idx = 0;
   for (let ch = startCh; ch <= endCh; ch++) {
     const firstV   = (ch === startCh) ? startV : 1;
-    const actualLast = (ch === endCh)
-      ? Math.min(endV, chapterLengths[ch] || endV)
-      : (chapterLengths[ch] || 999);
-    for (let v = firstV; v <= actualLast; v++) {
+    const lastV    = (ch === endCh) ? endV : (chapterLengths[ch] || 200);
+    for (let v = firstV; v <= lastV; v++) {
       if (idx >= parashaVerses.length) break;
       const key = `${ch}:${v}`;
       if (verseMap.has(key)) {
@@ -750,7 +816,7 @@ async function loadRashiForRef(torahRef) {
       idx++;
     }
   }
-  console.log('[Rashi] mapping done: idx reached', idx, '| parashaVerses:', parashaVerses.length, '| chapterLengths:', JSON.stringify(chapterLengths));
+  console.log('[Rashi] mapping done: idx reached', idx, '| parashaVerses:', parashaVerses.length, '| verseMap keys:', [...verseMap.keys()].join(','));
 
   rashiLoaded    = true;
   _rashiLoading  = false;
@@ -960,7 +1026,7 @@ function _renderDafButtons() {
   if (!btnWrap) return;
   btnWrap.innerHTML = `
     <div class="aliya-tab ${_dafView==='text'?'active':''}" onclick="switchDafView('text')">📖 גמרא</div>
-    <div class="aliya-tab ${_dafView==='rashi'?'active':''}" onclick="switchDafView('rashi')">📝 רש"י</div>
+    <div class="aliya-tab ${_dafView==='rashi'?'active':''}" onclick="switchDafView('rashi')">📝 גמרא + רש"י</div>
     <div class="aliya-tab ${_dafView==='steinsaltz'?'active':''}" onclick="switchDafView('steinsaltz')">📚 שטיינזלץ</div>
   `;
 }
@@ -975,26 +1041,32 @@ async function switchDafView(view) {
   el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px">⏳ טוען פירוש...</div>';
 
   try {
-    let commentaryRef;
-    if (view === 'rashi') {
-      commentaryRef = `Rashi on ${_dafRef}`;
-    } else {
-      commentaryRef = `Steinsaltz on ${_dafRef}`;
-    }
+    const commentaryRef = view === 'rashi' ? `Rashi on ${_dafRef}` : `Steinsaltz on ${_dafRef}`;
     console.log(`[DafYomi] loading commentary: ${commentaryRef}`);
     const data = await sefariaText(commentaryRef, 300);
     const flat = heFlat(data).filter(Boolean);
-    if (!flat.length) throw new Error('אין פירוש זמין');
 
     el.className = 'content-text';
-    const label = view === 'rashi' ? 'רש"י' : 'שטיינזלץ';
-    el.innerHTML = flat.map((v,i) =>
-      `<div style="margin-bottom:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04)">
-        <span style="color:var(--gold-dim);font-size:11px">${i+1} </span>
-        <span style="line-height:1.85">${v}</span>
-      </div>`
-    ).join('');
-    console.log(`[DafYomi] ${label} loaded: ${flat.length} entries`);
+    if (view === 'rashi' && flat.length) {
+      // Inline Rashi: show gemara text with Rashi embedded after each section
+      el.innerHTML = _dafFlat.map((v, i) => {
+        const rashiText = (flat[i] && typeof flat[i] === 'string') ? flat[i] : 
+                          (Array.isArray(flat[i]) ? flat[i].flat().filter(Boolean).join(' ') : '');
+        const rashiHtml = rashiText ? 
+          `<span style="color:var(--addition);font-size:calc(var(--font-size) * 0.82);font-style:italic"> (רש"י: ${rashiText.replace(/<[^>]+>/g,'')})</span>` : '';
+        return `<div style="margin-bottom:10px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}${rashiHtml}</div>`;
+      }).join('');
+    } else if (flat.length) {
+      el.innerHTML = flat.map((v,i) =>
+        `<div style="margin-bottom:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04)">
+          <span style="color:var(--gold-dim);font-size:11px">${i+1} </span>
+          <span style="line-height:1.85">${v}</span>
+        </div>`
+      ).join('');
+    } else {
+      throw new Error('אין פירוש זמין');
+    }
+    console.log(`[DafYomi] ${view} loaded: ${flat.length} entries`);
   } catch(e) {
     console.warn('[DafYomi] commentary error:', e.message);
     el.innerHTML = `<div style="color:var(--muted);text-align:center;padding:20px">⚠️ ${e.message}<br><small>ייתכן שאין ${view === 'rashi' ? 'רש"י' : 'שטיינזלץ'} לדף זה בספריא</small></div>`;
@@ -1053,8 +1125,7 @@ function _renderMishnaButtons() {
   if (!btnWrap) return;
   btnWrap.innerHTML = `
     <div class="aliya-tab ${_mishnaView==='text'?'active':''}" onclick="switchMishnaView('text')">📖 משנה</div>
-    <div class="aliya-tab ${_mishnaView==='bartenura'?'active':''}" onclick="switchMishnaView('bartenura')">📝 ברטנורא</div>
-    <div class="aliya-tab ${_mishnaView==='steinsaltz'?'active':''}" onclick="switchMishnaView('steinsaltz')">📚 שטיינזלץ</div>
+    <div class="aliya-tab ${_mishnaView==='bartenura'?'active':''}" onclick="switchMishnaView('bartenura')">📝 משנה + ברטנורא</div>
   `;
 }
 
@@ -1068,29 +1139,28 @@ async function switchMishnaView(view) {
   el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px">⏳ טוען פירוש...</div>';
 
   try {
-    let commentaryRef;
-    if (view === 'bartenura') {
-      commentaryRef = `Bartenura on ${_mishnaRef}`;
-    } else {
-      commentaryRef = `Steinsaltz on ${_mishnaRef}`;
-    }
+    const commentaryRef = `Bartenura on ${_mishnaRef}`;
     console.log(`[MishnaYomi] loading commentary: ${commentaryRef}`);
     const data = await sefariaText(commentaryRef, 300);
     const flat = heFlat(data).filter(Boolean);
-    if (!flat.length) throw new Error('אין פירוש זמין');
 
     el.className = 'content-text';
-    const label = view === 'bartenura' ? 'ברטנורא' : 'שטיינזלץ';
-    el.innerHTML = flat.map((v,i) =>
-      `<div style="margin-bottom:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04)">
-        <span style="color:var(--gold-dim);font-size:11px">${i+1} </span>
-        <span style="line-height:1.85">${v}</span>
-      </div>`
-    ).join('');
-    console.log(`[MishnaYomi] ${label} loaded: ${flat.length} entries`);
+    if (flat.length) {
+      // Inline Bartenura: show mishna text with commentary embedded
+      el.innerHTML = _mishnaFlat.map((v, i) => {
+        const bartText = (flat[i] && typeof flat[i] === 'string') ? flat[i] :
+                         (Array.isArray(flat[i]) ? flat[i].flat().filter(Boolean).join(' ') : '');
+        const bartHtml = bartText ?
+          `<span style="color:#7ab8d6;font-size:calc(var(--font-size) * 0.82);font-style:italic"> (ברטנורא: ${bartText.replace(/<[^>]+>/g,'')})</span>` : '';
+        return `<div style="margin-bottom:10px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}${bartHtml}</div>`;
+      }).join('');
+    } else {
+      throw new Error('אין פירוש ברטנורא זמין');
+    }
+    console.log(`[MishnaYomi] bartenura loaded: ${flat.length} entries`);
   } catch(e) {
     console.warn('[MishnaYomi] commentary error:', e.message);
-    el.innerHTML = `<div style="color:var(--muted);text-align:center;padding:20px">⚠️ ${e.message}<br><small>ייתכן שאין ${view === 'bartenura' ? 'ברטנורא' : 'שטיינזלץ'} למשנה זו בספריא</small></div>`;
+    el.innerHTML = `<div style="color:var(--muted);text-align:center;padding:20px">⚠️ ${e.message}</div>`;
   }
 }
 
