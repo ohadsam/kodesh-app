@@ -127,6 +127,7 @@ body {
   padding: 18px;
   margin-bottom: 14px;
   position: relative;
+  overflow: hidden;
 }
 .card-header {
   display: flex; align-items: center; justify-content: space-between;
@@ -146,7 +147,9 @@ body {
   font-size: calc(var(--font-size) * 1.05);
   line-height: 1.85;
   color: var(--cream);
-  white-space: normal;   /* was pre-wrap – caused every verse to be its own line */
+  white-space: normal;
+  overflow: hidden;
+  word-break: break-word;
 }
 .content-text.loading { color: var(--muted); font-style: italic; font-size: 14px; }
 
