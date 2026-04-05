@@ -92,7 +92,7 @@ let currentAliya = 'all';
 let rashiLoaded = false;
 let rashiVisible = false;
 
-const APP_VERSION  = '5.22';
+const APP_VERSION  = '5.23';
 const STORAGE_KEY  = 'kodesh_app_v1';
 const SIDDUR_CACHE_KEY = 'siddur_cache_v';
 
@@ -198,91 +198,22 @@ function heFlat(data) {
 function cleanSefariaHtml(str) {
   if (!str) return '';
 
-  // First: decode HTML entities
-  let s = str
+  return str
     .replace(/&thinsp;/g, '\u2009').replace(/&nbsp;/g, '\u00a0')
     .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&mdash;/g, '\u2014').replace(/&ndash;/g, '\u2013');
-
-  // ── PASS 1: Handle Pattern B (separate <small> labels followed by content) ──
-  // Pattern: <small>בקיץ</small> content <small>בחורף</small> content
-  // Convert to: \uE001קיץ::content\uE001\uE001חורף::content\uE001
-  s = s.replace(/<small[^>]*>\s*בקיץ\s*<\/small>\s*(.*?)\s*<small[^>]*>\s*בחורף\s*<\/small>\s*(.*?)(?=<|$)/gi,
-    (_, summerContent, winterContent) => {
-      const sc = summerContent.replace(/<[^>]+>/g, '').trim();
-      const wc = winterContent.replace(/<[^>]+>/g, '').trim();
-      return '\uE001קיץ::' + sc + '\uE001\uE001חורף::' + wc + '\uE001';
-    });
-  // Same but winter first
-  s = s.replace(/<small[^>]*>\s*בחורף\s*<\/small>\s*(.*?)\s*<small[^>]*>\s*בקיץ\s*<\/small>\s*(.*?)(?=<|$)/gi,
-    (_, winterContent, summerContent) => {
-      const wc = winterContent.replace(/<[^>]+>/g, '').trim();
-      const sc = summerContent.replace(/<[^>]+>/g, '').trim();
-      return '\uE001חורף::' + wc + '\uE001\uE001קיץ::' + sc + '\uE001';
-    });
-
-  // Pattern B for עשי"ת: <small>בעשי"ת</small> content
-  s = s.replace(/<small[^>]*>\s*בעשי.ת\s*<\/small>\s*(.*?)(?=<(?!\/?(b|i|strong|em|span)\b)|$)/gi,
-    (_, content) => {
-      const c = content.replace(/<[^>]+>/g, '').trim();
-      if (!c) return ''; // empty = just a label without content, skip
-      return '\uE001עשי"ת::' + c + '\uE001';
-    });
-
-  // ── PASS 2: Handle Pattern A (everything inside one <small> tag) ──
-  s = s.replace(/<small[^>]*>(.*?)<\/small>/gi, (_, inner) => {
-    const text = inner.replace(/<[^>]+>/g, '').trim();
-    const t = text.replace(/[\u0591-\u05C7]/g, '').trim();
-    
-    // Already processed (has \uE001 markers) – skip
-    if (inner.includes('\uE001')) return inner;
-    
-    // Combined summer/winter in one tag
-    const swMatch = t.match(/בקיץ\s+(.*?)\s*בחורף\s+(.*)/);
-    if (swMatch) {
-      return '\uE001קיץ::' + swMatch[1].trim() + '\uE001\uE001חורף::' + swMatch[2].trim() + '\uE001';
-    }
-    const wsMatch = t.match(/בחורף\s+(.*?)\s*בקיץ\s+(.*)/);
-    if (wsMatch) {
-      return '\uE001חורף::' + wsMatch[1].trim() + '\uE001\uE001קיץ::' + wsMatch[2].trim() + '\uE001';
-    }
-    
-    // עשי"ת with content
-    const aseretMatch = t.match(/^בעשי.ת\s+(.*)/);
-    if (aseretMatch && aseretMatch[1].trim()) {
-      return '\uE001עשי"ת::' + aseretMatch[1].trim() + '\uE001';
-    }
-    
-    // חנוכה/פורים
-    if (/^בחנוכה/.test(t)) {
-      const content = t.replace(/^בחנוכה\s*(?:ובפורים\s*)?/, '');
-      if (content) return '\uE001חנוכה/פורים::' + content + '\uE001';
-    }
-    
-    // ר"ח/חוה"מ
-    if (/^בר.ח/.test(t) || /ראש.?חודש/.test(t)) {
-      const content = t.replace(/^בר.ח\s*(?:ובחוה.מ\s*)?/, '');
-      if (content) return '\uE001ר"ח::' + content + '\uE001';
-    }
-    
-    // Single season labels without content (from Pattern B already handled)
-    if (/^בקיץ$/.test(t) || /^בחורף$/.test(t) || /^בעשי.ת$/.test(t)) {
-      return ''; // remove bare labels (content already extracted in Pass 1)
-    }
-    
-    // Other seasonal keywords
-    if (/(?:^|ב)(?:קיץ|חרף|חורף)/.test(t) || /^(?:טל|גשם|מטר)/.test(t)) {
-      return '\uE001' + text + '\uE001';
-    }
-    if (/(?:^|[לב])(?:ר[".]ח|ראש.?ח|פסח|שבועות|סוכות|חנוכה|פורים|יו"ט)/.test(t)) {
-      return '\uE001' + text + '\uE001';
-    }
-    
-    // Non-seasonal <small> → muted inline
-    return `<span style="color:var(--muted);font-style:italic;font-size:.9em">${text}</span>`;
-  });
-
-  return s
+    .replace(/&mdash;/g, '\u2014').replace(/&ndash;/g, '\u2013')
+    .replace(/<small[^>]*>(.*?)<\/small>/gi, (_, inner) => {
+      const text = inner.replace(/<[^>]+>/g, '').trim();
+      // Remove English instructions entirely (Sefaria adds these as <small><i>...</i></small>)
+      if (/^[A-Za-z(]/.test(text) || /^If you/.test(text) || /^During/.test(text) || /^From the/.test(text)) {
+        return ''; // Remove English instructions
+      }
+      // Hebrew instructional text (בעשי"ת, בקיץ, בחורף labels) → remove
+      const t = text.replace(/[\u0591-\u05C7]/g, '').trim();
+      if (/^בקיץ$|^בחורף$|^בעשי.ת$/.test(t)) return '';
+      // Muted inline text (ברוך שם, etc.)
+      return `<span style="color:var(--muted);font-style:italic;font-size:.9em">${text}</span>`;
+    })
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<(?!\/?(?:b|i|strong|em|span)\b)[^>]+>/gi, '')
     .trim();
