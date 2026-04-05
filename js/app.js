@@ -19,6 +19,10 @@ function showTab(name) {
   if (bn)  bn.classList.add('active');
   currentTab = name;
 
+  // Scroll active tab into view in both nav bars
+  if (tab) tab.scrollIntoView({ behavior: 'instant', block: 'nearest', inline: 'center' });
+  if (bn)  bn.scrollIntoView({ behavior: 'instant', block: 'nearest', inline: 'center' });
+
   // Scroll to top on every tab switch
   window.scrollTo({ top: 0, behavior: 'instant' });
   page.scrollTop = 0;
@@ -135,35 +139,9 @@ function toggleDateNav() {
 // TAB SCROLL SYNC
 // ═══════════════════════════════════════════
 function initTabScrollSync() {
-  const topTabs = document.getElementById('tabs');
-  const bottomNav = document.getElementById('bottom-nav');
-  if (!topTabs || !bottomNav) return;
-
-  let syncing = false;
-  let userScrolling = false;
-  let scrollTimeout = null;
-
-  // Only sync when user is actively touching/scrolling the tab bar
-  topTabs.addEventListener('touchstart', () => { userScrolling = true; }, { passive: true });
-  topTabs.addEventListener('touchend', () => { setTimeout(() => userScrolling = false, 300); }, { passive: true });
-  bottomNav.addEventListener('touchstart', () => { userScrolling = true; }, { passive: true });
-  bottomNav.addEventListener('touchend', () => { setTimeout(() => userScrolling = false, 300); }, { passive: true });
-
-  topTabs.addEventListener('scroll', () => {
-    if (syncing || !userScrolling) return;
-    syncing = true;
-    const ratio = topTabs.scrollLeft / (topTabs.scrollWidth - topTabs.clientWidth || 1);
-    bottomNav.scrollLeft = ratio * (bottomNav.scrollWidth - bottomNav.clientWidth);
-    requestAnimationFrame(() => syncing = false);
-  }, { passive: true });
-
-  bottomNav.addEventListener('scroll', () => {
-    if (syncing || !userScrolling) return;
-    syncing = true;
-    const ratio = bottomNav.scrollLeft / (bottomNav.scrollWidth - bottomNav.clientWidth || 1);
-    topTabs.scrollLeft = ratio * (topTabs.scrollWidth - topTabs.clientWidth);
-    requestAnimationFrame(() => syncing = false);
-  }, { passive: true });
+  // Instead of continuous scroll sync, just scroll the active tab into view
+  // when a tab is clicked in either bar
+  // This avoids the scrollIntoView interference issue
 }
 
 async function loadHebrewDate() {
