@@ -20,7 +20,7 @@
        NOTE: this is the ONLY version check. utils.js must NOT have another one. -->
   <script>
     (function() {
-      var V = '5.23';
+      var V = '5.25';
       // Show version in splash immediately
       var sv = document.getElementById('splash-version');
       if (sv) sv.textContent = 'גרסה ' + V;
@@ -66,6 +66,21 @@
 
 <!-- SPLASH -->
 <!-- OMER MODAL -->
+<!-- Reminder Check Modal (shown on app open) -->
+<div id="reminder-modal" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,.85);align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--card);border:1px solid var(--gold-dim);border-radius:18px;width:100%;max-width:420px;max-height:80vh;display:flex;flex-direction:column;direction:rtl">
+    <div style="padding:16px 18px 10px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+      <div style="font-family:'Frank Ruhl Libre',serif;font-size:17px;color:var(--gold);font-weight:700">📋 תזכורות להיום</div>
+      <button onclick="closeReminderModal()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:4px 8px">✕</button>
+    </div>
+    <div id="reminder-list" style="padding:14px 18px;overflow-y:auto;flex:1;font-size:14px;color:var(--cream);line-height:1.8"></div>
+    <div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:10px">
+      <button onclick="markAllRemindersDone()" style="flex:1;background:var(--addition-bg);border:1px solid var(--addition-border);color:var(--addition);padding:10px;border-radius:12px;font-size:13px;font-family:'Heebo',sans-serif;cursor:pointer;font-weight:600">✅ סמן הכל כבוצע</button>
+      <button onclick="closeReminderModal()" style="background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:10px 16px;border-radius:12px;font-size:13px;font-family:'Heebo',sans-serif;cursor:pointer">סגור</button>
+    </div>
+  </div>
+</div>
+
 <div id="omer-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.85);align-items:center;justify-content:center;padding:20px">
   <div style="background:var(--card);border:1px solid var(--border);border-radius:18px;width:100%;max-width:420px;max-height:85vh;display:flex;flex-direction:column">
     <!-- Header -->
@@ -91,7 +106,7 @@
   <div style="font-family:'Frank Ruhl Libre',serif;font-size:26px;color:var(--cream);font-weight:700">לימוד יומי</div>
   <p>מכין את הלמידה של היום...</p>
   <div class="spinner"></div>
-  <p id="splash-version" style="font-size:11px;color:var(--muted);margin-top:4px">גרסה 5.23</p>
+  <p id="splash-version" style="font-size:11px;color:var(--muted);margin-top:4px">גרסה 5.25</p>
 </div>
 
 <!-- SETTINGS PANEL -->
@@ -213,13 +228,44 @@
       </div>
     </div>
 
-    <!-- Version & Copyright - INSIDE settings-inner -->
+    <!-- Version & Copyright -->
     <div style="text-align:center;padding:18px 0 8px;border-top:1px solid var(--border);margin-top:8px">
       <div style="font-size:13px;font-weight:600;color:var(--gold-dim);margin-bottom:4px">📖 לימוד יומי</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">גרסה 5.23</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">גרסה 5.25</div>
+      <button onclick="showWhatsNew()" style="background:var(--card);border:1px solid var(--gold-dim);color:var(--gold);padding:6px 16px;border-radius:8px;font-size:11px;cursor:pointer;font-family:'Heebo',sans-serif;margin-bottom:6px">🆕 מה חדש?</button>
       <div style="font-size:11px;color:var(--muted)">© כל הזכויות שמורות לאוהד סמט</div>
     </div>
   </div>
+</div>
+
+<!-- What's New Modal -->
+<div id="whats-new-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000" onclick="closeWhatsNew()"></div>
+<div id="whats-new-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:88%;max-width:400px;max-height:80vh;overflow-y:auto;
+  background:var(--surface);border:1px solid var(--gold-dim);border-radius:16px;z-index:10001;padding:20px;direction:rtl">
+  <div style="font-size:16px;font-weight:700;color:var(--gold);margin-bottom:12px;text-align:center">🆕 מה חדש בגרסה 5.25</div>
+  <div style="font-size:13px;color:var(--cream);line-height:1.7" id="whats-new-content">
+    <div style="margin-bottom:10px"><b>📕 סידור</b></div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• באנר סטטוס: מראה מה אומרים ומה לא בכל תפילה</div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• הלל, מוסף, יעלה ויבוא – מותאם אוטומטית ליום</div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• ברכת המזון הועברה לטאב ברכות</div>
+    <div style="margin-bottom:10px"><b>📗 רמב"ם יומי</b> – טאב חדש!</div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• פרק יומי מהרמב"ם מספריא</div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• כפתור פירוש שטיינזלץ</div>
+    <div style="margin-bottom:10px"><b>📝 הרב זקס</b></div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• מאמרי "שיג ושיח" על פרשת השבוע</div>
+    <div style="margin-bottom:10px"><b>📚 דף יומי / משנה</b></div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• רש"י מוטמע בתוך הגמרא</div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• ברטנורא מוטמע בתוך המשנה</div>
+    <div style="margin-bottom:10px"><b>🌙 ספירת העומר</b></div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• נוסח מלא (יהי רצון + עלינו לשבח)</div>
+    <div style="margin-bottom:10px"><b>✨ ברכות</b></div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• כפתורים צפים + ניווט מהיר</div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• ברכת הלבנה – נוסח מלא</div>
+    <div style="margin-bottom:10px"><b>📅 ניווט ימים</b></div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• לחיצה על התאריך בטופבר פותחת ניווט ימים</div>
+  </div>
+  <button onclick="closeWhatsNew()" style="display:block;width:100%;margin-top:14px;background:var(--gold);color:#000;border:none;border-radius:10px;padding:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Heebo',sans-serif">👍 הבנתי</button>
 </div>
 
 <!-- TOP BAR -->
@@ -259,6 +305,7 @@
   <button class="tab" onclick="showTab('daf')" id="t-daf"><span class="icon">📚</span>דף יומי</button>
   <button class="tab" onclick="showTab('mishna')" id="t-mishna"><span class="icon">📜</span>משנה</button>
   <button class="tab" onclick="showTab('929')" id="t-929"><span class="icon">✡️</span>929</button>
+  <button class="tab" onclick="showTab('rambam')" id="t-rambam"><span class="icon">📗</span>רמב"ם</button>
   <button class="tab" onclick="showTab('parasha')" id="t-parasha"><span class="icon">📜</span>פרשה</button>
   <button class="tab" onclick="showTab('igeret')" id="t-igeret"><span class="icon">✉️</span>אגרת</button>
   <button class="tab" onclick="showTab('tefilot')" id="t-tefilot"><span class="icon">🤲</span>תפילות</button>
@@ -419,9 +466,16 @@
     </div>
   </div>
 
-  <!-- Special additions banner -->
-  <div id="siddur-additions-banner" style="display:none;margin-bottom:10px;padding:8px 12px;background:rgba(201,165,74,.12);border:1px solid var(--gold-dim);border-radius:10px;font-size:12px;color:var(--gold)">
-    ✨ <span id="siddur-additions-text"></span>
+  <!-- Prayer status: what to say and what not to say today -->
+  <div id="siddur-status-banner" style="display:none;margin-bottom:10px">
+    <div id="siddur-status-say" style="padding:8px 12px;background:rgba(61,140,90,.15);border:1px solid rgba(61,140,90,.4);border-radius:10px 10px 0 0;font-size:12px;color:#5cb87a;direction:rtl">
+      <div style="font-weight:700;margin-bottom:4px">✅ אומרים היום:</div>
+      <div id="siddur-status-say-list"></div>
+    </div>
+    <div id="siddur-status-skip" style="padding:8px 12px;background:rgba(180,80,60,.12);border:1px solid rgba(180,80,60,.3);border-top:none;border-radius:0 0 10px 10px;font-size:12px;color:#c87060;direction:rtl">
+      <div style="font-weight:700;margin-bottom:4px">❌ לא אומרים היום:</div>
+      <div id="siddur-status-skip-list"></div>
+    </div>
   </div>
 
   <!-- Prayer content with section nav -->
@@ -666,6 +720,24 @@
     <div id="tanach-content" class="content-text loading">טוען פרק תנ"ך...</div>
     <div class="source-link">
       מקור: <a href="https://www.sefaria.org" target="_blank">ספריא</a> | <a href="https://929.org.il" target="_blank">929.org.il</a>
+    </div>
+  </div>
+</div>
+
+<!-- ─── PAGE: RAMBAM YOMI ────────────────── -->
+<div class="page" id="page-rambam">
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title"><span class="emoji">📗</span>רמב"ם יומי</div>
+        <div class="card-subtitle" id="rambam-subtitle">טוען...</div>
+      </div>
+      <div id="done-rambam"></div>
+    </div>
+    <div id="rambam-view-buttons" class="aliya-tabs" style="margin-bottom:8px;gap:6px;flex-wrap:wrap"></div>
+    <div id="rambam-content" class="content-text loading">טוען רמב"ם יומי...</div>
+    <div class="source-link">
+      מקור: <a href="https://www.sefaria.org/texts/Halakhah/Mishneh%20Torah" target="_blank">משנה תורה – ספריא</a>
     </div>
   </div>
 </div>
@@ -974,7 +1046,7 @@
     💡 לכיול המצפן: הזז את הטלפון בתנועת ∞ (שמונה שוכב) מספר פעמים
   </div>
   <div style="text-align:center;color:var(--muted);font-size:11px;padding:12px 0 4px">
-    גרסה 5.23 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
+    גרסה 5.25 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
   </div>
 </div>
 
@@ -1018,6 +1090,7 @@
   <button class="bnav-btn" onclick="showTab('daf')" id="bn-daf"><span class="bicon">📚</span>דף</button>
   <button class="bnav-btn" onclick="showTab('mishna')" id="bn-mishna"><span class="bicon">📜</span>משנה</button>
   <button class="bnav-btn" onclick="showTab('929')" id="bn-929"><span class="bicon">✡️</span>929</button>
+  <button class="bnav-btn" onclick="showTab('rambam')" id="bn-rambam"><span class="bicon">📗</span>רמב"ם</button>
   <button class="bnav-btn" onclick="showTab('parasha')" id="bn-parasha"><span class="bicon">📜</span>פרשה</button>
   <button class="bnav-btn" onclick="showTab('igeret')" id="bn-igeret"><span class="bicon">✉️</span>אגרת</button>
   <button class="bnav-btn" onclick="showTab('tefilot')" id="bn-tefilot"><span class="bicon">🤲</span>תפילות</button>
@@ -1031,19 +1104,19 @@
      JavaScript modules (load order matters)
      v4.3 – querystring busts browser/SW cache
      ═══════════════════════════════════════ -->
-<script src="js/network-log.js?v=5.23"></script>
-<script src="js/utils.js?v=5.23"></script>
-<script src="js/settings.js?v=5.23"></script>
-<script src="js/app.js?v=5.23"></script>
-<script src="js/tehilim.js?v=5.23"></script>
-<script src="js/calendar.js?v=5.23"></script>
-<script src="js/content.js?v=5.23"></script>
-<script src="js/tefilot.js?v=5.23"></script>
-<script src="js/siddur-inserts.js?v=5.23"></script>
-<script src="js/siddur.js?v=5.23"></script>
-<script src="js/omer.js?v=5.23"></script>
-<script src="js/brachot.js?v=5.23"></script>
-<script src="js/misc.js?v=5.23"></script>
-<script src="js/init.js?v=5.23"></script>
+<script src="js/network-log.js?v=5.25"></script>
+<script src="js/utils.js?v=5.25"></script>
+<script src="js/settings.js?v=5.25"></script>
+<script src="js/app.js?v=5.25"></script>
+<script src="js/tehilim.js?v=5.25"></script>
+<script src="js/calendar.js?v=5.25"></script>
+<script src="js/content.js?v=5.25"></script>
+<script src="js/tefilot.js?v=5.25"></script>
+<script src="js/siddur-inserts.js?v=5.25"></script>
+<script src="js/siddur.js?v=5.25"></script>
+<script src="js/omer.js?v=5.25"></script>
+<script src="js/brachot.js?v=5.25"></script>
+<script src="js/misc.js?v=5.25"></script>
+<script src="js/init.js?v=5.25"></script>
 </body>
 </html>
