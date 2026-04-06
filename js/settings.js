@@ -205,3 +205,134 @@ async function nuclearReset() {
   console.log('[NuclearReset] reloading...');
   window.location.href = window.location.href.split('?')[0] + '?nocache=' + Date.now();
 }
+
+// ═══════════════════════════════════════════
+// WHAT'S NEW POPUP
+// ═══════════════════════════════════════════
+function showWhatsNew() {
+  const overlay = document.getElementById('whats-new-overlay');
+  const modal = document.getElementById('whats-new-modal');
+  if (overlay) overlay.style.display = 'block';
+  if (modal) modal.style.display = 'block';
+  // Mark as seen
+  appState._lastSeenVersion = APP_VERSION;
+  saveState();
+}
+
+function closeWhatsNew() {
+  const overlay = document.getElementById('whats-new-overlay');
+  const modal = document.getElementById('whats-new-modal');
+  if (overlay) overlay.style.display = 'none';
+  if (modal) modal.style.display = 'none';
+}
+
+function checkWhatsNew() {
+  const lastSeen = appState._lastSeenVersion || '';
+  if (lastSeen !== APP_VERSION) {
+    // Show after a short delay so splash finishes first
+    setTimeout(() => showWhatsNew(), 2500);
+  }
+}
+
+// ═══════════════════════════════════════════
+// REMINDER CHECK ON APP OPEN
+// ═══════════════════════════════════════════
+const REMINDER_ITEMS = [
+  { key: 'omer', name: '🌾 ספירת העומר', checkFn: () => {
+    const hd = appState?._lastHebrewDate;
+    if (!hd) return false;
+    const m = hd.hm, d = hd.hd;
+    return (m === 'Nisan' && d >= 16) || m === 'Iyar' || (m === 'Sivan' && d <= 5);
+  }},
+  { key: 'halacha',  name: '📖 הלכה יומית',     daily: true },
+  { key: 'tehilim',  name: '🙏 תהילים יומי',     daily: true },
+  { key: 'lashon',   name: '🗣 שמירת הלשון',     daily: true },
+  { key: 'daf',      name: '📚 דף יומי',         daily: true },
+  { key: 'mishna',   name: '📜 משנה יומית',       daily: true },
+  { key: 'rambam',   name: '📗 רמב"ם יומי',      daily: true },
+  { key: 'parasha',  name: '📜 פרשת השבוע',      weekly: true },
+];
+
+function checkRemindersOnOpen() {
+  const today = formatDate(new Date());
+  const doneMap = appState._remindersDone || {};
+  
+  // Clean old dates (keep only today)
+  for (const k of Object.keys(doneMap)) {
+    if (k !== today) delete doneMap[k];
+  }
+  appState._remindersDone = doneMap;
+  saveState();
+  
+  const todayDone = doneMap[today] || {};
+  const pending = [];
+  
+  for (const item of REMINDER_ITEMS) {
+    // Check if reminder is enabled
+    const r = appState?.reminders?.[item.key];
+    if (!r?.enabled) continue;
+    
+    // Check if applicable today (special check for omer)
+    if (item.checkFn && !item.checkFn()) continue;
+    
+    // Check if already done today
+    if (todayDone[item.key]) continue;
+    
+    // Check scheduled time – only show if scheduled time has passed
+    const [h, m] = (r.time || '08:00').split(':').map(Number);
+    const now = new Date();
+    if (now.getHours() < h || (now.getHours() === h && now.getMinutes() < m)) continue;
+    
+    pending.push(item);
+  }
+  
+  if (!pending.length) return false;
+  
+  // Build the reminder list
+  const listEl = document.getElementById('reminder-list');
+  if (!listEl) return false;
+  
+  listEl.innerHTML = pending.map(item => `
+    <label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer">
+      <input type="checkbox" id="rem-chk-${item.key}" onchange="toggleReminderDone('${item.key}', this.checked)"
+        style="width:20px;height:20px;accent-color:var(--gold);flex-shrink:0">
+      <span style="font-family:'Frank Ruhl Libre',serif;font-size:15px">${item.name}</span>
+    </label>
+  `).join('') + `
+    <div style="margin-top:10px;font-size:11px;color:var(--muted);text-align:center">
+      סמן את מה שכבר ביצעת היום
+    </div>`;
+  
+  window._pendingReminders = pending;
+  const modal = document.getElementById('reminder-modal');
+  if (modal) modal.style.display = 'flex';
+  return true;
+}
+
+function toggleReminderDone(key, done) {
+  const today = formatDate(new Date());
+  if (!appState._remindersDone) appState._remindersDone = {};
+  if (!appState._remindersDone[today]) appState._remindersDone[today] = {};
+  appState._remindersDone[today][key] = done;
+  saveState();
+}
+
+function markAllRemindersDone() {
+  const today = formatDate(new Date());
+  if (!appState._remindersDone) appState._remindersDone = {};
+  if (!appState._remindersDone[today]) appState._remindersDone[today] = {};
+  for (const item of (window._pendingReminders || [])) {
+    appState._remindersDone[today][item.key] = true;
+    const chk = document.getElementById('rem-chk-' + item.key);
+    if (chk) chk.checked = true;
+  }
+  saveState();
+  setTimeout(() => closeReminderModal(), 500);
+}
+
+function closeReminderModal() {
+  const modal = document.getElementById('reminder-modal');
+  if (modal) modal.style.display = 'none';
+  // After reminders, check what's new
+  if (typeof checkWhatsNew === 'function') checkWhatsNew();
+}

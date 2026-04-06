@@ -32,6 +32,12 @@ async function init() {
       const splash = document.getElementById('splash');
       if (splash) splash.classList.add('hide');
       setTimeout(() => { const s = document.getElementById('splash'); if(s) s.remove(); }, 600);
+      // Check reminders first (will chain to what's new after closing)
+      setTimeout(() => {
+        const hadReminders = typeof checkRemindersOnOpen === 'function' ? checkRemindersOnOpen() : false;
+        // If no reminders, check what's new directly
+        if (!hadReminders && typeof checkWhatsNew === 'function') checkWhatsNew();
+      }, 500);
     }, 1500);
 
     console.log('✅ [init] DONE');

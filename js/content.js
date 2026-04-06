@@ -1240,3 +1240,87 @@ async function loadTanach929() {
     el.textContent = 'שגיאה בטעינה: ' + e.message;
   }
 }
+
+// ═══════════════════════════════════════════
+// RAMBAM YOMI
+// ═══════════════════════════════════════════
+let _rambamRef = null;
+let _rambamView = 'text';
+let _rambamFlat = [];
+
+async function loadRambamYomi() {
+  const el    = document.getElementById('rambam-content');
+  const subEl = document.getElementById('rambam-subtitle');
+  el.className = 'content-text loading'; el.textContent = 'טוען רמב"ם יומי...';
+  _rambamView = 'text';
+  try {
+    console.log('[RambamYomi] fetching calendar...');
+    const cal = await fetchWithDelay('https://www.sefaria.org/api/calendars?diaspora=0');
+    const item = (cal?.calendar_items || []).find(i =>
+      (i.title?.en || '').toLowerCase().includes('daily rambam') ||
+      (i.title?.he || '').includes('רמב"ם') ||
+      (i.title?.en || '').toLowerCase().includes('rambam')
+    );
+    if (!item) throw new Error('לא נמצא רמב"ם יומי בלוח');
+    _rambamRef = item.ref;
+    console.log('[RambamYomi] ref:', item.ref, 'he:', item.heRef);
+    subEl.textContent = item.heRef || item.ref;
+
+    const data = await sefariaText(item.ref, 400);
+    _rambamFlat = heFlat(data);
+    if (!_rambamFlat.length) throw new Error('אין טקסט עברי');
+
+    _renderRambamButtons();
+    _renderRambamContent();
+    updateDoneButton('rambam', item.ref);
+    console.log(`[RambamYomi] OK – ${_rambamFlat.length} sections`);
+  } catch(e) {
+    console.error('[RambamYomi] error:', e);
+    el.textContent = 'שגיאה בטעינה: ' + e.message;
+  }
+}
+
+function _renderRambamButtons() {
+  const btnWrap = document.getElementById('rambam-view-buttons');
+  if (!btnWrap) return;
+  btnWrap.innerHTML = `
+    <div class="aliya-tab ${_rambamView==='text'?'active':''}" onclick="switchRambamView('text')">📖 רמב"ם</div>
+    <div class="aliya-tab ${_rambamView==='steinsaltz'?'active':''}" onclick="switchRambamView('steinsaltz')">📚 שטיינזלץ</div>
+  `;
+}
+
+async function switchRambamView(view) {
+  _rambamView = view;
+  _renderRambamButtons();
+  const el = document.getElementById('rambam-content');
+  if (view === 'text') { _renderRambamContent(); return; }
+  if (!_rambamRef) return;
+  el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px">⏳ טוען פירוש שטיינזלץ...</div>';
+  try {
+    // Steinsaltz on Mishneh Torah uses format: "Steinsaltz on Mishneh Torah, Book, Chapter"
+    const commentaryRef = `Steinsaltz on ${_rambamRef}`;
+    console.log('[RambamYomi] loading:', commentaryRef);
+    const data = await sefariaText(commentaryRef, 300);
+    const flat = heFlat(data).filter(Boolean);
+    if (!flat.length) throw new Error('אין פירוש שטיינזלץ זמין');
+    el.className = 'content-text';
+    el.innerHTML = flat.map((v,i) =>
+      `<div style="margin-bottom:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04)">
+        <span style="color:var(--gold-dim);font-size:11px">${i+1} </span>
+        <span style="line-height:1.85">${v}</span>
+      </div>`
+    ).join('');
+    console.log('[RambamYomi] steinsaltz loaded:', flat.length, 'entries');
+  } catch(e) {
+    console.warn('[RambamYomi] commentary error:', e.message);
+    el.innerHTML = `<div style="color:var(--muted);text-align:center;padding:20px">⚠️ ${e.message}</div>`;
+  }
+}
+
+function _renderRambamContent() {
+  const el = document.getElementById('rambam-content');
+  el.className = 'content-text';
+  el.innerHTML = _rambamFlat.map((v,i) =>
+    `<div style="margin-bottom:8px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}</div>`
+  ).join('');
+}

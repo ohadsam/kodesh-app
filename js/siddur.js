@@ -177,7 +177,7 @@ function getSiddurSections(nusach, prayer) {
              'Weekday_Shacharit,_Torah_Reading'),
       isAddition:true, condition:'isTorahReadingDay' },
     { label:'מוסף ר"ח ✨',        ref: r('Musaf_for_Rosh_Chodesh', null, null), isAddition:true, condition:'isRoshChodesh' },
-    { label:'מוסף לשלוש רגלים ✨', ref: r('Musaf_for_Shalosh_Regalim', null, null), isAddition:true, condition:'isShaloshRegalim' },
+    { label:"מוסף לחול המועד ✨", ref: "Weekday_Siddur_Sefard_Linear,_Musaf_for_Chol_Hamo'ed", isAddition:true, condition:'isShaloshRegalim' },
     { label:'שירות חנוכה ✨',     ref: r('Chanukah_Service', null, null), isAddition:true, condition:'isChanuka' },
     { label:"אשרי / ובא לציון",
       ref: r("The_Morning_Prayers,_Ashrei_U'va_L'Tzion", null, null) },
@@ -348,12 +348,64 @@ function setSiddurPrayer(p) {
 
 function shouldShowSection(s) {
   if (!s.condition) return true;
-  // If calendar not initialized yet, hide all additions (isAddition=true)
   if (!window._siddurCal && s.isAddition) return false;
   const fn = SIDDUR_CONDITIONS[s.condition];
   if (!fn) return true;
   const result = fn();
   return s.conditionType === 'skip' ? !result : !!result;
+}
+
+function _updatePrayerStatusBanner(allSections, visibleSections) {
+  const banner = document.getElementById('siddur-status-banner');
+  if (!banner) return;
+  
+  const cal = window._siddurCal || {};
+  const isWinter = typeof _isWinterSeason === 'function' ? _isWinterSeason() : false;
+  
+  const sayItems = [];
+  const skipItems = [];
+  
+  // Section-based items (additions shown/hidden)
+  const addSections = allSections.filter(s => s.isAddition && s.condition);
+  for (const s of addSections) {
+    const shown = visibleSections.includes(s);
+    const name = s.label.replace(' ✨', '');
+    if (shown) sayItems.push(name);
+    else skipItems.push(name);
+  }
+  
+  // Inline Amida inserts (always in text, user needs to know what to say)
+  if (isWinter) {
+    sayItems.push('משיב הרוח ומוריד הגשם');
+    sayItems.push('ותן טל ומטר לברכה');
+    skipItems.push('מוריד הטל');
+    skipItems.push('ותן ברכה');
+  } else {
+    sayItems.push('מוריד הטל');
+    sayItems.push('ותן ברכה');
+    skipItems.push('משיב הרוח ומוריד הגשם');
+    skipItems.push('ותן טל ומטר לברכה');
+  }
+  
+  // עשי"ת
+  const hd = (typeof appState !== 'undefined') ? appState?._lastHebrewDate : null;
+  const isAseret = hd && hd.hm === 'Tishrei' && hd.hd >= 1 && hd.hd <= 10;
+  if (isAseret) {
+    sayItems.push('זכרנו לחיים (עשי"ת)');
+  } else {
+    skipItems.push('תוספות עשרת ימי תשובה');
+  }
+  
+  // על הנסים
+  if (cal.isChanuka) sayItems.push('על הנסים – חנוכה');
+  else if (cal.isPurim) sayItems.push('על הנסים – פורים');
+  else skipItems.push('על הנסים');
+  
+  const sayEl = document.getElementById('siddur-status-say-list');
+  const skipEl = document.getElementById('siddur-status-skip-list');
+  if (sayEl) sayEl.innerHTML = sayItems.length ? sayItems.join(' · ') : 'אין תוספות מיוחדות';
+  if (skipEl) skipEl.innerHTML = skipItems.length ? skipItems.join(' · ') : '—';
+  banner.style.display = 'block';
 }
 
 async function initSiddur() {
@@ -661,6 +713,9 @@ async function loadSiddur() {
   const sections    = allSections.filter(s => shouldShowSection(s));
   const total       = sections.length;
   console.log('[Siddur] visible sections=', total, sections.map(s=>s.label));
+
+  // ── Prayer status banner ──────────────────────
+  _updatePrayerStatusBanner(allSections, sections);
 
   // ── Progress bar ──────────────────────────
   const progressWrap = document.getElementById('siddur-progress-wrap');

@@ -1,46 +1,56 @@
 // ═══════════════════════════════════════════════════════════════════
-// SIDDUR-INSERTS.JS  –  post-render seasonal text show/hide/styling
+// SIDDUR-INSERTS.JS – seasonal text STYLING (not hiding)
 //
-// After rendering, scan each <p> for known seasonal Hebrew text patterns.
-// - If condition IS active → wrap in green styled block
-// - If condition is NOT active → REMOVE the paragraph entirely
+// Instead of hiding seasonal text, we STYLE it:
+// - Active: green block (say this today)
+// - Inactive: red-muted strikethrough (don't say this today)
+// The user can always see what exists and what to say/skip.
 // ═══════════════════════════════════════════════════════════════════
 
 const _sd = s => s.replace(/[\u0591-\u05C7]/g, '').trim();
 
 function _greenBlock(label, innerHtml) {
-  const lbl = label
-    ? `<span style="display:block;font-size:9px;font-family:'Heebo',sans-serif;` +
-      `color:var(--addition);font-style:normal;font-weight:700;letter-spacing:.4px;` +
-      `margin-bottom:3px;opacity:.9">${label}</span>`
-    : '';
-  return `<p style="display:block;margin:4px 0 10px 0;padding:7px 12px 6px;` +
-         `background:var(--addition-bg);border-right:3px solid var(--addition);` +
-         `border-radius:0 6px 6px 0;font-family:'Frank Ruhl Libre',serif;` +
-         `font-size:var(--font-size);color:var(--addition);font-style:italic;` +
-         `font-weight:600;line-height:1.85">` + lbl + innerHtml + `</p>`;
+  const lbl = `<span style="display:block;font-size:9px;font-family:'Heebo',sans-serif;
+    color:var(--addition);font-style:normal;font-weight:700;letter-spacing:.4px;
+    margin-bottom:3px;opacity:.9">✅ ${label}</span>`;
+  return `<p style="display:block;margin:4px 0 10px 0;padding:7px 12px 6px;
+    background:var(--addition-bg);border-right:3px solid var(--addition);
+    border-radius:0 6px 6px 0;font-family:'Frank Ruhl Libre',serif;
+    font-size:var(--font-size);color:var(--addition);font-style:italic;
+    font-weight:600;line-height:1.85">${lbl}${innerHtml}</p>`;
+}
+
+function _redBlock(label, innerHtml) {
+  const lbl = `<span style="display:block;font-size:9px;font-family:'Heebo',sans-serif;
+    color:#c87060;font-style:normal;font-weight:700;letter-spacing:.4px;
+    margin-bottom:3px;opacity:.9">❌ ${label} – לא אומרים</span>`;
+  return `<p style="display:block;margin:4px 0 10px 0;padding:7px 12px 6px;
+    background:rgba(180,80,60,.08);border-right:3px solid rgba(180,80,60,.3);
+    border-radius:0 6px 6px 0;font-family:'Frank Ruhl Libre',serif;
+    font-size:calc(var(--font-size)*0.85);color:rgba(180,80,60,.5);
+    font-style:italic;line-height:1.85;text-decoration:line-through">${lbl}${innerHtml}</p>`;
 }
 
 const SEASONAL_DEFS = [
-  { label: 'קיץ – מוריד הטל', starts: /^מוריד הטל$/,
+  { label: 'מוריד הטל (קיץ)', starts: /^מוריד הטל$/,
     show: () => !_isWinterSeason() },
-  { label: 'חורף – משיב הרוח', starts: /משיב הרוח/,
+  { label: 'משיב הרוח ומוריד הגשם (חורף)', starts: /משיב הרוח/,
     show: () => _isWinterSeason() },
-  { label: 'קיץ – ותן ברכה', starts: /^ותן ברכה$/,
+  { label: 'ותן ברכה (קיץ)', starts: /^ותן ברכה$/,
     show: () => !_isWinterSeason() },
-  { label: 'חורף – ותן טל ומטר', starts: /ותן טל ומטר/,
+  { label: 'ותן טל ומטר לברכה (חורף)', starts: /ותן טל ומטר/,
     show: () => _isWinterSeason() },
-  { label: 'ר"ח / חוה"מ', starts: /יעלה ויבוא/,
+  { label: 'יעלה ויבוא', starts: /יעלה ויבוא/,
     show: () => { const c = window._siddurCal||{}; return c.isRoshChodesh || c.isCholHamoed || c.isYomTov; } },
-  { label: 'חנוכה / פורים', starts: /על הנסים/,
+  { label: 'על הנסים', starts: /על הנסים/,
     show: () => { const c = window._siddurCal||{}; return c.isChanuka || c.isPurim; } },
-  { label: 'עשי"ת', starts: /^זכרנו לחיים/,
+  { label: 'זכרנו לחיים (עשי"ת)', starts: /^זכרנו לחיים/,
     show: () => _isAseretYemei() },
-  { label: 'עשי"ת', starts: /^מי כמוך אב הרחמן/,
+  { label: 'מי כמוך אב הרחמן (עשי"ת)', starts: /^מי כמוך אב הרחמן/,
     show: () => _isAseretYemei() },
-  { label: 'עשי"ת', starts: /^וכתוב לחיים טובים/,
+  { label: 'וכתוב לחיים (עשי"ת)', starts: /^וכתוב לחיים/,
     show: () => _isAseretYemei() },
-  { label: 'עשי"ת', starts: /^בספר חיים ברכה ושלום/,
+  { label: 'בספר חיים (עשי"ת)', starts: /^בספר חיים/,
     show: () => _isAseretYemei() },
 ];
 
@@ -58,12 +68,12 @@ function wrapSeasonalParagraphs(html, isAdd) {
     if (!text) return part;
     for (const def of SEASONAL_DEFS) {
       if (def.starts.test(text)) {
+        const innerMatch = part.match(/<p[^>]*>([\s\S]*)<\/p>/);
+        const inner = innerMatch ? innerMatch[1] : text;
         if (def.show()) {
-          const innerMatch = part.match(/<p[^>]*>([\s\S]*)<\/p>/);
-          const inner = innerMatch ? innerMatch[1] : text;
           return _greenBlock(def.label, inner);
         } else {
-          return ''; // HIDE
+          return _redBlock(def.label, inner);
         }
       }
     }
