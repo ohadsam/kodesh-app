@@ -393,6 +393,15 @@ function _updatePrayerStatusBanner(allSections, visibleSections) {
     skipItems.push('תוספות עשרת ימי תשובה');
   }
   
+  // יעלה ויבוא — inline in Amida, not a separate section
+  const sayYaaleh = cal.isRoshChodesh || cal.isCholHamoed || cal.isYomTov;
+  if (sayYaaleh) {
+    const occasion = cal.isRoshChodesh ? 'ר"ח' : cal.isCholHamoed ? 'חול המועד' : 'יו"ט';
+    sayItems.push(`יעלה ויבוא (${occasion})`);
+  } else {
+    skipItems.push('יעלה ויבוא');
+  }
+
   // על הנסים
   if (cal.isChanuka) sayItems.push('על הנסים – חנוכה');
   else if (cal.isPurim) sayItems.push('על הנסים – פורים');
@@ -521,10 +530,49 @@ async function initSiddur() {
     // ── computed ──
     isYomTov: todayEvents.some(t => /יום טוב|Yom Tov|Rosh Hashana|Yom Kippur|Sukkot I(?!\S)|Pesach I(?!\S)|Shavuot I(?!\S)|שמחת תורה|שמיני עצרת|פסח|שבועות|ראש השנה|יום כיפור/i.test(t)),
     get skipTachanun() {
-      return this.isRoshChodesh || this.isCholHamoed || this.isChanuka ||
-             this.isPurim || this.isSunday || this.isShabbat || this.isYomTov ||
-             // Skip tachanun on all Nisan, Lag BaOmer, 14-15 Adar, Yom HaAtzmaut, etc.
-             todayEvents.some(t => /יום טוב|Yom Tov|Holiday|Lag BaOmer|ל"ג בעומר|יום העצמאות|Independence|יום ירושלים|Jerusalem Day|ט"ו בשבט|Tu BiShvat|Tu B.Shvat|שושן פורים|Shushan/i.test(t));
+      const hd = appState?._lastHebrewDate;
+      const m = hd?.hm, d = hd?.hd;
+
+      // Always skip:
+      if (this.isShabbat) return true;
+      if (this.isYomTov)  return true;
+      if (this.isCholHamoed) return true;
+      if (this.isRoshChodesh) return true;
+      if (this.isChanuka) return true;
+      if (this.isPurim)   return true;
+      // Sunday – skip only shacharit (handled by prayer type elsewhere; we skip always here)
+      if (this.isSunday)  return true;
+
+      if (hd) {
+        // כל חודש ניסן
+        if (m === 'Nisan') return true;
+        // מיום כיפור (י' תשרי) עד ר"ח חשוון (כולל) = תשרי 10-30
+        if (m === 'Tishrei' && d >= 10) return true;
+        // ט"ו בשבט
+        if (m === 'Shevat' && d === 15) return true;
+        // פורים: י"ד וט"ו אדר (א' ו-ב')
+        if ((m === 'Adar' || m === 'Adar I' || m === 'Adar II') && (d === 14 || d === 15)) return true;
+        // שושן פורים (ט"ו) – already covered above
+        // ל"ג בעומר (י"ח אייר)
+        if (m === 'Iyar' && d === 18) return true;
+        // יום העצמאות (ה' אייר)
+        if (m === 'Iyar' && d === 5) return true;
+        // יום ירושלים (כ"ח אייר)
+        if (m === 'Iyar' && d === 28) return true;
+        // מר"ח סיוון עד י"ב סיוון (כולל)
+        if (m === 'Sivan' && d <= 12) return true;
+        // תשעה באב (ט' באב)
+        if (m === 'Av' && d === 9) return true;
+        // ט"ו באב
+        if (m === 'Av' && d === 15) return true;
+      }
+
+      // Hebcal event-based fallbacks
+      if (todayEvents.some(t =>
+        /Lag BaOmer|ל"ג בעומר|Independence Day|יום העצמאות|Jerusalem Day|יום ירושלים|Tu BiShvat|ט"ו בשבט|Shushan Purim|שושן פורים/i.test(t)
+      )) return true;
+
+      return false;
     },
   };
   console.log('[Siddur] cal:', JSON.stringify({
@@ -672,6 +720,60 @@ function _staticTextToHtml(rawText, isAdd) {
   return blocks.map(b => `<p style="${baseStyle}">${b}</p>`).join('');
 }
 
+// Replace inline seasonal phrases that appear together in one paragraph.
+// Works on rendered HTML by direct text search-and-replace.
+// Handles nikud variants by matching both with-nikud and plain Hebrew.
+function _fixAmidaSeasonalWords(html) {
+  const winter = (typeof _isWinterSeason === 'function') ? _isWinterSeason() : false;
+
+  const SAY   = 'color:var(--addition);font-weight:700';
+  const SKIP  = 'color:rgba(180,80,60,.55);text-decoration:line-through;font-size:.9em';
+  const sayTag  = (t, lbl) => `<span style="${SAY}" title="${lbl}">✅ ${t}</span>`;
+  const skipTag = (t, lbl) => `<span style="${SKIP}" title="${lbl}">❌ ${t}</span>`;
+
+  // מוריד הטל (summer) vs משיב הרוח ומוריד הגשם (winter)
+  // Both may appear in same paragraph — mark each inline
+  const GESHEM_RE = /מַשִּׁיב הָרוּחַ וּמוֹרִיד הַגֶּשֶׁם|משיב הרוח ומוריד הגשם/g;
+  const TAL_RE    = /מוֹרִיד הַטָּל|מוריד הטל/g;
+  if (winter) {
+    html = html.replace(GESHEM_RE, m => sayTag(m,  'אומרים מחשוון עד פסח'));
+    html = html.replace(TAL_RE,    m => skipTag(m, 'לא אומרים בחורף'));
+  } else {
+    html = html.replace(GESHEM_RE, m => skipTag(m, 'לא אומרים בקיץ'));
+    html = html.replace(TAL_RE,    m => sayTag(m,  'אומרים מפסח עד חשוון'));
+  }
+
+  // ותן ברכה (summer) vs ותן טל ומטר לברכה (winter)
+  const MATAR_RE  = /וְתֵן טַל וּמָטָר לִבְרָכָה|ותן טל ומטר לברכה/g;
+  const BRACHA_RE = /וְתֵן בְּרָכָה|ותן ברכה/g;
+  if (winter) {
+    html = html.replace(MATAR_RE,  m => sayTag(m,  'אומרים בחורף'));
+    html = html.replace(BRACHA_RE, m => skipTag(m, 'לא אומרים בחורף'));
+  } else {
+    html = html.replace(MATAR_RE,  m => skipTag(m, 'לא אומרים בקיץ'));
+    html = html.replace(BRACHA_RE, m => sayTag(m,  'אומרים בקיץ'));
+  }
+
+  // יעלה ויבוא — inline inside Amida text
+  const cal = window._siddurCal || {};
+  const sayYaaleh = cal.isRoshChodesh || cal.isCholHamoed || cal.isYomTov;
+  const YAALEH_RE = /יַעֲלֶה וְיָבֹא|יעלה ויבוא/;
+  if (YAALEH_RE.test(html.replace(/<[^>]+>/g, ''))) {
+    if (sayYaaleh) {
+      // Already shown via wrapSeasonalParagraphs — add green label if not already wrapped
+      if (!html.includes('✅ יעלה ויבוא') && !html.includes('addition-bg')) {
+        html = html.replace(/(יַעֲלֶה וְיָבֹא|יעלה ויבוא)/, m => sayTag(m, 'אומרים בר"ח, חול המועד ויו"ט'));
+      }
+    } else {
+      if (!html.includes('❌')) {
+        html = html.replace(/(יַעֲלֶה וְיָבֹא|יעלה ויבוא)/, m => skipTag(m, 'לא אומרים היום'));
+      }
+    }
+  }
+
+  return html;
+}
+
 // Fetch a single section and return rendered HTML
 // Returns ONLY the inner text content (no wrapper div with condition label)
 // The skeleton wrapper (with label) stays in place; we replace only the content placeholder
@@ -716,6 +818,8 @@ async function _fetchSectionHtml(s, _unused, yaalehOccasion) {
   if (typeof wrapSeasonalParagraphs === 'function' && !s.isAddition) {
     html = wrapSeasonalParagraphs(html, false);
   }
+  // Fix inline seasonal words that Sefaria puts in same paragraph (מוריד הטל / משיב הרוח, ותן ברכה / ותן טל)
+  html = _fixAmidaSeasonalWords(html);
   _putCache(s.ref, html);
   console.log('[Siddur] 🌐 fetched-network:', s.label, '→', paragraphs.length, 'paragraphs,', flat.length, 'verses');
   return html;

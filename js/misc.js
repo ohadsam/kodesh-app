@@ -92,7 +92,7 @@ function updateCompassUI() {
     const arrowEl = document.getElementById('compass-arrows');
     if (arrowEl) arrowEl.style.transform = `rotate(${needleAngle}deg)`;
 
-    // Legacy elements (may not exist)
+    // Legacy elements
     const needle = document.getElementById('jerusalem-needle');
     const tail   = document.getElementById('jerusalem-needle-tail');
     const star   = document.getElementById('jerusalem-star');
@@ -100,23 +100,33 @@ function updateCompassUI() {
     if (tail)   tail.style.transform   = `rotate(${needleAngle}deg)`;
     if (star)   star.style.transform   = `translate(-50%,-50%) rotate(${needleAngle}deg) translateY(-100px)`;
 
-    // Alignment
-    const diff = Math.abs(((needleAngle+180)%360)-180);
-    console.log('[Compass] deviceHeading:', Math.round(deviceHeading), '° | qiblaAngle:', Math.round(qiblaAngle), '° | needleAngle:', Math.round(needleAngle), '° | diff from forward:', Math.round(diff), '°');
-    const ind  = document.getElementById('alignment-indicator');
+    // Normalize diff to -180..+180 for directional feedback
+    const normDiff = ((needleAngle % 360) + 540) % 360 - 180;
+    const absDiff = Math.abs(normDiff);
+    console.log('[Compass] deviceHeading:', Math.round(deviceHeading), '° | qiblaAngle:', Math.round(qiblaAngle), '° | needleAngle:', Math.round(needleAngle), '° | diff from forward:', Math.round(absDiff), '°');
+    const ind = document.getElementById('alignment-indicator');
     if (ind) {
-      if (diff < 10)      { ind.style.cssText += ';background:rgba(61,140,90,.25);color:#5cb87a;border-color:#3d8c5a'; ind.textContent='✅ פנה ירושלים! התפלל כעת'; }
-      else if (diff < 25) { ind.style.cssText += ';background:rgba(201,165,74,.2);color:var(--gold);border-color:var(--gold-dim)'; ind.textContent='↻ כמעט – סובב עוד קצת'; }
-      else                { ind.style.cssText += ';background:rgba(100,70,20,.2);color:var(--muted);border-color:var(--border)'; ind.textContent='↑ סובב את הטלפון עד שהחץ מצביע למעלה'; }
+      if (absDiff < 8) {
+        ind.style.cssText += ';background:rgba(61,140,90,.25);color:#5cb87a;border-color:#3d8c5a';
+        ind.textContent = '✅ פנה ירושלים! התפלל כעת';
+      } else if (absDiff < 20) {
+        const dir = normDiff > 0 ? 'שמאלה ←' : '← ימינה';
+        ind.style.cssText += ';background:rgba(201,165,74,.2);color:var(--gold);border-color:var(--gold-dim)';
+        ind.textContent = `↻ כמעט – סובב ${dir} ${Math.round(absDiff)}°`;
+      } else {
+        const dir = normDiff > 0 ? 'שמאלה ←' : '← ימינה';
+        ind.style.cssText += ';background:rgba(100,70,20,.2);color:var(--muted);border-color:var(--border)';
+        ind.textContent = `סובב ${dir} ${Math.round(absDiff)}° – החץ יצביע לירושלים`;
+      }
     }
-    // Tilt warning – phone too upright reduces accuracy (beta near 90 = portrait)
+    // Tilt warning
     const tiltWarn = document.getElementById('tilt-warning');
     if (tiltWarn && deviceBeta !== null) {
       tiltWarn.style.display = Math.abs(deviceBeta) > 30 ? 'block' : 'none';
     }
   } else {
     const ind = document.getElementById('alignment-indicator');
-    if (ind) { ind.textContent='לחץ "הפעל חיישן כיוון" למטה'; ind.style.color='var(--muted)'; }
+    if (ind) { ind.textContent = 'לחץ "הפעל חיישן כיוון" למטה'; ind.style.color = 'var(--muted)'; }
     console.log('[Compass] no device heading yet – waiting for sensor data');
   }
 }

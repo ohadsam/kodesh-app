@@ -1305,13 +1305,15 @@ async function switchRambamView(view) {
     console.log('[RambamYomi] loading inline:', commentaryRef);
     const data = await sefariaText(commentaryRef, 300);
 
-    // Build per-halacha commentary: data is array where each element = one halacha's commentary
-    // Each element may itself be an array of paragraphs — join them
-    const rawArr = Array.isArray(data) ? data : [];
+    // data.he is an array where index i = commentary text for halacha i+1
+    // Each entry may be a string or array of paragraph strings
+    const rawArr = Array.isArray(data?.he) ? data.he : [];
+    if (!rawArr.length) throw new Error('אין פירוש שטיינזלץ זמין');
+
+    // Build per-halacha text strings
     const byHalacha = rawArr.map(entry => {
       if (!entry) return '';
       if (Array.isArray(entry)) {
-        // Multiple paragraphs for this halacha — join them
         return entry.flat(Infinity).filter(Boolean)
           .map(s => String(s).replace(/<[^>]+>/g, '').trim())
           .filter(Boolean).join(' ');
@@ -1322,7 +1324,6 @@ async function switchRambamView(view) {
     if (!byHalacha.some(Boolean)) throw new Error('אין פירוש שטיינזלץ זמין');
 
     el.className = 'content-text';
-    // Inline: rambam halacha + steinsaltz below it (index-aligned)
     el.innerHTML = _rambamFlat.map((v, i) => {
       const stText = byHalacha[i] || '';
       const stHtml = stText
@@ -1339,7 +1340,7 @@ async function switchRambamView(view) {
         ${stHtml}
       </div>`;
     }).join('');
-    console.log('[RambamYomi] steinsaltz inline:', byHalacha.filter(Boolean).length, 'aligned entries');
+    console.log('[RambamYomi] steinsaltz inline:', byHalacha.filter(Boolean).length, 'entries aligned to', _rambamFlat.length, 'halachot');
   } catch(e) {
     console.warn('[RambamYomi] commentary error:', e.message);
     el.innerHTML = `<div style="color:var(--muted);text-align:center;padding:20px">⚠️ ${e.message}</div>`;
