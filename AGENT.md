@@ -178,3 +178,42 @@ could be more precise for edge cases.
 - Font size slider
 - Offline improvements
 - Selichot for fast days
+
+---
+
+## v5.27 (April 9, 2026) – Fixes
+
+### Siddur – seasonal text
+- `_renderParagraphs` now shows RED strikethrough for wrong-season \uE002 blocks instead of deleting them
+- Helper `_shouldShowSeasonalLabel(label)` centralizes all season/calendar logic
+- מוריד הטל, משיב הרוח, ותן ברכה, ותן טל ומטר — always visible (green ✅ or red ❌)
+- על הנסים (חנוכה/פורים labels), יעלה ויבוא — same treatment
+- Status banner now includes tachanun reason (ר"ח, חנוכה, ניסן, etc.)
+
+### Rambam Steinsaltz alignment
+- `switchRambamView('steinsaltz')` now uses `rawArr.map()` per-halacha instead of `heFlat()`
+- Each entry in Sefaria's he array corresponds to one halacha — paragraphs joined with space
+- Eliminates index drift when one halacha has multiple Steinsaltz paragraphs
+
+### Tehilim scroll
+- `scrollTehilimTop()` scrolls to `#tehilim-num-title` (chapter title) not page top
+
+### Brachot
+- תפילת הדרך updated with 3× repeated verses after prayer
+- `readBrachaAloud()` added: Web Speech API TTS with he-IL voice
+- `#bracha-tts-wrap` div added in index.html; button shown if speechSynthesis available
+- Stop/resume toggle on same button
+
+### Compass calibration detection
+- `_alphaHistory[]` tracks last 60 alpha samples
+- `_checkSensorCalibration(alpha)`: if range < 15° → shows `#qibla-calibration` warning
+- Warning includes figure-8 calibration instruction + sensor range display
+- `#qibla-raw-alpha` shows live α and range for debugging
+- iOS declination corrected to 4.5° (was 5°)
+- Relative orientation fallback added (when absolute=false, used only if no absolute ever received)
+
+### Key learnings
+- Android `deviceorientationabsolute` can return `e.absolute=true` but still be uncalibrated
+- Uncalibrated: alpha range < 15° during full rotation (should be ~360°)
+- Fix: user must do figure-8 motion with phone to calibrate magnetometer
+- `heFlat()` on Steinsaltz commentary arrays causes index misalignment — use raw array indexing
