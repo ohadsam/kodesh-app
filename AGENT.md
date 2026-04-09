@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.20 (April 5, 2026 b)
+**Last updated:** v5.26 (April 9, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -24,18 +24,27 @@ js/
   network-log.js  – Patches fetch(), 10-min log retention
   utils.js        – APP_VERSION, state, dates, buildParagraphs, cleanSefariaHtml, logs
   settings.js     – ALL_TABS, tab visibility, reminders (including omer), nuclearReset
-  app.js          – showTab, loadTab, changeDay, loadHebrewDate (caches _lastHebrewDate)
-  tehilim.js      – initTehilim, loadTehilim, scrollTehilimTop (150ms timeout)
+  app.js          – showTab, loadTab, changeDay, loadHebrewDate, initTabScrollSync
+  tehilim.js      – initTehilim, loadTehilim, scrollTehilimTop,
+                    hebrewToNumber, parseTehilimSearch, searchTehilimChapter,
+                    TEHILIM_SCHEDULE, CHAPTER_TO_DAY, getTehilimNavInfo
   calendar.js     – loadCalendar, loadZmanim (chametz times), loadEvents (fast times), setCity
-  content.js      – loadParasha, loadAliyaText, _kickoffHaftara, loadSpecificParasha,
-                    PARASHA_ALIYOT (54 static), HAFTARA_REFS (54 static haftara refs)
+  content.js      – loadParasha, loadAliyaText (scrolls to top on aliya change),
+                    _kickoffHaftara, loadSpecificParasha,
+                    PARASHA_ALIYOT (54 static), HAFTARA_REFS (54 static haftara refs),
+                    loadDafYomi, switchDafView (rashi inline),
+                    loadMishnaYomi, switchMishnaView (bartenura inline),
+                    loadRambamYomi, switchRambamView (steinsaltz INLINE per halacha)
   tefilot.js      – initTefilot, showTefila, TEFILOT static texts
-  siddur-inserts.js – wrapSeasonalParagraphs() – post-render HTML string wrapping
+  siddur-inserts.js – wrapSeasonalParagraphs() – multi-paragraph aware green/red blocks
+                    SEASONAL_DEFS with multiPara support for על הנסים, יעלה ויבוא
   siddur.js       – getSiddurSections, loadSiddur, _renderParagraphs, _fetchSectionHtml,
-                    AL_HANISSIM_CHANUKA, AL_HANISSIM_PURIM, CHATZI_KADDISH static texts
+                    AL_HANISSIM_CHANUKA, AL_HANISSIM_PURIM, CHATZI_KADDISH static texts,
+                    openSiddurStatusPopup/closeSiddurStatusPopup (new in v5.26),
+                    initSiddurFloatBtn (3 buttons: top/sections/status)
   omer.js         – buildOmerText, getOmerDay, getOmerDayForDisplay, showOmerNow
-  brachot.js      – BRACHOT data, showBracha, setBrachotNusach, loadBrachot
-  misc.js         – updateDoneButton, toggleDone, Qibla/compass
+  brachot.js      – BRACHOT data (includes tefila_haderech), showBracha, loadBrachot
+  misc.js         – updateDoneButton, toggleDone, Qibla/compass (GPS spoof detection)
   init.js         – init(), error handlers
 ```
 
@@ -48,145 +57,124 @@ js/
 2. `heFlat()` flattens nested arrays
 3. `cleanSefariaHtml()`: seasonal `<small>` → `\uE001text\uE001` markers
 4. `buildParagraphs()`:
-   - 60+ BREAK_BEFORE patterns (Amida brachot, kaddish, kedusha, psalms, tachanun…)
-   - Sof-pasuk flush: `U+05C3` → `:` at verse end triggers paragraph break
+   - 60+ BREAK_BEFORE patterns
+   - Sof-pasuk flush: `U+05C3` → `:` triggers paragraph break
    - BRACHA_END flush: `ברוך אתה יי`
    - MAX_WORDS_PER_PARA = 45
 5. `_renderParagraphs(pars, isAdd)` → HTML string
-6. `wrapSeasonalParagraphs(html)` post-processes seasonal inserts in green blocks
+6. `wrapSeasonalParagraphs(html)` post-processes — multi-paragraph aware
 7. HTML injected into `sc-${id}` placeholders
 
+### Siddur Seasonal Wrapping (siddur-inserts.js) — v5.26
+- Each SEASONAL_DEF has: `label`, `starts` (regex on first para), `show()` condition
+- New: `multiPara:true` + `ends` regex to capture multi-paragraph blocks
+- Covers: מוריד הטל, משיב הרוח, ותן ברכה, ותן טל, יעלה ויבוא (multi), על הנסים (multi), עשי"ת inserts
+- **יעלה ויבוא is NO LONGER a separate section** — only shown inline via wrapSeasonalParagraphs
+
 ### Siddur Conditional Sections
-- **יעלה ויבוא** – R"C / Chol HaMoed
-- **על הנסים** – Chanuka / Purim (static texts in all 3 tefilot + birkat)
-- **הלל** – R"C, Chanuka, Chol HaMoed (Psalms 113-118)
-- **מוסף** – Rosh Chodesh
-- **ספירת העומר** – Nisan 16 – Sivan 5 (computed from Hebrew date)
-- **תחנון** – hidden on R"C, Chol HaMoed, Chanuka, Purim, Sun, Shabbat, Yom Tov, Lag BaOmer…
-- **אבינו מלכנו** – Aseret Yemei Teshuva, fast days (not Erev Shabbat)
+- **על הנסים** – Chanuka / Purim (static texts + inline via wrapSeasonalParagraphs)
+- **הלל** – R"C, Chanuka, Chol HaMoed
+- **מוסף ר"ח** – Rosh Chodesh only
+- **מוסף לחול המועד** – condition:`isCholHamoed` (NOT isShaloshRegalim — fixed v5.26)
+- **ספירת העומר** – Nisan 16 – Sivan 5 (arvit only)
+- **תחנון** – hidden on many days
+
+### Siddur Floating Buttons (3 total)
+- `siddur-float-btn` (bottom 76px) — scroll to top ☰
+- `siddur-sec-btn` (bottom 122px) — sections popup ≡
+- `siddur-status-btn` (bottom 168px) — NEW: prayer status popup 📋
+
+### Tehilim — v5.26
+- `scrollTehilimTop()` — uses `window.scrollTo({top:0})` + page.scrollTop=0
+- Called automatically at end of `loadTehilim()` render
+- `wrapAction` in nav buttons also calls scrollTehilimTop
+- **Search**: `hebrewToNumber()` converts Hebrew letters to gematria value
+- `parseTehilimSearch(query)`: supports plain numbers AND Hebrew gematria (קל=130)
+- Search input in HTML with Enter key support
+
+### Parasha/Torah — v5.26
+- `loadAliyaText()` scrolls to top on each aliya change
+
+### Rambam Steinsaltz — v5.26
+- `switchRambamView('steinsaltz')` now shows commentary INLINE per halacha
+- Format: halacha text → green block with 📚 שטיינזלץ label below it
+- Same pattern as Rashi in Daf Yomi
+
+### Compass/Qibla — v5.26
+- GPS spoofing detection: rejects if accuracy=0, >5000m, or lat/lon≈0
+- Falls back to saved city on spoofed/unavailable GPS
+- "🔄 רענון מיקום" button added to qibla info panel
+
+### Tab Scroll Sync — v5.26
+- `initTabScrollSync()` restored with proportional scroll sync
+- Uses `_syncLock` flag + `requestAnimationFrame` to prevent bounce loops
 
 ### Parasha / Haftara
 - **PARASHA_ALIYOT** – static table of all 54 parshiot
 - **HAFTARA_REFS** – static table of 54 haftara refs (Ashkenaz Israel)
-- Hebcal `leyning` primary source; HAFTARA_REFS as fallback
-- `_kickoffHaftara`: multi-chapter fallback (splits "Book Ch1:V1-Ch2:V2" per chapter)
-- `loadSpecificParasha`: always loads haftara via Hebcal or HAFTARA_REFS
+- Hebcal `leyning` primary; HAFTARA_REFS as fallback
+- `_kickoffHaftara`: multi-chapter fallback
 
 ### Omer (omer.js)
-- `getOmerDay()`: computed from Hebrew date (Nisan 16=1, Iyar 1=16, Sivan 5=49)
-- `getOmerDayForDisplay()`: after tzet → advance; Nisan 15 evening → day 1
+- `getOmerDay()`: computed from Hebrew date
 - Full text: לשם יחוד, ברכה, ספירה, הרחמן, למנצח, אנא בכח, יהי רצון, עלינו
 
 ### Special Zmanim (calendar.js)
-- Erev Pesach: `sofZmanAchilatChametz` + `sofZmanBiurChametz` from Hebcal
-- Fast days: `Fast begins` / `Fast ends` from Hebcal events API
-- All special rows auto-show/hide in `z-special-rows` div
+- Erev Pesach: chametz times from Hebcal
+- Fast days from Hebcal events API
 
 ---
 
-## Known Issues (as of v5.14)
+## Known Issues / Open Items
 
-### 🟡 Siddur – Fine-tuning edge cases
-Some Sefaria sections may still have suboptimal breaks if verses lack sof-pasuk marks.
+### 🟡 Compass – GPS Spoofing (partial fix in v5.26)
+GPS spoofing detection added, but if device returns plausible fake coords
+the compass will still show wrong direction. User can press "רענון מיקום"
+or change city in settings as workaround.
 
-### 🟡 Winter/Summer Season Detection
-`_isWinterSeason()` uses hardcoded months. Could use Shmini Atzeret/Pesach dates.
+### 🟡 Siddur – wrapSeasonalParagraphs multiPara
+The `ends` regex for יעלה ויבוא / על הנסים must match the last paragraph exactly.
+If Sefaria changes text, adjust `ends` regex in siddur-inserts.js SEASONAL_DEFS.
+
+### 🟡 Push Notifications for Omer
+Requires Firebase Cloud Messaging backend. Not yet implemented.
+Web Push API needs a service worker with VAPID keys + server.
 
 ### 🟡 Birkat HaMazon – Sefaria ref fragility
-Uses multi-ref fallback. If Sefaria changes API, may need new refs.
+Multi-ref fallback. If Sefaria changes API, may need new refs.
+
+### 🟡 Winter/Summer Season Detection
+Uses Hebrew calendar months (correct), but Shmini Atzeret/Pesach exact dates
+could be more precise for edge cases.
 
 ---
 
 ## Recently Fixed
 
-### v5.20 (April 5, 2026 b)
-- ✅ REGRESSION FIX: qibla page restored (page-qibla div was accidentally removed)
-- ✅ Rashi: fallback to commentary=1 when direct endpoint returns chapLen<5
-- ✅ Rashi: detect triple-nested array structure and flatten
-- ✅ Rabbi Sacks: fixed ref format (no book level, just parasha name)
-- ✅ Rabbi Sacks: fixed parasha name spellings (Chayei_Sarah, Vayeitze, Nasso, etc.)
-- ✅ Date-nav-drawer: removed sticky positioning to not interfere with siddur layout
+### v5.26 (April 9, 2026)
+- ✅ Tab scroll sync restored (proportional sync, lock prevents bounce)
+- ✅ Auto-scroll to top on Tehilim chapter change (window.scrollTo)
+- ✅ Auto-scroll to top on Parasha aliya change
+- ✅ Rambam Steinsaltz: now inline per halacha (like Rashi in Daf)
+- ✅ יעלה ויבוא removed as separate section (was duplicated outside Amida)
+- ✅ על הנסים: multi-paragraph wrapping fixed in wrapSeasonalParagraphs
+- ✅ מוריד הטל / משיב הרוח: displayed with green/red (never deleted)
+- ✅ ברכת השנים: same fix via multiPara-aware wrapping
+- ✅ מוסף לחול המועד: condition changed to isCholHamoed (stops after Pesach)
+- ✅ GPS compass: spoofing detection + refresh button
+- ✅ תפילת הדרך added to Brachot tab (with תהילים קכא)
+- ✅ Siddur: 3rd floating button 📋 shows prayer status popup
+- ✅ Tehilim search: gematria support (פרק קל, כג, 130 etc.)
 
-### v5.18 (April 5, 2026 b)
-- ✅ Omer: fixed יום→ימים grammar (day 1 = "יום אחד", day 2+ = "X ימים")
-- ✅ Winter/summer season: uses Hebrew date (Pesach ↔ Shmini Atzeret), not hardcoded months
-- ✅ Removed omer from shacharit (only in arvit per halacha)
-- ✅ Added מוסף לשלוש רגלים (Pesach + Sukkot) in shacharit
-- ✅ ברכי נפשי only shows on Rosh Chodesh
-- ✅ isShaloshRegalim, isYomHaatzmaut, isYomYerushalayim added to _siddurCal
-- ✅ R"C detection from Hebrew date (day 1 or 30)
-- ✅ Chol HaMoed detection from Hebrew date
-- ✅ Hallel condition includes Yom HaAtzmaut + Yom Yerushalayim
-- ✅ Removed ברכת המזון from siddur (exists in brachot tab)
-- ✅ Rashi mapping fix: uses endV directly, not chapterLengths from Rashi endpoint
-- ✅ Daf Yomi: Rashi shown inline (green, smaller, in parentheses within gemara text)
-- ✅ Mishna: Bartenura inline, removed Steinsaltz button (not available on Sefaria)
-- ✅ Motzaei Shabbat: fixed "למען תהילתך", "מזוני רויחי" text
-- ✅ ברכת הלבנה: complete nusach with all psukim (הללו שמש וירח, שיר למעלות fixed)
-- ✅ Rabbi Sacks on parasha: new "הרב זקס" button loads שיג ושיח from Sefaria
-- ✅ Brachot: auto-scroll to content on bracha selection
-- ✅ Brachot: floating nav buttons (⬆ scroll top + ☰ popup navigation)
-
-### v5.17 (April 4, 2026)
-- ✅ Rashi: fixed direct endpoint parsing (flat(Infinity), chapterLengths tracking)
-- ✅ Siddur: initSiddur is async, fetches today events from Hebcal if missing
-- ✅ Siddur: Hallel/Torah reading/Yom Tov conditions now include isYomTov
-- ✅ Siddur: Omer section added to arvit with dynamic day text
-- ✅ Siddur: seasonal inserts filter by season (winter/summer visibility)
-- ✅ Chametz times: uses sofZmanTfilla as accurate base, await loadHebrewDate
-- ✅ Motzaei Shabbat: fixed missing words (למען תהילתך, מזוני רויחי)
-- ✅ Daf Yomi: added Rashi + Steinsaltz commentary toggle buttons
-- ✅ Mishna Yomi: added Bartenura + Steinsaltz commentary toggle buttons
-- ✅ Top/bottom tab nav scroll sync (scroll one, other follows)
-- ✅ Expandable date navigation drawer (tap date chip in topbar)
-- ✅ Date offset badge on topbar when not on today
-- ✅ Date drawer affects all screens (global day navigation)
-
-### v5.16 (April 3, 2026)
-- ✅ Rashi: uses direct "Rashi on Book Ch" endpoint (much faster, smaller response)
-- ✅ Rashi: AbortController timeout (20s) prevents hanging on slow Sefaria responses
-- ✅ Siddur seasonal inserts: filters by season (hides winter inserts in summer, vice versa)
-- ✅ Siddur seasonal inserts: hides R"C/holiday inserts when not applicable
-- ✅ Omer: showOmerNow() force-loads Hebrew date if not cached
-- ✅ Chametz times: fallback computation from sunrise when Hebcal doesn't return fields
-- ✅ Chametz times: checks alternative Hebcal field names (GRA/MGA variants)
-
-### v5.14 (April 3, 2026)
-- ✅ Siddur paragraph spacing – sof-pasuk flush, 60+ patterns, MAX_WORDS=45
-- ✅ על הנסים in shacharit/mincha/arvit (Chanuka + Purim)
-- ✅ Omer detection from Hebrew date (not just Hebcal events)
-- ✅ Omer Nisan 15 evening → day 1
-- ✅ skipTachanun: Lag BaOmer, Yom HaAtzmaut, Tu BiShvat, etc.
-- ✅ Haftara: multi-chapter fallback + static HAFTARA_REFS for all 54 parshiot
-- ✅ Haftara loads for manually-selected parshiot
-- ✅ Birkat HaMazon multi-ref fallback (fixes 500 error)
-- ✅ ברכת הלבנה complete nusach
-- ✅ הבדלה with הנה אל ישועתי
-- ✅ תפילה למדינה full Rabbanut nusach
-- ✅ על המחיה per-holiday inserts
-- ✅ ברכת האילנות correct יהי רצון
-
-### v5.13
-- ✅ Omer full text + reminder, brachot fixes, birkat hamazon
-
-### v5.12
-- ✅ Brachot tab with 22 brachot + 3 nusachim
-
-### v5.11
-- ✅ Combined parshiot, haftara, fast times
-
-### v5.10
-- ✅ Static PARASHA_ALIYOT for 54 parshiot
-
-### v5.9
-- ✅ Infinite reload loop fix
+### v5.25 (prior)
+- ✅ Various fixes (see previous AGENT.md)
 
 ---
 
 ## Pending / Future Work
-- Shabbat-specific siddur (Kabbalat Shabbat, Musaf)
+- Push notifications for omer (Firebase Cloud Messaging)
+- Shabbat-specific siddur (Kabbalat Shabbat, Musaf Shabbat)
 - Half-Hallel for Rosh Chodesh
-- Winter/summer from Hebcal dates
 - Font size slider
 - Offline improvements
 - Selichot for fast days

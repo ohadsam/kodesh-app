@@ -20,7 +20,7 @@
        NOTE: this is the ONLY version check. utils.js must NOT have another one. -->
   <script>
     (function() {
-      var V = '5.25';
+      var V = '5.26';
       // Show version in splash immediately
       var sv = document.getElementById('splash-version');
       if (sv) sv.textContent = 'גרסה ' + V;
@@ -106,7 +106,7 @@
   <div style="font-family:'Frank Ruhl Libre',serif;font-size:26px;color:var(--cream);font-weight:700">לימוד יומי</div>
   <p>מכין את הלמידה של היום...</p>
   <div class="spinner"></div>
-  <p id="splash-version" style="font-size:11px;color:var(--muted);margin-top:4px">גרסה 5.25</p>
+  <p id="splash-version" style="font-size:11px;color:var(--muted);margin-top:4px">גרסה 5.26</p>
 </div>
 
 <!-- SETTINGS PANEL -->
@@ -231,7 +231,7 @@
     <!-- Version & Copyright -->
     <div style="text-align:center;padding:18px 0 8px;border-top:1px solid var(--border);margin-top:8px">
       <div style="font-size:13px;font-weight:600;color:var(--gold-dim);margin-bottom:4px">📖 לימוד יומי</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">גרסה 5.25</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">גרסה 5.26</div>
       <button onclick="showWhatsNew()" style="background:var(--card);border:1px solid var(--gold-dim);color:var(--gold);padding:6px 16px;border-radius:8px;font-size:11px;cursor:pointer;font-family:'Heebo',sans-serif;margin-bottom:6px">🆕 מה חדש?</button>
       <div style="font-size:11px;color:var(--muted)">© כל הזכויות שמורות לאוהד סמט</div>
     </div>
@@ -243,27 +243,27 @@
 <div id="whats-new-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
   width:88%;max-width:400px;max-height:80vh;overflow-y:auto;
   background:var(--surface);border:1px solid var(--gold-dim);border-radius:16px;z-index:10001;padding:20px;direction:rtl">
-  <div style="font-size:16px;font-weight:700;color:var(--gold);margin-bottom:12px;text-align:center">🆕 מה חדש בגרסה 5.25</div>
+  <div style="font-size:16px;font-weight:700;color:var(--gold);margin-bottom:12px;text-align:center">🆕 מה חדש בגרסה 5.26</div>
   <div style="font-size:13px;color:var(--cream);line-height:1.7" id="whats-new-content">
-    <div style="margin-bottom:10px"><b>📕 סידור</b></div>
-    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• באנר סטטוס: מראה מה אומרים ומה לא בכל תפילה</div>
-    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• הלל, מוסף, יעלה ויבוא – מותאם אוטומטית ליום</div>
-    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• ברכת המזון הועברה לטאב ברכות</div>
-    <div style="margin-bottom:10px"><b>📗 רמב"ם יומי</b> – טאב חדש!</div>
-    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• פרק יומי מהרמב"ם מספריא</div>
-    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• כפתור פירוש שטיינזלץ</div>
-    <div style="margin-bottom:10px"><b>📝 הרב זקס</b></div>
-    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• מאמרי "שיג ושיח" על פרשת השבוע</div>
-    <div style="margin-bottom:10px"><b>📚 דף יומי / משנה</b></div>
-    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• רש"י מוטמע בתוך הגמרא</div>
-    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• ברטנורא מוטמע בתוך המשנה</div>
-    <div style="margin-bottom:10px"><b>🌙 ספירת העומר</b></div>
-    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• נוסח מלא (יהי רצון + עלינו לשבח)</div>
+    <div style="margin-bottom:10px"><b>📕 סידור – תיקונים</b></div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• יעלה ויבוא הוסר כסקשן כפול – מוצג רק בתוך העמידה</div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• על הנסים מסומן נכון בכל הטקסט (לא רק ההתחלה)</div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• מוריד הטל / משיב הרוח – מוצגים תמיד (ירוק/אדום)</div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• מוסף חול המועד מפסיק להופיע אחרי שנגמר החג</div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• כפתור מרחף 📋 – רשימת מה אומרים / לא אומרים</div>
+    <div style="margin-bottom:10px"><b>📗 רמב"ם – שטיינזלץ מוטמע</b></div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• פירוש שטיינזלץ מוטמע בתוך הלכה (כמו רש"י בגמרא)</div>
+    <div style="margin-bottom:10px"><b>🙏 תהילים</b></div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• חיפוש פרק לפי מספר או אותיות (פרק קל = 130 וכד')</div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• גלילה אוטומטית לראש הפרק בניווט בין פרקים</div>
     <div style="margin-bottom:10px"><b>✨ ברכות</b></div>
-    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• כפתורים צפים + ניווט מהיר</div>
-    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• ברכת הלבנה – נוסח מלא</div>
-    <div style="margin-bottom:10px"><b>📅 ניווט ימים</b></div>
-    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• לחיצה על התאריך בטופבר פותחת ניווט ימים</div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• תפילת הדרך עם תהילים קכא נוסף לטאב ברכות</div>
+    <div style="margin-bottom:10px"><b>🧭 מצפן</b></div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• זיהוי שיבוש GPS וחזרה אוטומטית לעיר שמורה</div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• כפתור רענון מיקום</div>
+    <div style="margin-bottom:10px"><b>🔄 כללי</b></div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• סנכרון גלילה בין סרגל ניווט עליון ותחתון</div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• גלילה אוטומטית לראש בניווט בין עליות התורה</div>
   </div>
   <button onclick="closeWhatsNew()" style="display:block;width:100%;margin-top:14px;background:var(--gold);color:#000;border:none;border-radius:10px;padding:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Heebo',sans-serif">👍 הבנתי</button>
 </div>
@@ -423,6 +423,46 @@
     ≡
   </button>
 
+  <!-- Floating prayer status button -->
+  <button id="siddur-status-btn" onclick="openSiddurStatusPopup()"
+    style="position:fixed;bottom:168px;left:12px;z-index:9999;
+    width:40px;height:40px;border-radius:50%;border:1px solid rgba(201,165,74,.4);
+    background:rgba(25,20,10,0.93);color:var(--gold);font-size:16px;cursor:pointer;
+    box-shadow:0 2px 10px rgba(0,0,0,.6);backdrop-filter:blur(4px);
+    display:flex;align-items:center;justify-content:center;
+    opacity:0;transition:opacity 0.25s;pointer-events:none" title="מה אומרים היום">
+    📋
+  </button>
+
+  <!-- Status popup overlay -->
+  <div id="siddur-status-popup-overlay" onclick="closeSiddurStatusPopup()"
+    style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.45)">
+  </div>
+  <!-- Status popup panel -->
+  <div id="siddur-status-popup"
+    style="display:none;position:fixed;bottom:76px;left:8px;z-index:10001;
+    width:240px;max-height:70vh;
+    background:rgba(18,12,6,0.97);border:1px solid var(--border);
+    border-radius:16px;backdrop-filter:blur(16px);
+    box-shadow:0 8px 32px rgba(0,0,0,.7);
+    overflow-y:auto;padding:0 0 8px">
+    <div style="padding:8px 14px 8px;font-size:11px;color:var(--gold);font-weight:700;
+      border-bottom:1px solid var(--border);letter-spacing:.3px;position:sticky;top:0;
+      background:rgba(18,12,6,0.97)">
+      📋 מה אומרים היום
+      <button onclick="closeSiddurStatusPopup()" style="float:left;background:none;border:none;
+        color:var(--muted);font-size:16px;cursor:pointer;line-height:1;padding:0">✕</button>
+    </div>
+    <div style="padding:8px 12px 4px">
+      <div style="font-size:10px;font-weight:700;color:#5cb87a;margin-bottom:4px">✅ אומרים:</div>
+      <div id="siddur-status-popup-say" style="font-size:12px;color:#5cb87a;line-height:1.8"></div>
+    </div>
+    <div style="padding:4px 12px 4px;border-top:1px solid rgba(255,255,255,.06);margin-top:4px">
+      <div style="font-size:10px;font-weight:700;color:#c87060;margin-bottom:4px">❌ לא אומרים:</div>
+      <div id="siddur-status-popup-skip" style="font-size:12px;color:#c87060;line-height:1.8"></div>
+    </div>
+  </div>
+
   <!-- Sections popup overlay -->
   <div id="siddur-sec-popup-overlay" onclick="closeSiddurSectionsPopup()"
     style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.45)">
@@ -565,6 +605,22 @@
       <select id="tehilim-select" onchange="loadTehilim(this.value)">
         <option value="">-- בחר פרק ספציפי --</option>
       </select>
+    </div>
+    <!-- Chapter search with gematria support -->
+    <div style="margin-top:10px">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">חיפוש פרק (מספר או אותיות, למשל: 130 / קל / פרק קמא):</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="tehilim-search-input" type="text" placeholder="למשל: 23 או כג או פרק כג"
+          style="flex:1;padding:8px 12px;border-radius:10px;border:1px solid var(--border);
+          background:var(--surface);color:var(--cream);font-family:'Heebo',sans-serif;
+          font-size:14px;direction:rtl;outline:none"
+          onkeydown="if(event.key==='Enter') searchTehilimChapter()">
+        <button onclick="searchTehilimChapter()"
+          style="padding:8px 14px;border-radius:10px;border:1px solid var(--gold);
+          background:rgba(201,165,74,.12);color:var(--gold);cursor:pointer;
+          font-family:'Heebo',sans-serif;font-size:13px;white-space:nowrap">חפש</button>
+      </div>
+      <div id="tehilim-search-error" style="font-size:11px;color:#c87060;margin-top:4px"></div>
     </div>
   </div>
 
@@ -1046,7 +1102,7 @@
     💡 לכיול המצפן: הזז את הטלפון בתנועת ∞ (שמונה שוכב) מספר פעמים
   </div>
   <div style="text-align:center;color:var(--muted);font-size:11px;padding:12px 0 4px">
-    גרסה 5.25 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
+    גרסה 5.26 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
   </div>
 </div>
 
@@ -1104,19 +1160,19 @@
      JavaScript modules (load order matters)
      v4.3 – querystring busts browser/SW cache
      ═══════════════════════════════════════ -->
-<script src="js/network-log.js?v=5.25"></script>
-<script src="js/utils.js?v=5.25"></script>
-<script src="js/settings.js?v=5.25"></script>
-<script src="js/app.js?v=5.25"></script>
-<script src="js/tehilim.js?v=5.25"></script>
-<script src="js/calendar.js?v=5.25"></script>
-<script src="js/content.js?v=5.25"></script>
-<script src="js/tefilot.js?v=5.25"></script>
-<script src="js/siddur-inserts.js?v=5.25"></script>
-<script src="js/siddur.js?v=5.25"></script>
-<script src="js/omer.js?v=5.25"></script>
-<script src="js/brachot.js?v=5.25"></script>
-<script src="js/misc.js?v=5.25"></script>
-<script src="js/init.js?v=5.25"></script>
+<script src="js/network-log.js?v=5.26"></script>
+<script src="js/utils.js?v=5.26"></script>
+<script src="js/settings.js?v=5.26"></script>
+<script src="js/app.js?v=5.26"></script>
+<script src="js/tehilim.js?v=5.26"></script>
+<script src="js/calendar.js?v=5.26"></script>
+<script src="js/content.js?v=5.26"></script>
+<script src="js/tefilot.js?v=5.26"></script>
+<script src="js/siddur-inserts.js?v=5.26"></script>
+<script src="js/siddur.js?v=5.26"></script>
+<script src="js/omer.js?v=5.26"></script>
+<script src="js/brachot.js?v=5.26"></script>
+<script src="js/misc.js?v=5.26"></script>
+<script src="js/init.js?v=5.26"></script>
 </body>
 </html>
