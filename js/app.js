@@ -140,9 +140,27 @@ function toggleDateNav() {
 // TAB SCROLL SYNC
 // ═══════════════════════════════════════════
 function initTabScrollSync() {
-  // Instead of continuous scroll sync, just scroll the active tab into view
-  // when a tab is clicked in either bar
-  // This avoids the scrollIntoView interference issue
+  const topNav    = document.getElementById('tabs');
+  const bottomNav = document.getElementById('bottom-nav');
+  if (!topNav || !bottomNav) return;
+
+  let _syncLock = false;
+
+  function syncScroll(source, target) {
+    if (_syncLock) return;
+    _syncLock = true;
+    // Calculate proportional scroll position
+    const srcMax = source.scrollWidth - source.clientWidth;
+    const tgtMax = target.scrollWidth - target.clientWidth;
+    if (srcMax > 0 && tgtMax > 0) {
+      const ratio = source.scrollLeft / srcMax;
+      target.scrollLeft = ratio * tgtMax;
+    }
+    requestAnimationFrame(() => { _syncLock = false; });
+  }
+
+  topNav.addEventListener('scroll',    () => syncScroll(topNav, bottomNav),    { passive: true });
+  bottomNav.addEventListener('scroll', () => syncScroll(bottomNav, topNav),    { passive: true });
 }
 
 async function loadHebrewDate() {

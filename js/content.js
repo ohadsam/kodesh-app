@@ -646,6 +646,10 @@ async function loadAliyaText(ref) {
   loadingEl.style.display = 'block';
   loadingEl.textContent = 'טוען...';
   document.getElementById('parasha-content').innerHTML = '';
+  // Scroll to top when changing aliya
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  const page = document.getElementById('page-parasha');
+  if (page) page.scrollTop = 0;
   parashaVerses = []; rashiVerses = []; onkelosVerses = [];
   rashiLoaded = false; onkelosLoaded = false;
   _rashiLoading = false;   // cancel any in-progress Rashi load
@@ -1297,20 +1301,30 @@ async function switchRambamView(view) {
   if (!_rambamRef) return;
   el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px">⏳ טוען פירוש שטיינזלץ...</div>';
   try {
-    // Steinsaltz on Mishneh Torah uses format: "Steinsaltz on Mishneh Torah, Book, Chapter"
     const commentaryRef = `Steinsaltz on ${_rambamRef}`;
-    console.log('[RambamYomi] loading:', commentaryRef);
+    console.log('[RambamYomi] loading inline:', commentaryRef);
     const data = await sefariaText(commentaryRef, 300);
     const flat = heFlat(data).filter(Boolean);
     if (!flat.length) throw new Error('אין פירוש שטיינזלץ זמין');
     el.className = 'content-text';
-    el.innerHTML = flat.map((v,i) =>
-      `<div style="margin-bottom:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04)">
-        <span style="color:var(--gold-dim);font-size:11px">${i+1} </span>
-        <span style="line-height:1.85">${v}</span>
-      </div>`
-    ).join('');
-    console.log('[RambamYomi] steinsaltz loaded:', flat.length, 'entries');
+    // Inline: show rambam halacha + steinsaltz embedded after each halacha
+    el.innerHTML = _rambamFlat.map((v, i) => {
+      const stText = (flat[i] && typeof flat[i] === 'string') ? flat[i] :
+                     (Array.isArray(flat[i]) ? flat[i].flat().filter(Boolean).join(' ') : '');
+      const stHtml = stText
+        ? `<div style="margin-top:6px;padding:5px 10px;background:rgba(126,214,160,.07);
+            border-right:2px solid var(--addition);border-radius:0 5px 5px 0;
+            color:var(--addition);font-size:calc(var(--font-size)*0.84);
+            font-style:italic;line-height:1.8">
+            <span style="font-size:9px;font-weight:700;display:block;margin-bottom:2px;opacity:.8">📚 שטיינזלץ</span>
+            ${stText.replace(/<[^>]+>/g,'')}</div>`
+        : '';
+      return `<div style="margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.05)">
+        <div><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}</div>
+        ${stHtml}
+      </div>`;
+    }).join('');
+    console.log('[RambamYomi] steinsaltz inline:', flat.length, 'entries');
   } catch(e) {
     console.warn('[RambamYomi] commentary error:', e.message);
     el.innerHTML = `<div style="color:var(--muted);text-align:center;padding:20px">⚠️ ${e.message}</div>`;

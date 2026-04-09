@@ -194,7 +194,6 @@ async function initQibla() {
   drawCompassTicks();
   qiblaInitDone = true;
 
-  // Always try live GPS first for accuracy
   let lat, lon, locationName;
   try {
     const pos = await new Promise((resolve, reject) => {
@@ -202,16 +201,26 @@ async function initQibla() {
       navigator.geolocation.getCurrentPosition(resolve, reject, {
         enableHighAccuracy: true,
         timeout: 8000,
-        maximumAge: 30000   // accept cached position up to 30 sec old
+        maximumAge: 30000
       });
     });
     lat = pos.coords.latitude;
     lon = pos.coords.longitude;
-    locationName = `📍 מיקום נוכחי (${lat.toFixed(4)}°, ${lon.toFixed(4)}°)`;
-    console.log('[Qibla] live GPS OK: lat', lat, 'lon', lon, 'accuracy', pos.coords.accuracy, 'm');
+    const acc = pos.coords.accuracy;
+
+    // Spoofing detection: accuracy too perfect or location makes no sense
+    const isSuspect = acc === 0 || acc > 5000 ||
+                      (lat === 0 && lon === 0) ||
+                      (Math.abs(lat) < 0.001 && Math.abs(lon) < 0.001);
+    if (isSuspect) {
+      console.warn('[Qibla] GPS suspect (acc=' + acc + ') – falling back to saved city');
+      throw new Error('GPS לא מדויק (ייתכן שיבוש)');
+    }
+
+    locationName = `📍 GPS (${lat.toFixed(4)}°, ${lon.toFixed(4)}°, דיוק: ${Math.round(acc)}מ')`;
+    console.log('[Qibla] live GPS OK: lat', lat, 'lon', lon, 'accuracy', acc, 'm');
     setQiblaStatus('');
   } catch(e) {
-    // GPS failed – fall back to saved city
     console.warn('[Qibla] GPS failed:', e.message, '– falling back to saved city');
     const savedCity = appState.cityKey || 'petah_tikva';
     if (savedCity === 'gps' && appState.gpsLat) {
@@ -219,7 +228,7 @@ async function initQibla() {
       locationName = `📍 GPS שמור (${lat.toFixed(4)}°, ${lon.toFixed(4)}°)`;
     } else {
       const c = CITIES[savedCity] || CITIES['petah_tikva'];
-      lat = c.lat; lon = c.lon; locationName = `🏙️ ${c.name} (ברירת מחדל)`;
+      lat = c.lat; lon = c.lon; locationName = `🏙️ ${c.name}`;
     }
     setQiblaStatus(`⚠️ GPS לא זמין – משתמש ב${locationName}`);
   }
@@ -233,10 +242,12 @@ async function initQibla() {
     <div style="margin-bottom:6px">📍 <strong>מיקום:</strong> ${locationName}</div>
     <div style="margin-bottom:6px">🕍 <strong>כיוון הכותל המערבי:</strong> ${qiblaAngle.toFixed(1)}° (${bearingToLabel(qiblaAngle)})</div>
     <div style="margin-bottom:6px">📏 <strong>מרחק מהכותל:</strong> ${Math.round(distKm)} ק"מ</div>
-    <div style="font-size:11px;color:var(--muted);margin-top:8px">מחושב לכותל המערבי: 31.7767°N, 35.2345°E</div>`;
+    <div style="font-size:11px;color:var(--muted);margin-top:8px">מחושב לכותל המערבי: 31.7767°N, 35.2345°E</div>
+    <button onclick="initQibla()" style="margin-top:8px;padding:5px 12px;border-radius:8px;
+      border:1px solid var(--border);background:transparent;color:var(--muted);
+      cursor:pointer;font-size:11px">🔄 רענן מיקום</button>`;
 
   updateCompassUI();
-  // Auto-start compass sensor
   startCompassListener();
 }
 

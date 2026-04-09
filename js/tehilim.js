@@ -44,6 +44,53 @@ function getTehilimChapters(hebrewDay) {
 
 let selectedTehilimHebrewDay = null; // tracks which day button is active
 
+// Hebrew letter → gematria value map
+const GEMATRIA_MAP = {
+  'א':1,'ב':2,'ג':3,'ד':4,'ה':5,'ו':6,'ז':7,'ח':8,'ט':9,
+  'י':10,'כ':20,'ך':20,'ל':30,'מ':40,'ם':40,'נ':50,'ן':50,
+  'ס':60,'ע':70,'פ':80,'ף':80,'צ':90,'ץ':90,'ק':100,
+  'ר':200,'ש':300,'ת':400
+};
+
+function hebrewToNumber(str) {
+  // Remove apostrophes, quotes, spaces
+  const clean = str.replace(/['"״׳\s]/g,'');
+  let sum = 0;
+  for (const ch of clean) {
+    const v = GEMATRIA_MAP[ch];
+    if (!v) return null; // not a valid Hebrew number
+    sum += v;
+  }
+  return sum || null;
+}
+
+function parseTehilimSearch(query) {
+  const q = query.trim();
+  if (!q) return null;
+  // Try plain number first
+  const num = parseInt(q);
+  if (!isNaN(num) && String(num) === q) return num;
+  // Try Hebrew prefix removal: "פרק קל" → "קל"
+  const stripped = q.replace(/^פרק\s*/,'').trim();
+  // Try gematria
+  const gval = hebrewToNumber(stripped);
+  if (gval) return gval;
+  return null;
+}
+
+function searchTehilimChapter() {
+  const input = document.getElementById('tehilim-search-input');
+  if (!input) return;
+  const chapter = parseTehilimSearch(input.value);
+  const errEl = document.getElementById('tehilim-search-error');
+  if (!chapter || chapter < 1 || chapter > 150) {
+    if (errEl) errEl.textContent = 'פרק לא תקין (1-150)';
+    return;
+  }
+  if (errEl) errEl.textContent = '';
+  loadTehilim(chapter);
+}
+
 function initTehilim() {
   // Build chapter dropdown
   const sel = document.getElementById('tehilim-select');
@@ -186,15 +233,12 @@ function getTehilimNavInfo(chapter) {
 let currentTehilimChapter = 1;
 
 function scrollTehilimTop() {
-  // Delay to wait for the new chapter content to render before scrolling
+  // Scroll to top of page so new chapter starts from the beginning
   setTimeout(() => {
-    const el = document.getElementById('tehilim-content');
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } else {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  }, 150);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const page = document.getElementById('page-tehilim');
+    if (page) page.scrollTop = 0;
+  }, 50);
 }
 
 async function loadTehilim(chapter) {
@@ -239,6 +283,7 @@ async function loadTehilim(chapter) {
 
     sub.textContent = `${flat.length} פסוקים`;
     updateDoneButton('tehilim', chapter);
+    scrollTehilimTop();
     console.log(`[Tehilim] OK – ${flat.length} verses, day ${nav?.day}`);
   } catch(e) {
     console.error('[Tehilim] error:', e);

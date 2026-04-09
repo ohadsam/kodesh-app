@@ -1,10 +1,8 @@
 // ═══════════════════════════════════════════════════════════════════
 // SIDDUR-INSERTS.JS – seasonal text STYLING (not hiding)
 //
-// Instead of hiding seasonal text, we STYLE it:
-// - Active: green block (say this today)
-// - Inactive: red-muted strikethrough (don't say this today)
-// The user can always see what exists and what to say/skip.
+// Active: green block (say this today)
+// Inactive: red-muted strikethrough (don't say this today)
 // ═══════════════════════════════════════════════════════════════════
 
 const _sd = s => s.replace(/[\u0591-\u05C7]/g, '').trim();
@@ -31,26 +29,44 @@ function _redBlock(label, innerHtml) {
     font-style:italic;line-height:1.85;text-decoration:line-through">${lbl}${innerHtml}</p>`;
 }
 
+// Each def: label, starts (regex on first para), ends (optional regex on last para),
+// multiPara (true = collect all consecutive paras until ends match or no more paras)
 const SEASONAL_DEFS = [
-  { label: 'מוריד הטל (קיץ)', starts: /^מוריד הטל$/,
+  { label: 'מוריד הטל (קיץ)',
+    starts: /^מוריד הטל$/,
     show: () => !_isWinterSeason() },
-  { label: 'משיב הרוח ומוריד הגשם (חורף)', starts: /משיב הרוח/,
+  { label: 'משיב הרוח ומוריד הגשם (חורף)',
+    starts: /משיב הרוח/,
     show: () => _isWinterSeason() },
-  { label: 'ותן ברכה (קיץ)', starts: /^ותן ברכה$/,
+  { label: 'ותן ברכה (קיץ)',
+    starts: /^ותן ברכה$/,
     show: () => !_isWinterSeason() },
-  { label: 'ותן טל ומטר לברכה (חורף)', starts: /ותן טל ומטר/,
+  { label: 'ותן טל ומטר לברכה (חורף)',
+    starts: /ותן טל ומטר/,
     show: () => _isWinterSeason() },
-  { label: 'יעלה ויבוא', starts: /יעלה ויבוא/,
+  // יעלה ויבוא – multi-paragraph block
+  { label: 'יעלה ויבוא',
+    starts: /יעלה ויבוא/,
+    multiPara: true,
+    ends: /כִּי אֵל מֶלֶךְ חַנּוּן|כי אל מלך חנון/,
     show: () => { const c = window._siddurCal||{}; return c.isRoshChodesh || c.isCholHamoed || c.isYomTov; } },
-  { label: 'על הנסים', starts: /על הנסים/,
+  // על הנסים – multi-paragraph block
+  { label: 'על הנסים',
+    starts: /על הנסים ועל הפרקן|עַל הַנִּסִּים/,
+    multiPara: true,
+    ends: /וְקָבְעוּ שְׁמוֹנַת|וְתָלוּ אוֹתוֹ|ותלו אותו|וקבעו שמונת/,
     show: () => { const c = window._siddurCal||{}; return c.isChanuka || c.isPurim; } },
-  { label: 'זכרנו לחיים (עשי"ת)', starts: /^זכרנו לחיים/,
+  { label: 'זכרנו לחיים (עשי"ת)',
+    starts: /^זכרנו לחיים/,
     show: () => _isAseretYemei() },
-  { label: 'מי כמוך אב הרחמן (עשי"ת)', starts: /^מי כמוך אב הרחמן/,
+  { label: 'מי כמוך אב הרחמן (עשי"ת)',
+    starts: /^מי כמוך אב הרחמן/,
     show: () => _isAseretYemei() },
-  { label: 'וכתוב לחיים (עשי"ת)', starts: /^וכתוב לחיים/,
+  { label: 'וכתוב לחיים (עשי"ת)',
+    starts: /^וכתוב לחיים/,
     show: () => _isAseretYemei() },
-  { label: 'בספר חיים (עשי"ת)', starts: /^בספר חיים/,
+  { label: 'בספר חיים (עשי"ת)',
+    starts: /^בספר חיים/,
     show: () => _isAseretYemei() },
 ];
 
@@ -61,24 +77,57 @@ function _isAseretYemei() {
 
 function wrapSeasonalParagraphs(html, isAdd) {
   if (!html) return html;
-  const parts = html.split(/(?=<p )|(?=<p>)/);
-  return parts.map(part => {
-    if (!part.startsWith('<p')) return part;
+  // Split into <p> blocks, preserving other tags
+  const parts = html.split(/(?=<p[ >])/);
+  const out = [];
+  let i = 0;
+
+  while (i < parts.length) {
+    const part = parts[i];
+    if (!part.startsWith('<p')) { out.push(part); i++; continue; }
+
     const text = _sd(part.replace(/<[^>]+>/g, ''));
-    if (!text) return part;
+    if (!text) { out.push(part); i++; continue; }
+
+    let matched = false;
     for (const def of SEASONAL_DEFS) {
       if (def.starts.test(text)) {
-        const innerMatch = part.match(/<p[^>]*>([\s\S]*)<\/p>/);
-        const inner = innerMatch ? innerMatch[1] : text;
-        if (def.show()) {
-          return _greenBlock(def.label, inner);
+        matched = true;
+        const shouldShow = def.show();
+
+        if (def.multiPara) {
+          // Collect paragraphs until we hit the end marker
+          const collected = [part];
+          let j = i + 1;
+          while (j < parts.length) {
+            const next = parts[j];
+            if (!next.startsWith('<p')) break;
+            collected.push(next);
+            const nextText = _sd(next.replace(/<[^>]+>/g, ''));
+            if (def.ends && def.ends.test(nextText)) { j++; break; }
+            j++;
+          }
+          // Extract inner HTML from all collected <p> tags
+          const innerHtml = collected.map(p => {
+            const m = p.match(/<p[^>]*>([\s\S]*?)<\/p>/);
+            return m ? m[1] : p.replace(/<p[^>]*>/, '').replace(/<\/p>/, '');
+          }).join('<br>');
+
+          out.push(shouldShow ? _greenBlock(def.label, innerHtml) : _redBlock(def.label, innerHtml));
+          i = j;
         } else {
-          return _redBlock(def.label, inner);
+          // Single paragraph
+          const innerMatch = part.match(/<p[^>]*>([\s\S]*?)<\/p>/);
+          const inner = innerMatch ? innerMatch[1] : text;
+          out.push(shouldShow ? _greenBlock(def.label, inner) : _redBlock(def.label, inner));
+          i++;
         }
+        break;
       }
     }
-    return part;
-  }).join('');
+    if (!matched) { out.push(part); i++; }
+  }
+  return out.join('');
 }
 
 function _isWinterSeason() {

@@ -161,7 +161,6 @@ function getSiddurSections(nusach, prayer) {
     { label:'שמונה עשרה',
       ref: r('The_Morning_Prayers,_Shemoneh_Esrei', null,
              'Weekday_Shacharit,_Amida') },
-    yaaleh,
     { label:'על הנסים – חנוכה ✨', ref:null, staticText:AL_HANISSIM_CHANUKA, isAddition:true, condition:'isChanuka' },
     { label:'על הנסים – פורים ✨', ref:null, staticText:AL_HANISSIM_PURIM,   isAddition:true, condition:'isPurim' },
     { label:'תחנון',
@@ -177,7 +176,7 @@ function getSiddurSections(nusach, prayer) {
              'Weekday_Shacharit,_Torah_Reading'),
       isAddition:true, condition:'isTorahReadingDay' },
     { label:'מוסף ר"ח ✨',        ref: r('Musaf_for_Rosh_Chodesh', null, null), isAddition:true, condition:'isRoshChodesh' },
-    { label:"מוסף לחול המועד ✨", ref: "Weekday_Siddur_Sefard_Linear,_Musaf_for_Chol_Hamo'ed", isAddition:true, condition:'isShaloshRegalim' },
+    { label:"מוסף לחול המועד ✨", ref: "Weekday_Siddur_Sefard_Linear,_Musaf_for_Chol_Hamo'ed", isAddition:true, condition:'isCholHamoed' },
     { label:'שירות חנוכה ✨',     ref: r('Chanukah_Service', null, null), isAddition:true, condition:'isChanuka' },
     { label:"אשרי / ובא לציון",
       ref: r("The_Morning_Prayers,_Ashrei_U'va_L'Tzion", null, null) },
@@ -222,7 +221,6 @@ function getSiddurSections(nusach, prayer) {
       isAddition:true, condition:'isTorahReadingDay' },
     { label:'שמונה עשרה',
       ref: r('Mincha,_Shemoneh_Esrei', null, 'Weekday_Mincha,_Amida') },
-    yaaleh,
     { label:'על הנסים – חנוכה ✨', ref:null, staticText:AL_HANISSIM_CHANUKA, isAddition:true, condition:'isChanuka' },
     { label:'על הנסים – פורים ✨', ref:null, staticText:AL_HANISSIM_PURIM,   isAddition:true, condition:'isPurim' },
     { label:'תחנון',
@@ -251,7 +249,6 @@ function getSiddurSections(nusach, prayer) {
       ref: r('Maariv,_Berachos_Following_Shema', null, null) },
     { label:'שמונה עשרה',
       ref: r('Maariv,_Shemoneh_Esrei', null, null) },
-    yaaleh,
     { label:'על הנסים – חנוכה ✨', ref:null, staticText:AL_HANISSIM_CHANUKA, isAddition:true, condition:'isChanuka' },
     { label:'על הנסים – פורים ✨', ref:null, staticText:AL_HANISSIM_PURIM,   isAddition:true, condition:'isPurim' },
     { label:'ספירת העומר ✨',     ref:null, isAddition:true, condition:'isOmer',
@@ -918,10 +915,32 @@ function closeSiddurSectionsPopup() {
   if (popup)   popup.style.display   = 'none';
 }
 
+function openSiddurStatusPopup() {
+  // Sync content from status banner to popup
+  const sayList  = document.getElementById('siddur-status-say-list');
+  const skipList = document.getElementById('siddur-status-skip-list');
+  const popSay   = document.getElementById('siddur-status-popup-say');
+  const popSkip  = document.getElementById('siddur-status-popup-skip');
+  if (popSay  && sayList)  popSay.innerHTML  = (sayList.innerHTML  || '').split(' · ').map(s => `<div>• ${s}</div>`).join('');
+  if (popSkip && skipList) popSkip.innerHTML = (skipList.innerHTML || '').split(' · ').map(s => `<div>• ${s}</div>`).join('');
+  const overlay = document.getElementById('siddur-status-popup-overlay');
+  const popup   = document.getElementById('siddur-status-popup');
+  if (overlay) overlay.style.display = 'block';
+  if (popup)   popup.style.display   = 'block';
+}
+
+function closeSiddurStatusPopup() {
+  const overlay = document.getElementById('siddur-status-popup-overlay');
+  const popup   = document.getElementById('siddur-status-popup');
+  if (overlay) overlay.style.display = 'none';
+  if (popup)   popup.style.display   = 'none';
+}
+
 // Show/hide floating nav button based on scroll position
 function initSiddurFloatBtn() {
-  const btn    = document.getElementById('siddur-float-btn');
-  const secBtn = document.getElementById('siddur-sec-btn');
+  const btn       = document.getElementById('siddur-float-btn');
+  const secBtn    = document.getElementById('siddur-sec-btn');
+  const statusBtn = document.getElementById('siddur-status-btn');
   if (!btn) return;
   const page      = document.getElementById('page-siddur');
   const topAnchor = document.getElementById('siddur-top');
@@ -930,11 +949,16 @@ function initSiddurFloatBtn() {
     if (!page || !page.classList.contains('active')) return;
     const anchorY  = topAnchor ? topAnchor.getBoundingClientRect().top : -999;
     const scrolled = anchorY < -80 || (page.scrollTop || 0) > 150;
+    const show = val => { return scrolled ? '1' : '0'; };
     btn.style.opacity       = scrolled ? '1' : '0';
     btn.style.pointerEvents = scrolled ? 'auto' : 'none';
     if (secBtn) {
       secBtn.style.opacity       = scrolled ? '1' : '0';
       secBtn.style.pointerEvents = scrolled ? 'auto' : 'none';
+    }
+    if (statusBtn) {
+      statusBtn.style.opacity       = scrolled ? '1' : '0';
+      statusBtn.style.pointerEvents = scrolled ? 'auto' : 'none';
     }
   }
 
