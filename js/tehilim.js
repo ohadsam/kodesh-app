@@ -233,12 +233,15 @@ function getTehilimNavInfo(chapter) {
 let currentTehilimChapter = 1;
 
 function scrollTehilimTop() {
-  // Scroll to top of page so new chapter starts from the beginning
   setTimeout(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    const page = document.getElementById('page-tehilim');
-    if (page) page.scrollTop = 0;
-  }, 50);
+    // Scroll to the chapter title (not page top — tehilim-select is above)
+    const titleEl = document.getElementById('tehilim-num-title');
+    if (titleEl) {
+      titleEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, 80);
 }
 
 async function loadTehilim(chapter) {

@@ -117,31 +117,24 @@ const BRACHOT = {
       '',
       'בָּרוּךְ אַתָּה יְהֹוָה, שׁוֹמֵעַ תְּפִלָּה.',
       '',
-      '— לאחר תפילת הדרך אומרים: —',
+      '— אחרי תפילת הדרך אומרים ג׳ פעמים: —',
       '',
-      'יְהִי רָצוֹן מִלְּפָנֶיךָ יְהֹוָה אֱלֹהֵינוּ וֵאלֹהֵי אֲבוֹתֵינוּ,',
-      'שֶׁתִּשְׁלַח רְפוּאָה שְׁלֵמָה',
-      'לְכָל חוֹלֵי עַמְּךָ יִשְׂרָאֵל,',
-      'וְלִי [שמי] בֶּן / בַּת [שם אם].',
+      'יְהִי שֵׁם יְהֹוָה מְבֹרָךְ מֵעַתָּה וְעַד עוֹלָם. (×3)',
       '',
-      'תהילים קכא:',
-      'שִׁיר לַמַּעֲלוֹת,',
-      'אֶשָּׂא עֵינַי אֶל הֶהָרִים,',
-      'מֵאַיִן יָבֹא עֶזְרִי.',
-      'עֶזְרִי מֵעִם יְיָ,',
-      'עֹשֵׂה שָׁמַיִם וָאָרֶץ.',
-      'אַל יִתֵּן לַמּוֹט רַגְלֶךָ,',
-      'אַל יָנוּם שֹׁמְרֶךָ.',
-      'הִנֵּה לֹא יָנוּם וְלֹא יִישָׁן,',
-      'שׁוֹמֵר יִשְׂרָאֵל.',
-      'יְיָ שֹׁמְרֶךָ,',
-      'יְיָ צִלְּךָ עַל יַד יְמִינֶךָ.',
-      'יוֹמָם הַשֶּׁמֶשׁ לֹא יַכֶּכָּה,',
-      'וְיָרֵחַ בַּלָּיְלָה.',
-      'יְיָ יִשְׁמָרְךָ מִכָּל רָע,',
-      'יִשְׁמֹר אֶת נַפְשֶׁךָ.',
-      'יְיָ יִשְׁמָר צֵאתְךָ וּבוֹאֶךָ,',
-      'מֵעַתָּה וְעַד עוֹלָם.',
+      'יְהֹוָה שֹׁמְרֶךָ יְהֹוָה צִלְּךָ עַל יַד יְמִינֶךָ. (×3)',
+      '',
+      'יְהֹוָה יִשְׁמָר צֵאתְךָ וּבוֹאֶךָ מֵעַתָּה וְעַד עוֹלָם. (×3)',
+      '',
+      '— תהילים קכא —',
+      '',
+      'שִׁיר לַמַּעֲלוֹת, אֶשָּׂא עֵינַי אֶל הֶהָרִים, מֵאַיִן יָבֹא עֶזְרִי.',
+      'עֶזְרִי מֵעִם יְיָ, עֹשֵׂה שָׁמַיִם וָאָרֶץ.',
+      'אַל יִתֵּן לַמּוֹט רַגְלֶךָ, אַל יָנוּם שֹׁמְרֶךָ.',
+      'הִנֵּה לֹא יָנוּם וְלֹא יִישָׁן שׁוֹמֵר יִשְׂרָאֵל.',
+      'יְיָ שֹׁמְרֶךָ, יְיָ צִלְּךָ עַל יַד יְמִינֶךָ.',
+      'יוֹמָם הַשֶּׁמֶשׁ לֹא יַכֶּכָּה, וְיָרֵחַ בַּלָּיְלָה.',
+      'יְיָ יִשְׁמָרְךָ מִכָּל רָע, יִשְׁמֹר אֶת נַפְשֶׁךָ.',
+      'יְיָ יִשְׁמָר צֵאתְךָ וּבוֹאֶךָ, מֵעַתָּה וְעַד עוֹלָם.',
     ],
   },
 
@@ -576,6 +569,23 @@ async function showBracha(key) {
   if (titleEl)  titleEl.textContent  = b.title;
   if (sourceEl) sourceEl.textContent = b.source || '';
 
+  // TTS button – read bracha aloud using Web Speech API
+  const ttsWrap = document.getElementById('bracha-tts-wrap');
+  if (ttsWrap) {
+    if ('speechSynthesis' in window) {
+      ttsWrap.innerHTML = `
+        <button id="bracha-tts-btn" onclick="readBrachaAloud()"
+          style="padding:6px 14px;border-radius:10px;border:1px solid var(--gold-dim);
+          background:rgba(201,165,74,.1);color:var(--gold);cursor:pointer;
+          font-family:'Heebo',sans-serif;font-size:12px;display:flex;
+          align-items:center;gap:6px">
+          🔊 הקרא בקול
+        </button>`;
+    } else {
+      ttsWrap.innerHTML = '';
+    }
+  }
+
   // Auto-scroll to the bracha content area
   setTimeout(() => {
     if (titleEl) titleEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -663,6 +673,51 @@ function _renderBrachaText(paragraphs) {
     return `<p style="font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);
       color:var(--cream);line-height:1.9;display:block;margin-bottom:8px">${p}</p>`;
   }).join('');
+}
+
+// ── Text-to-Speech ──────────────────────────────────────────────────
+let _ttsActive = false;
+
+function readBrachaAloud() {
+  if (!('speechSynthesis' in window)) return;
+  const btn = document.getElementById('bracha-tts-btn');
+
+  if (_ttsActive || window.speechSynthesis.speaking) {
+    window.speechSynthesis.cancel();
+    _ttsActive = false;
+    if (btn) btn.innerHTML = '🔊 הקרא בקול';
+    return;
+  }
+
+  // Collect text from bracha-content, strip HTML
+  const contentEl = document.getElementById('bracha-content');
+  if (!contentEl) return;
+  const text = contentEl.innerText || contentEl.textContent || '';
+  if (!text.trim()) return;
+
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = 'he-IL';
+  utter.rate = 0.85;
+  utter.pitch = 1;
+
+  // Try to find Hebrew voice
+  const voices = window.speechSynthesis.getVoices();
+  const heVoice = voices.find(v => v.lang.startsWith('he')) ||
+                  voices.find(v => v.lang.startsWith('iw'));
+  if (heVoice) utter.voice = heVoice;
+
+  utter.onend = () => {
+    _ttsActive = false;
+    if (btn) btn.innerHTML = '🔊 הקרא בקול';
+  };
+  utter.onerror = () => {
+    _ttsActive = false;
+    if (btn) btn.innerHTML = '🔊 הקרא בקול';
+  };
+
+  _ttsActive = true;
+  if (btn) btn.innerHTML = '⏹ עצור הקראה';
+  window.speechSynthesis.speak(utter);
 }
 
 function loadBrachot() {

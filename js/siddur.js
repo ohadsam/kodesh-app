@@ -358,11 +358,12 @@ function _updatePrayerStatusBanner(allSections, visibleSections) {
   
   const cal = window._siddurCal || {};
   const isWinter = typeof _isWinterSeason === 'function' ? _isWinterSeason() : false;
+  const hd = (typeof appState !== 'undefined') ? appState?._lastHebrewDate : null;
   
   const sayItems = [];
   const skipItems = [];
   
-  // Section-based items (additions shown/hidden)
+  // Section-based additions
   const addSections = allSections.filter(s => s.isAddition && s.condition);
   for (const s of addSections) {
     const shown = visibleSections.includes(s);
@@ -371,24 +372,23 @@ function _updatePrayerStatusBanner(allSections, visibleSections) {
     else skipItems.push(name);
   }
   
-  // Inline Amida inserts (always in text, user needs to know what to say)
+  // Inline Amida inserts (always in text)
   if (isWinter) {
     sayItems.push('משיב הרוח ומוריד הגשם');
     sayItems.push('ותן טל ומטר לברכה');
-    skipItems.push('מוריד הטל');
-    skipItems.push('ותן ברכה');
+    skipItems.push('מוריד הטל (קיץ)');
+    skipItems.push('ותן ברכה (קיץ)');
   } else {
-    sayItems.push('מוריד הטל');
-    sayItems.push('ותן ברכה');
-    skipItems.push('משיב הרוח ומוריד הגשם');
-    skipItems.push('ותן טל ומטר לברכה');
+    sayItems.push('מוריד הטל (קיץ)');
+    sayItems.push('ותן ברכה (קיץ)');
+    skipItems.push('משיב הרוח ומוריד הגשם (חורף)');
+    skipItems.push('ותן טל ומטר לברכה (חורף)');
   }
   
   // עשי"ת
-  const hd = (typeof appState !== 'undefined') ? appState?._lastHebrewDate : null;
   const isAseret = hd && hd.hm === 'Tishrei' && hd.hd >= 1 && hd.hd <= 10;
   if (isAseret) {
-    sayItems.push('זכרנו לחיים (עשי"ת)');
+    sayItems.push('זכרנו לחיים, מי כמוך, וכתוב לחיים, בספר חיים (עשי"ת)');
   } else {
     skipItems.push('תוספות עשרת ימי תשובה');
   }
@@ -397,7 +397,34 @@ function _updatePrayerStatusBanner(allSections, visibleSections) {
   if (cal.isChanuka) sayItems.push('על הנסים – חנוכה');
   else if (cal.isPurim) sayItems.push('על הנסים – פורים');
   else skipItems.push('על הנסים');
-  
+
+  // ── תחנון ──────────────────────────────────
+  // Build a human-readable reason why tachanun is/isn't said
+  const tachanunReasons = [];
+  if (cal.skipTachanun) {
+    if (cal.isShabbat)      tachanunReasons.push('שבת');
+    if (cal.isYomTov)       tachanunReasons.push('יום טוב');
+    if (cal.isRoshChodesh)  tachanunReasons.push('ראש חודש');
+    if (cal.isCholHamoed)   tachanunReasons.push('חול המועד');
+    if (cal.isChanuka)      tachanunReasons.push('חנוכה');
+    if (cal.isPurim)        tachanunReasons.push('פורים');
+    if (cal.isSunday)       tachanunReasons.push('ראשון (אין תחנון בשחרית בלבד)');
+    if (hd) {
+      const m = hd.hm, d = hd.hd;
+      if (m === 'Nisan')            tachanunReasons.push('ניסן');
+      if (m === 'Iyar' && d === 18) tachanunReasons.push('ל"ג בעומר');
+      if (m === 'Iyar' && d === 5)  tachanunReasons.push('יום העצמאות');
+      if (m === 'Iyar' && d === 28) tachanunReasons.push('יום ירושלים');
+      if (m === 'Shevat' && d === 15) tachanunReasons.push('ט"ו בשבט');
+      if (m === 'Av' && d === 15)   tachanunReasons.push('ט"ו באב');
+      if (m === 'Adar' && d === 15) tachanunReasons.push('שושן פורים');
+    }
+    if (!tachanunReasons.length) tachanunReasons.push('יום מיוחד');
+    skipItems.push(`תחנון (${tachanunReasons.join(', ')})`);
+  } else {
+    sayItems.push('תחנון');
+  }
+
   const sayEl = document.getElementById('siddur-status-say-list');
   const skipEl = document.getElementById('siddur-status-skip-list');
   if (sayEl) sayEl.innerHTML = sayItems.length ? sayItems.join(' · ') : 'אין תוספות מיוחדות';
@@ -547,6 +574,23 @@ function _renderParagraphs(paragraphs, isAdd) {
   const isWinter = typeof _isWinterSeason === 'function' ? _isWinterSeason() : (new Date().getMonth()+1 >= 10 || new Date().getMonth()+1 <= 4);
   const cal = window._siddurCal || {};
 
+  // Helper: render a seasonal block from Sefaria \uE002 markers
+  function _shouldShowSeasonalLabel(label) {
+    const hd = (typeof appState !== 'undefined') ? appState?._lastHebrewDate : null;
+    if (label === 'חורף') return isWinter;
+    if (label === 'קיץ')  return !isWinter;
+    if (label === 'ר"ח')  return cal.isRoshChodesh || cal.isCholHamoed || cal.isYomTov;
+    if (/פסח/.test(label))     return cal.isCholHamoed || cal.isYomTov;
+    if (/שבועות/.test(label))  return cal.isYomTov;
+    if (/סוכות/.test(label))   return cal.isCholHamoed || cal.isYomTov;
+    if (label === 'חנוכה/פורים') return cal.isChanuka || cal.isPurim;
+    if (label === 'חנוכה')     return !!cal.isChanuka;
+    if (label === 'פורים')     return !!cal.isPurim;
+    if (label === 'שבת')       return !!cal.isShabbat;
+    if (label === 'עשי"ת')     return !!(hd && hd.hm === 'Tishrei' && hd.hd >= 1 && hd.hd <= 10);
+    return true; // unknown label → show
+  }
+
   return paragraphs.map(p => {
     // Seasonal insert: \uE002 label \uE003 content \uE004
     if (p.startsWith('\uE002')) {
@@ -556,39 +600,35 @@ function _renderParagraphs(paragraphs, isAdd) {
       const content = contentEnd > 0 ? p.slice(labelEnd + 1, contentEnd) : p.slice(labelEnd + 1);
       if (!content.trim()) return '';
 
-      // Filter by season: hide wrong-season inserts
-      const plainContent = content.replace(/<[^>]+>/g, '').replace(/[\u0591-\u05C7]/g, '');
-      if (label === 'חורף' && !isWinter) return ''; // hide winter in summer
-      if (label === 'קיץ'  &&  isWinter) return ''; // hide summer in winter
-      // Hide ר"ח inserts when not R"C/Moed
-      if (label === 'ר"ח' && !cal.isRoshChodesh && !cal.isCholHamoed && !cal.isYomTov) return '';
-      // Holiday-specific inserts
-      if (/פסח/.test(label) && !cal.isCholHamoed && !cal.isYomTov) return '';
-      if (/שבועות/.test(label) && !cal.isYomTov) return '';
-      if (/סוכות/.test(label) && !cal.isCholHamoed && !cal.isYomTov) return '';
-      // חנוכה/פורים (על הנסים in Amida)
-      if (label === 'חנוכה/פורים' && !cal.isChanuka && !cal.isPurim) return '';
-      if (label === 'חנוכה' && !cal.isChanuka) return '';
-      if (label === 'פורים' && !cal.isPurim) return '';
-      if (label === 'שבת' && !cal.isShabbat) return '';
-      // עשי"ת – only during 1-10 Tishrei
-      if (label === 'עשי"ת') {
-        const hd = (typeof appState !== 'undefined') ? appState?._lastHebrewDate : null;
-        const isAseretYemei = hd && hd.hm === 'Tishrei' && hd.hd >= 1 && hd.hd <= 10;
-        if (!isAseretYemei) return '';
-      }
+      const shouldShow = _shouldShowSeasonalLabel(label);
 
-      const labelHtml = label
-        ? `<span style="display:block;font-size:9px;font-family:'Heebo',sans-serif;` +
-          `color:var(--addition);font-style:normal;font-weight:700;letter-spacing:.4px;` +
-          `margin-bottom:2px;opacity:.9">${label}</span>`
-        : '';
-      return `<p style="display:block;margin:4px 0 8px 0;padding:6px 10px 5px;` +
-             `background:var(--addition-bg);border-right:3px solid var(--addition);` +
-             `border-radius:0 6px 6px 0;font-family:'Frank Ruhl Libre',serif;` +
-             `font-size:var(--font-size);color:var(--addition);font-style:italic;` +
-             `font-weight:600;line-height:1.85">` +
-             labelHtml + content + `</p>`;
+      if (shouldShow) {
+        // ✅ Green block – say this today
+        const lbl = label
+          ? `<span style="display:block;font-size:9px;font-family:'Heebo',sans-serif;` +
+            `color:var(--addition);font-style:normal;font-weight:700;letter-spacing:.4px;` +
+            `margin-bottom:2px;opacity:.9">✅ ${label}</span>`
+          : '';
+        return `<p style="display:block;margin:4px 0 8px 0;padding:6px 10px 5px;` +
+               `background:var(--addition-bg);border-right:3px solid var(--addition);` +
+               `border-radius:0 6px 6px 0;font-family:'Frank Ruhl Libre',serif;` +
+               `font-size:var(--font-size);color:var(--addition);font-style:italic;` +
+               `font-weight:600;line-height:1.85">` +
+               lbl + content + `</p>`;
+      } else {
+        // ❌ Red strikethrough – don't say this today (but still show so user knows it exists)
+        const lbl = label
+          ? `<span style="display:block;font-size:9px;font-family:'Heebo',sans-serif;` +
+            `color:#c87060;font-style:normal;font-weight:700;letter-spacing:.4px;` +
+            `margin-bottom:2px;opacity:.9;text-decoration:none">❌ ${label} – לא אומרים</span>`
+          : '';
+        return `<p style="display:block;margin:4px 0 8px 0;padding:6px 10px 5px;` +
+               `background:rgba(180,80,60,.07);border-right:3px solid rgba(180,80,60,.3);` +
+               `border-radius:0 6px 6px 0;font-family:'Frank Ruhl Libre',serif;` +
+               `font-size:calc(var(--font-size)*0.85);color:rgba(180,80,60,.5);` +
+               `font-style:italic;line-height:1.85;text-decoration:line-through">` +
+               lbl + content + `</p>`;
+      }
     }
 
     if (p.startsWith('__HEADER__')) {

@@ -1304,27 +1304,42 @@ async function switchRambamView(view) {
     const commentaryRef = `Steinsaltz on ${_rambamRef}`;
     console.log('[RambamYomi] loading inline:', commentaryRef);
     const data = await sefariaText(commentaryRef, 300);
-    const flat = heFlat(data).filter(Boolean);
-    if (!flat.length) throw new Error('אין פירוש שטיינזלץ זמין');
+
+    // Build per-halacha commentary: data is array where each element = one halacha's commentary
+    // Each element may itself be an array of paragraphs — join them
+    const rawArr = Array.isArray(data) ? data : [];
+    const byHalacha = rawArr.map(entry => {
+      if (!entry) return '';
+      if (Array.isArray(entry)) {
+        // Multiple paragraphs for this halacha — join them
+        return entry.flat(Infinity).filter(Boolean)
+          .map(s => String(s).replace(/<[^>]+>/g, '').trim())
+          .filter(Boolean).join(' ');
+      }
+      return String(entry).replace(/<[^>]+>/g, '').trim();
+    });
+
+    if (!byHalacha.some(Boolean)) throw new Error('אין פירוש שטיינזלץ זמין');
+
     el.className = 'content-text';
-    // Inline: show rambam halacha + steinsaltz embedded after each halacha
+    // Inline: rambam halacha + steinsaltz below it (index-aligned)
     el.innerHTML = _rambamFlat.map((v, i) => {
-      const stText = (flat[i] && typeof flat[i] === 'string') ? flat[i] :
-                     (Array.isArray(flat[i]) ? flat[i].flat().filter(Boolean).join(' ') : '');
+      const stText = byHalacha[i] || '';
       const stHtml = stText
-        ? `<div style="margin-top:6px;padding:5px 10px;background:rgba(126,214,160,.07);
+        ? `<div style="margin-top:6px;padding:5px 10px;
+            background:rgba(126,214,160,.07);
             border-right:2px solid var(--addition);border-radius:0 5px 5px 0;
             color:var(--addition);font-size:calc(var(--font-size)*0.84);
             font-style:italic;line-height:1.8">
             <span style="font-size:9px;font-weight:700;display:block;margin-bottom:2px;opacity:.8">📚 שטיינזלץ</span>
-            ${stText.replace(/<[^>]+>/g,'')}</div>`
+            ${stText}</div>`
         : '';
       return `<div style="margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.05)">
         <div><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}</div>
         ${stHtml}
       </div>`;
     }).join('');
-    console.log('[RambamYomi] steinsaltz inline:', flat.length, 'entries');
+    console.log('[RambamYomi] steinsaltz inline:', byHalacha.filter(Boolean).length, 'aligned entries');
   } catch(e) {
     console.warn('[RambamYomi] commentary error:', e.message);
     el.innerHTML = `<div style="color:var(--muted);text-align:center;padding:20px">⚠️ ${e.message}</div>`;

@@ -121,6 +121,50 @@ function updateCompassUI() {
   }
 }
 
+// Track alpha history to detect uncalibrated sensor
+let _alphaHistory = [];
+let _calibrationWarned = false;
+let _lastAlphaRange = 0;
+
+function _checkSensorCalibration(alpha) {
+  _alphaHistory.push(alpha);
+  if (_alphaHistory.length > 60) _alphaHistory.shift(); // keep last 60 samples (~3 sec)
+  if (_alphaHistory.length < 20) return; // not enough data yet
+
+  const min = Math.min(..._alphaHistory);
+  const max = Math.max(..._alphaHistory);
+  _lastAlphaRange = max - min;
+
+  const calEl = document.getElementById('qibla-calibration');
+  if (!calEl) return;
+
+  if (_lastAlphaRange < 15) {
+    // Sensor barely moving — almost certainly uncalibrated
+    if (!_calibrationWarned) {
+      _calibrationWarned = true;
+      calEl.style.display = 'block';
+      calEl.innerHTML = `
+        <div style="font-size:12px;font-weight:700;color:#c87060;margin-bottom:6px">⚠️ חיישן המצפן לא מכויל</div>
+        <div style="font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:8px">
+          הטלפון אינו מזהה סיבוב אמיתי. יש לכייל את המגנטומטר:<br>
+          <strong>הזז את הטלפון בתנועת שמינייה (∞) כ-10 שניות</strong> ואז לחץ רענון.
+        </div>
+        <div style="font-size:10px;color:var(--muted);opacity:.7">
+          טווח חיישן: ${Math.round(_lastAlphaRange)}° (דרוש: >30°)
+        </div>
+        <button onclick="initQibla()" style="margin-top:8px;padding:6px 14px;border-radius:8px;
+          border:1px solid var(--gold);background:rgba(201,165,74,.15);color:var(--gold);
+          cursor:pointer;font-size:12px;font-family:'Heebo',sans-serif">
+          🔄 רענן לאחר כיול
+        </button>`;
+    }
+  } else {
+    // Sensor is working
+    _calibrationWarned = false;
+    calEl.style.display = 'none';
+  }
+}
+
 function startCompassListener() {
   if (compassListener) {
     window.removeEventListener('deviceorientationabsolute', compassListener, true);
@@ -129,20 +173,40 @@ function startCompassListener() {
   }
   if (window._aoSensor) { try { window._aoSensor.stop(); } catch(e){} window._aoSensor = null; }
 
+  // Reset calibration tracking
+  _alphaHistory = [];
+  _calibrationWarned = false;
+
   compassListener = (e) => {
     let h = null;
     deviceBeta = e.beta;
 
     if (typeof e.webkitCompassHeading === 'number' && e.webkitCompassHeading >= 0) {
-      // iOS: tilt-compensated by OS. Add ~5° magnetic declination correction for Israel
-      h = (e.webkitCompassHeading + 5) % 360;
+      // iOS: tilt-compensated by OS + Israel magnetic declination (~4.5°)
+      h = (e.webkitCompassHeading + 4.5) % 360;
       console.log('[Compass] iOS webkit+decl:', h.toFixed(1));
 
     } else if (e.absolute === true && e.alpha !== null) {
-      // Android: use fused absolute heading from OS sensor (already tilt-compensated)
+      // Android absolute orientation sensor
       const screenAngle = (window.screen?.orientation?.angle ?? window.orientation ?? 0);
       h = (360 - e.alpha + screenAngle) % 360;
+      // Check calibration
+      _checkSensorCalibration(e.alpha);
+      // Show raw debug info
+      const rawEl = document.getElementById('qibla-raw-alpha');
+      if (rawEl) rawEl.textContent = `α=${e.alpha.toFixed(1)}° range=${Math.round(_lastAlphaRange)}°`;
       console.log('[Compass] Android heading:', h.toFixed(1), 'α=', e.alpha.toFixed(1), 'screen=', screenAngle);
+
+    } else if (e.alpha !== null && e.absolute === false) {
+      // Relative orientation — less accurate but better than nothing
+      // Only use if no absolute reading ever came
+      if (deviceHeading === null) {
+        const screenAngle = (window.screen?.orientation?.angle ?? window.orientation ?? 0);
+        h = (360 - e.alpha + screenAngle) % 360;
+        console.log('[Compass] Android relative (fallback):', h.toFixed(1));
+        setQiblaStatus('⚠️ מצפן יחסי (פחות מדויק) – יש לכייל');
+      }
+      return;
     } else {
       return;
     }
