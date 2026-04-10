@@ -726,49 +726,56 @@ function _staticTextToHtml(rawText, isAdd) {
 function _fixAmidaSeasonalWords(html) {
   const winter = (typeof _isWinterSeason === 'function') ? _isWinterSeason() : false;
 
-  const SAY   = 'color:var(--addition);font-weight:700';
-  const SKIP  = 'color:rgba(180,80,60,.55);text-decoration:line-through;font-size:.9em';
-  const sayTag  = (t, lbl) => `<span style="${SAY}" title="${lbl}">✅ ${t}</span>`;
-  const skipTag = (t, lbl) => `<span style="${SKIP}" title="${lbl}">❌ ${t}</span>`;
+  // ── מוריד הטל / משיב הרוח ──────────────────────────────────────
+  // Sefaria puts both in ONE <small> block. After rendering they appear
+  // in a single green paragraph. We need to:
+  // 1. Remove the one NOT said today from the paragraph entirely
+  // 2. Mark the one that IS said with a subtle ✅ label
 
-  // מוריד הטל (summer) vs משיב הרוח ומוריד הגשם (winter)
-  // Both may appear in same paragraph — mark each inline
-  const GESHEM_RE = /מַשִּׁיב הָרוּחַ וּמוֹרִיד הַגֶּשֶׁם|משיב הרוח ומוריד הגשם/g;
-  const TAL_RE    = /מוֹרִיד הַטָּל|מוריד הטל/g;
+  const sayGreen  = (t, lbl) =>
+    `<span style="background:rgba(61,140,90,.18);padding:1px 5px;border-radius:4px;color:var(--addition);font-weight:700" title="${lbl}">✅ ${t}</span>`;
+  const hideSpan  = () => ''; // remove from DOM entirely
+
+  // Nikud + plain variants
+  const GESHEM_PAT = /מַשִּׁיב הָרוּחַ וּמוֹרִיד הַגֶּשֶׁם|משיב הרוח ומוריד הגשם/g;
+  const TAL_PAT    = /מוֹרִיד הַטָּל|מוריד הטל/g;
+
   if (winter) {
-    html = html.replace(GESHEM_RE, m => sayTag(m,  'אומרים מחשוון עד פסח'));
-    html = html.replace(TAL_RE,    m => skipTag(m, 'לא אומרים בחורף'));
+    // Winter: say משיב הרוח, remove מוריד הטל
+    html = html.replace(GESHEM_PAT, m => sayGreen(m, 'אומרים בחורף'));
+    html = html.replace(TAL_PAT,    ()  => hideSpan());
   } else {
-    html = html.replace(GESHEM_RE, m => skipTag(m, 'לא אומרים בקיץ'));
-    html = html.replace(TAL_RE,    m => sayTag(m,  'אומרים מפסח עד חשוון'));
+    // Summer: say מוריד הטל, remove משיב הרוח
+    html = html.replace(TAL_PAT,    m => sayGreen(m, 'אומרים בקיץ'));
+    html = html.replace(GESHEM_PAT, ()  => hideSpan());
   }
 
-  // ותן ברכה (summer) vs ותן טל ומטר לברכה (winter)
-  const MATAR_RE  = /וְתֵן טַל וּמָטָר לִבְרָכָה|ותן טל ומטר לברכה/g;
-  const BRACHA_RE = /וְתֵן בְּרָכָה|ותן ברכה/g;
+  // ── ותן ברכה / ותן טל ומטר ──────────────────────────────────────
+  // Same approach: keep only the correct one, remove the other
+  const MATAR_PAT  = /וְתֵן טַל וּמָטָר לִבְרָכָה|ותן טל ומטר לברכה/g;
+  const BRACHA_PAT = /וְתֵן בְּרָכָה|ותן ברכה/g;
+
   if (winter) {
-    html = html.replace(MATAR_RE,  m => sayTag(m,  'אומרים בחורף'));
-    html = html.replace(BRACHA_RE, m => skipTag(m, 'לא אומרים בחורף'));
+    html = html.replace(MATAR_PAT,  m => sayGreen(m, 'אומרים בחורף'));
+    html = html.replace(BRACHA_PAT, ()  => hideSpan());
   } else {
-    html = html.replace(MATAR_RE,  m => skipTag(m, 'לא אומרים בקיץ'));
-    html = html.replace(BRACHA_RE, m => sayTag(m,  'אומרים בקיץ'));
+    html = html.replace(BRACHA_PAT, m => sayGreen(m, 'אומרים בקיץ'));
+    html = html.replace(MATAR_PAT,  ()  => hideSpan());
   }
 
-  // יעלה ויבוא — inline inside Amida text
+  // ── יעלה ויבוא ───────────────────────────────────────────────────
   const cal = window._siddurCal || {};
   const sayYaaleh = cal.isRoshChodesh || cal.isCholHamoed || cal.isYomTov;
-  const YAALEH_RE = /יַעֲלֶה וְיָבֹא|יעלה ויבוא/;
-  if (YAALEH_RE.test(html.replace(/<[^>]+>/g, ''))) {
-    if (sayYaaleh) {
-      // Already shown via wrapSeasonalParagraphs — add green label if not already wrapped
-      if (!html.includes('✅ יעלה ויבוא') && !html.includes('addition-bg')) {
-        html = html.replace(/(יַעֲלֶה וְיָבֹא|יעלה ויבוא)/, m => sayTag(m, 'אומרים בר"ח, חול המועד ויו"ט'));
-      }
-    } else {
-      if (!html.includes('❌')) {
-        html = html.replace(/(יַעֲלֶה וְיָבֹא|יעלה ויבוא)/, m => skipTag(m, 'לא אומרים היום'));
-      }
-    }
+  // Match first occurrence of יעלה ויבוא (beginning of the paragraph)
+  const YAALEH_PAT = /(יַעֲלֶה וְיָבֹא|יעלה ויבוא)/;
+  if (!sayYaaleh) {
+    // Not today — mark the entire paragraph containing יעלה ויבוא as red strikethrough
+    // Find <p ...> containing יעלה and wrap it
+    html = html.replace(
+      /(<p [^>]*>)((?:(?!<\/p>)[\s\S])*?(?:יַעֲלֶה וְיָבֹא|יעלה ויבוא)(?:(?!<\/p>)[\s\S])*?)(<\/p>)/g,
+      (_, open, content, close) =>
+        `${open}<span style="color:rgba(180,80,60,.5);text-decoration:line-through;font-size:.9em" title="לא אומרים היום">❌ ${content}</span>${close}`
+    );
   }
 
   return html;

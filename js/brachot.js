@@ -98,18 +98,19 @@ const BRACHOT = {
 
   tefila_haderech: {
     title: 'תפילת הדרך',
-    source: 'בצאת לדרך (נסיעה, טיסה, ים) – אומרים פעם אחת ביום',
+    source: 'אומרים בצאת לדרך (נסיעה, טיסה, ים) – פעם אחת ביום, לאחר שיצא מהעיר',
     shared: [
+      // ── התפילה ──
       'יְהִי רָצוֹן מִלְּפָנֶיךָ יְהֹוָה אֱלֹהֵינוּ וֵאלֹהֵי אֲבוֹתֵינוּ,',
       'שֶׁתּוֹלִיכֵנוּ לְשָׁלוֹם',
-      'וְתַצְעִידֵנוּ לְשָׁלוֹם',
+      'וְתַצְעִידֵנוּ לְשָׁלוֹם,',
       'וְתַדְרִיכֵנוּ לְשָׁלוֹם,',
       'וְתִסְמְכֵנוּ לְשָׁלוֹם,',
       'וְתַגִּיעֵנוּ לִמְחוֹז חֶפְצֵנוּ לְחַיִּים וּלְשִׂמְחָה וּלְשָׁלוֹם.',
       'וְתַצִּילֵנוּ מִכַּף כָּל אוֹיֵב וְאוֹרֵב,',
-      'מֵחַיּוֹת רָעוֹת וּמִכָּל מִינֵי פֻּרְעָנִיּוֹת',
-      'הַמִּתְרַגְּשׁוֹת לָבוֹא לָעוֹלָם,',
-      'וְתִשְׁלַח בְּרָכָה בְּכָל מַעֲשֵׂה יָדֵינוּ,',
+      'מִלִּסְטִים וּמֵחַיּוֹת רָעוֹת בַּדֶּרֶךְ,',
+      'וּמִכָּל מִינֵי פֻּרְעָנִיּוֹת הַמִּתְרַגְּשׁוֹת לָבוֹא לָעוֹלָם,',
+      'וְתִשְׁלַח בְּרָכָה בְּמַעֲשֵׂה יָדֵינוּ,',
       'וְתִתְּנֵנוּ לְחֵן וּלְחֶסֶד וּלְרַחֲמִים בְּעֵינֶיךָ',
       'וּבְעֵינֵי כָּל רוֹאֵינוּ,',
       'וְתִשְׁמַע קוֹל תַּחֲנוּנֵינוּ,',
@@ -117,24 +118,29 @@ const BRACHOT = {
       '',
       'בָּרוּךְ אַתָּה יְהֹוָה, שׁוֹמֵעַ תְּפִלָּה.',
       '',
-      '— אחרי תפילת הדרך אומרים ג׳ פעמים: —',
+      // ── פסוקים שאומרים אחרי תפילת הדרך (שלוש פעמים כל אחד) ──
+      '— לאחר התפילה אומרים ג׳ פעמים: —',
       '',
-      'יְהִי שֵׁם יְהֹוָה מְבֹרָךְ מֵעַתָּה וְעַד עוֹלָם. (×3)',
-      '',
-      'יְהֹוָה שֹׁמְרֶךָ יְהֹוָה צִלְּךָ עַל יַד יְמִינֶךָ. (×3)',
+      'וְיַעֲקֹב הָלַךְ לְדַרְכּוֹ וַיִּפְגְּעוּ בוֹ מַלְאֲכֵי אֱלֹהִים.',
+      'וַיֹּאמֶר יַעֲקֹב כַּאֲשֶׁר רָאָם: מַחֲנֵה אֱלֹהִים זֶה.',
+      'וַיִּקְרָא שֵׁם הַמָּקוֹם הַהוּא מַחֲנָיִם. (×3)',
       '',
       'יְהֹוָה יִשְׁמָר צֵאתְךָ וּבוֹאֶךָ מֵעַתָּה וְעַד עוֹלָם. (×3)',
       '',
+      'יְהֹוָה שֹׁמְרֶךָ יְהֹוָה צִלְּךָ עַל יַד יְמִינֶךָ. (×3)',
+      '',
+      // ── תהילים קכא ──
       '— תהילים קכא —',
       '',
-      'שִׁיר לַמַּעֲלוֹת, אֶשָּׂא עֵינַי אֶל הֶהָרִים, מֵאַיִן יָבֹא עֶזְרִי.',
-      'עֶזְרִי מֵעִם יְיָ, עֹשֵׂה שָׁמַיִם וָאָרֶץ.',
+      'שִׁיר לַמַּעֲלוֹת.',
+      'אֶשָּׂא עֵינַי אֶל הֶהָרִים, מֵאַיִן יָבֹא עֶזְרִי.',
+      'עֶזְרִי מֵעִם יְהֹוָה, עֹשֵׂה שָׁמַיִם וָאָרֶץ.',
       'אַל יִתֵּן לַמּוֹט רַגְלֶךָ, אַל יָנוּם שֹׁמְרֶךָ.',
-      'הִנֵּה לֹא יָנוּם וְלֹא יִישָׁן שׁוֹמֵר יִשְׂרָאֵל.',
-      'יְיָ שֹׁמְרֶךָ, יְיָ צִלְּךָ עַל יַד יְמִינֶךָ.',
+      'הִנֵּה לֹא יָנוּם וְלֹא יִישָׁן, שׁוֹמֵר יִשְׂרָאֵל.',
+      'יְהֹוָה שֹׁמְרֶךָ, יְהֹוָה צִלְּךָ עַל יַד יְמִינֶךָ.',
       'יוֹמָם הַשֶּׁמֶשׁ לֹא יַכֶּכָּה, וְיָרֵחַ בַּלָּיְלָה.',
-      'יְיָ יִשְׁמָרְךָ מִכָּל רָע, יִשְׁמֹר אֶת נַפְשֶׁךָ.',
-      'יְיָ יִשְׁמָר צֵאתְךָ וּבוֹאֶךָ, מֵעַתָּה וְעַד עוֹלָם.',
+      'יְהֹוָה יִשְׁמָרְךָ מִכָּל רָע, יִשְׁמֹר אֶת נַפְשֶׁךָ.',
+      'יְהֹוָה יִשְׁמָר צֵאתְךָ וּבוֹאֶךָ, מֵעַתָּה וְעַד עוֹלָם.',
     ],
   },
 
@@ -675,49 +681,72 @@ function _renderBrachaText(paragraphs) {
   }).join('');
 }
 
-// ── Text-to-Speech ──────────────────────────────────────────────────
-let _ttsActive = false;
+// ── Shared Text-to-Speech utility ───────────────────────────────────
+// Replaces יהוה/יהֹוָה with אדוני per Jewish law before reading aloud
+function _ttsCleanText(text) {
+  return text
+    // Replace all forms of the Tetragrammaton with אדוני
+    .replace(/יְהֹוָה|יהוה|יְיָ|יי(?=[^\w]|$)/g, 'אדוני')
+    // Remove nikud (vowel marks) for cleaner TTS
+    .replace(/[\u05B0-\u05C7]/g, '')
+    .trim();
+}
 
-function readBrachaAloud() {
+let _ttsActive = false;
+let _ttsContentId = null; // which element is currently reading
+
+function _ttsRead(contentElId, btnElId) {
   if (!('speechSynthesis' in window)) return;
-  const btn = document.getElementById('bracha-tts-btn');
+  const btn = document.getElementById(btnElId);
 
   if (_ttsActive || window.speechSynthesis.speaking) {
     window.speechSynthesis.cancel();
     _ttsActive = false;
+    _ttsContentId = null;
     if (btn) btn.innerHTML = '🔊 הקרא בקול';
     return;
   }
 
-  // Collect text from bracha-content, strip HTML
-  const contentEl = document.getElementById('bracha-content');
+  const contentEl = document.getElementById(contentElId);
   if (!contentEl) return;
-  const text = contentEl.innerText || contentEl.textContent || '';
-  if (!text.trim()) return;
+  const rawText = contentEl.innerText || contentEl.textContent || '';
+  const text = _ttsCleanText(rawText);
+  if (!text) return;
 
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang = 'he-IL';
-  utter.rate = 0.85;
+  utter.rate = 0.82;
   utter.pitch = 1;
 
   // Try to find Hebrew voice
   const voices = window.speechSynthesis.getVoices();
-  const heVoice = voices.find(v => v.lang.startsWith('he')) ||
-                  voices.find(v => v.lang.startsWith('iw'));
+  const heVoice = voices.find(v => v.lang && v.lang.startsWith('he')) ||
+                  voices.find(v => v.lang && v.lang.startsWith('iw'));
   if (heVoice) utter.voice = heVoice;
 
   utter.onend = () => {
-    _ttsActive = false;
+    _ttsActive = false; _ttsContentId = null;
     if (btn) btn.innerHTML = '🔊 הקרא בקול';
   };
   utter.onerror = () => {
-    _ttsActive = false;
+    _ttsActive = false; _ttsContentId = null;
     if (btn) btn.innerHTML = '🔊 הקרא בקול';
   };
 
   _ttsActive = true;
+  _ttsContentId = contentElId;
   if (btn) btn.innerHTML = '⏹ עצור הקראה';
   window.speechSynthesis.speak(utter);
+}
+
+// Brachot TTS
+function readBrachaAloud() {
+  _ttsRead('bracha-content', 'bracha-tts-btn');
+}
+
+// Tehilim TTS
+function readTehilimAloud() {
+  _ttsRead('tehilim-content', 'tehilim-tts-btn');
 }
 
 function loadBrachot() {
