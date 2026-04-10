@@ -1028,6 +1028,12 @@ let _dafRef = null;
 let _dafView = 'text'; // 'text' | 'rashi' | 'steinsaltz'
 let _dafFlat = [];
 
+// Build Sefaria Calendars API URL with the current target date for day navigation support
+function _sefariaCalendarUrl() {
+  const d = getTargetDate();
+  return `https://www.sefaria.org/api/calendars?diaspora=0&year=${d.getFullYear()}&month=${d.getMonth()+1}&day=${d.getDate()}`;
+}
+
 async function loadDafYomi() {
   const el     = document.getElementById('daf-content');
   const subEl  = document.getElementById('daf-subtitle');
@@ -1035,7 +1041,7 @@ async function loadDafYomi() {
   _dafView = 'text';
   try {
     console.log('[DafYomi] fetching calendar...');
-    const cal  = await fetchWithDelay('https://www.sefaria.org/api/calendars?diaspora=0');
+    const cal  = await fetchWithDelay(_sefariaCalendarUrl());
     const item = (cal?.calendar_items || []).find(i =>
       (i.title?.en || '').toLowerCase().includes('daf yomi') ||
       (i.title?.he || '').includes('דף')
@@ -1134,7 +1140,7 @@ async function loadMishnaYomi() {
   _mishnaView = 'text';
   try {
     console.log('[MishnaYomi] fetching calendar...');
-    const cal  = await fetchWithDelay('https://www.sefaria.org/api/calendars?diaspora=0');
+    const cal  = await fetchWithDelay(_sefariaCalendarUrl());
     const item = (cal?.calendar_items || []).find(i =>
       (i.title?.en || '').toLowerCase().includes('mishnah yomi') ||
       (i.title?.en || '').toLowerCase().includes('mishna yomi') ||
@@ -1220,7 +1226,7 @@ async function loadTanach929() {
   el.className = 'content-text loading'; el.textContent = 'טוען פרק תנ"ך...';
   try {
     console.log('[929] fetching calendar...');
-    const cal  = await fetchWithDelay('https://www.sefaria.org/api/calendars?diaspora=0');
+    const cal  = await fetchWithDelay(_sefariaCalendarUrl());
     const item = (cal?.calendar_items || []).find(i =>
       (i.title?.en || '').includes('929') ||
       (i.title?.he || '').includes('929') ||
@@ -1259,7 +1265,7 @@ async function loadRambamYomi() {
   _rambamView = 'text';
   try {
     console.log('[RambamYomi] fetching calendar...');
-    const cal = await fetchWithDelay('https://www.sefaria.org/api/calendars?diaspora=0');
+    const cal = await fetchWithDelay(_sefariaCalendarUrl());
     const item = (cal?.calendar_items || []).find(i =>
       (i.title?.en || '').toLowerCase().includes('daily rambam') ||
       (i.title?.he || '').includes('רמב"ם') ||
@@ -1271,19 +1277,34 @@ async function loadRambamYomi() {
     subEl.textContent = item.heRef || item.ref;
 
     const data = await sefariaText(item.ref, 400);
-    // Store per-halacha (not flat sentences) so Steinsaltz index aligns 1:1
-    // data.he is 2D: he[halacha_idx][sentence_idx]
-    // Each halacha = one entry in _rambamFlat (sentences joined)
+    // data.he shape: either 1D (sentences) or 2D (halachot × sentences)
     const rawHe = data?.he;
-    if (Array.isArray(rawHe) && Array.isArray(rawHe[0])) {
-      // 2D array: group sentences per halacha
-      _rambamFlat = rawHe.map(halacha =>
-        (Array.isArray(halacha) ? halacha : [halacha])
-          .filter(Boolean).join(' ')
-      ).filter(Boolean);
+    const is2D = Array.isArray(rawHe) && rawHe.length > 0 && Array.isArray(rawHe[0]);
+    console.log('[RambamYomi] data.he shape:', is2D ? '2D' : '1D',
+                '| length:', Array.isArray(rawHe) ? rawHe.length : 'N/A',
+                '| ref:', item.ref);
+
+    if (is2D) {
+      // 2D: each element = one halacha, join its sentences
+      _rambamFlat = rawHe.map((halacha, i) => {
+        const sentences = (Array.isArray(halacha) ? halacha : [halacha]).filter(Boolean);
+        const joined = sentences.join(' ');
+        console.log(`[RambamYomi] halacha[${i}] ${sentences.length} sentences: ${joined.replace(/<[^>]+>/g,'').slice(0,60)}`);
+        return joined;
+      }).filter(Boolean);
     } else {
-      // 1D array: already one entry per halacha
-      _rambamFlat = (Array.isArray(rawHe) ? rawHe : []).filter(Boolean);
+      // 1D: each element is a sentence — treat all as ONE halacha (daily portion is one halacha)
+      // This handles refs like "Mishneh Torah, Book 1, Chapter 5:3" (single halacha)
+      const allSentences = (Array.isArray(rawHe) ? rawHe : []).filter(Boolean);
+      // If ref has a colon (halacha number), it's a single halacha → group all sentences
+      if (_rambamRef.includes(':')) {
+        _rambamFlat = [allSentences.join(' ')].filter(Boolean);
+        console.log('[RambamYomi] single halacha ref, joined', allSentences.length, 'sentences');
+      } else {
+        // Chapter ref without halacha number — sentences are individual halachot
+        _rambamFlat = allSentences;
+        console.log('[RambamYomi] chapter ref, treating each sentence as halacha:', allSentences.length);
+      }
     }
     if (!_rambamFlat.length) throw new Error('אין טקסט עברי');
 

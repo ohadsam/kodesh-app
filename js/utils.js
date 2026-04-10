@@ -92,7 +92,7 @@ let currentAliya = 'all';
 let rashiLoaded = false;
 let rashiVisible = false;
 
-const APP_VERSION  = '5.31';
+const APP_VERSION  = '5.33';
 const STORAGE_KEY  = 'kodesh_app_v1';
 const SIDDUR_CACHE_KEY = 'siddur_cache_v';
 
@@ -198,22 +198,43 @@ function heFlat(data) {
 function cleanSefariaHtml(str) {
   if (!str) return '';
 
-  return str
+  // Step 1: Convert seasonal <small> labels to \uE001 markers
+  // Sefaria uses <small>בחורף</small> / <small>בקיץ</small> to label seasonal alternatives.
+  // Convert to \uE001label\uE001 so buildParagraphs() can identify and handle them.
+  let s = str
     .replace(/&thinsp;/g, '\u2009').replace(/&nbsp;/g, '\u00a0')
     .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&mdash;/g, '\u2014').replace(/&ndash;/g, '\u2013')
-    .replace(/<small[^>]*>(.*?)<\/small>/gi, (_, inner) => {
-      const text = inner.replace(/<[^>]+>/g, '').trim();
-      // Remove English instructions entirely (Sefaria adds these as <small><i>...</i></small>)
-      if (/^[A-Za-z(]/.test(text) || /^If you/.test(text) || /^During/.test(text) || /^From the/.test(text)) {
-        return ''; // Remove English instructions
+    .replace(/&mdash;/g, '\u2014').replace(/&ndash;/g, '\u2013');
+
+  // Replace seasonal <small> with temp token \uFFF0label\uFFF1
+  s = s.replace(/<small[^>]*>(.*?)<\/small>/gi, (match, inner) => {
+    const text = inner.replace(/<[^>]+>/g, '').trim();
+    const t = text.replace(/[\u0591-\u05C7]/g, '').trim();
+    if (/^בחורף$|^חורף$/.test(t)) return '\uFFF0חורף\uFFF1';
+    if (/^בקיץ$|^קיץ$/.test(t))   return '\uFFF0קיץ\uFFF1';
+    if (/^בעשי.ת$/.test(t)) return '\uFFF0עשי\"ת\uFFF1';
+    if (/^[A-Za-z(]/.test(text) || /^If you|^During|^From the/.test(text)) return '';
+    return `<span style="color:var(--muted);font-style:italic;font-size:.9em">${text}</span>`;
+  });
+
+  // Convert temp tokens to \uE001 markers
+  if (s.includes('\uFFF0')) {
+    const parts = s.split('\uFFF0');
+    let result = parts[0];
+    for (let i = 1; i < parts.length; i++) {
+      const idx = parts[i].indexOf('\uFFF1');
+      if (idx >= 0) {
+        const label = parts[i].slice(0, idx);
+        const rest  = parts[i].slice(idx + 1);
+        result += '\uE001' + label + '\uE001' + rest;
+      } else {
+        result += parts[i];
       }
-      // Hebrew instructional text (בעשי"ת, בקיץ, בחורף labels) → remove
-      const t = text.replace(/[\u0591-\u05C7]/g, '').trim();
-      if (/^בקיץ$|^בחורף$|^בעשי.ת$/.test(t)) return '';
-      // Muted inline text (ברוך שם, etc.)
-      return `<span style="color:var(--muted);font-style:italic;font-size:.9em">${text}</span>`;
-    })
+    }
+    s = result;
+  }
+
+  return s
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<(?!\/?(?:b|i|strong|em|span)\b)[^>]+>/gi, '')
     .trim();
@@ -370,22 +391,33 @@ function buildParagraphs(flat) {
     // ── Handle seasonal markers ────────────────────────────────────────
     if (v.includes('\uE001')) {
       const segs = v.split('\uE001');
-      segs.forEach((seg, idx) => {
-        seg = seg.trim();
-        if (!seg) return;
-        if (idx % 2 === 1) {
-          flush();
-          const label = _seasonalLabel(seg);
-          const content = _seasonalContent(seg);
-          paragraphs.push('\uE002' + label + '\uE003' + content + '\uE004');
+      let i2 = 0;
+      while (i2 < segs.length) {
+        const seg = segs[i2].trim();
+        if (i2 % 2 === 0) {
+          // Regular content segment
+          if (seg) {
+            const plain = stripD(seg.replace(/<[^>]+>/g, ''));
+            if (BREAK_BEFORE.some(r => r.test(plain))) flush();
+            current.push(seg);
+            if (BRACHA_END.test(plain)) flush();
+            else if (SOF_PASUK.test(plain)) flush();
+          }
+          i2++;
         } else {
-          const plain = stripD(seg.replace(/<[^>]+>/g, ''));
-          if (BREAK_BEFORE.some(r => r.test(plain))) flush();
-          current.push(seg);
-          if (BRACHA_END.test(plain)) flush();
-          else if (SOF_PASUK.test(plain)) flush();
+          // Odd segment = the label (e.g. "חורף", "קיץ")
+          // NEW format: label is directly the season name
+          // Next even segment = the content for this label
+          const label = _seasonalLabel(seg) || seg; // use seg directly if no match
+          const contentSeg = segs[i2 + 1] || '';
+          flush();
+          if (contentSeg.trim()) {
+            console.log('[buildParagraphs] seasonal marker: label=', label, 'content=', contentSeg.replace(/<[^>]+>/g,'').slice(0,60));
+            paragraphs.push('\uE002' + label + '\uE003' + contentSeg.trim() + '\uE004');
+          }
+          i2 += 2; // skip both label and content
         }
-      });
+      }
       continue;
     }
 
