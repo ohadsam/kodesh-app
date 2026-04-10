@@ -286,14 +286,9 @@ async function loadTehilim(chapter) {
 
     sub.textContent = `${flat.length} פסוקים`;
     updateDoneButton('tehilim', chapter);
-    // TTS button
+    // Clear TTS wrap (removed - Hebrew TTS reads letter by letter on most devices)
     const ttsWrap = document.getElementById('tehilim-tts-wrap');
-    if (ttsWrap && 'speechSynthesis' in window) {
-      ttsWrap.innerHTML = `<button id="tehilim-tts-btn" onclick="readTehilimAloud()"
-        style="padding:5px 12px;border-radius:10px;border:1px solid var(--gold-dim);
-        background:rgba(201,165,74,.1);color:var(--gold);cursor:pointer;
-        font-family:'Heebo',sans-serif;font-size:12px">🔊 הקרא בקול</button>`;
-    }
+    if (ttsWrap) ttsWrap.innerHTML = '';
     scrollTehilimTop();
     console.log(`[Tehilim] OK – ${flat.length} verses, day ${nav?.day}`);
   } catch(e) {

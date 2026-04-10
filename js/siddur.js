@@ -650,6 +650,57 @@ function _renderParagraphs(paragraphs, isAdd) {
 
       const shouldShow = _shouldShowSeasonalLabel(label);
 
+      // ── Special handling for חורף/קיץ: both phrases may be in ONE block ──
+      // Sefaria puts "משיב הרוח ומוריד הגשם מוריד הטל" in one \uE002חורף block.
+      // We extract only the seasonally-correct phrase and show it plainly.
+      if (label === 'חורף' || label === 'קיץ') {
+        const plain = content.replace(/<[^>]+>/g, '').replace(/[\u0591-\u05C7]/g, '');
+
+        // Detect both phrases in this block
+        const hasGeshem = /משיב הרוח|מוריד הגשם/.test(plain);
+        const hasTal    = /מוריד הטל/.test(plain);
+
+        if (hasGeshem && hasTal) {
+          // Both in one block — extract the correct one and show ONLY that
+          if (isWinter) {
+            // Summer phrase → keep משיב הרוח, strip out מוריד הטל entirely
+            const filtered = content
+              .replace(/מוֹרִיד הַטָּל/g, '')
+              .replace(/מוריד הטל/g, '')
+              .replace(/\s{2,}/g, ' ').trim();
+            const lbl = `<span style="display:block;font-size:9px;font-family:'Heebo',sans-serif;color:var(--addition);font-weight:700;margin-bottom:2px;opacity:.9">✅ חורף</span>`;
+            return `<p style="display:block;margin:4px 0 8px 0;padding:6px 10px 5px;background:var(--addition-bg);border-right:3px solid var(--addition);border-radius:0 6px 6px 0;font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);color:var(--addition);font-style:italic;font-weight:600;line-height:1.85">${lbl}${filtered}</p>`;
+          } else {
+            // Summer: keep only מוריד הטל, strip out משיב הרוח
+            const filtered = content
+              .replace(/מַשִּׁיב הָרוּחַ וּמוֹרִיד הַגֶּשֶׁם/g, '')
+              .replace(/משיב הרוח ומוריד הגשם/g, '')
+              .replace(/\s{2,}/g, ' ').trim();
+            const lbl = `<span style="display:block;font-size:9px;font-family:'Heebo',sans-serif;color:var(--addition);font-weight:700;margin-bottom:2px;opacity:.9">✅ קיץ</span>`;
+            return `<p style="display:block;margin:4px 0 8px 0;padding:6px 10px 5px;background:var(--addition-bg);border-right:3px solid var(--addition);border-radius:0 6px 6px 0;font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);color:var(--addition);font-style:italic;font-weight:600;line-height:1.85">${lbl}${filtered}</p>`;
+          }
+        }
+        // Single phrase block → fall through to normal shouldShow logic below
+      }
+
+      // ── Same for ותן ברכה / ותן טל ומטר ──
+      if (label === 'חורף' || label === 'קיץ') {
+        const plain = content.replace(/<[^>]+>/g, '').replace(/[\u0591-\u05C7]/g, '');
+        const hasMatar  = /ותן טל ומטר/.test(plain);
+        const hasBracha = /ותן ברכה/.test(plain);
+        if (hasMatar && hasBracha) {
+          if (isWinter) {
+            const filtered = content.replace(/וְתֵן בְּרָכָה/g,'').replace(/ותן ברכה/g,'').replace(/\s{2,}/g,' ').trim();
+            const lbl = `<span style="display:block;font-size:9px;font-family:'Heebo',sans-serif;color:var(--addition);font-weight:700;margin-bottom:2px;opacity:.9">✅ חורף</span>`;
+            return `<p style="display:block;margin:4px 0 8px 0;padding:6px 10px 5px;background:var(--addition-bg);border-right:3px solid var(--addition);border-radius:0 6px 6px 0;font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);color:var(--addition);font-style:italic;font-weight:600;line-height:1.85">${lbl}${filtered}</p>`;
+          } else {
+            const filtered = content.replace(/וְתֵן טַל וּמָטָר לִבְרָכָה/g,'').replace(/ותן טל ומטר לברכה/g,'').replace(/\s{2,}/g,' ').trim();
+            const lbl = `<span style="display:block;font-size:9px;font-family:'Heebo',sans-serif;color:var(--addition);font-weight:700;margin-bottom:2px;opacity:.9">✅ קיץ</span>`;
+            return `<p style="display:block;margin:4px 0 8px 0;padding:6px 10px 5px;background:var(--addition-bg);border-right:3px solid var(--addition);border-radius:0 6px 6px 0;font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);color:var(--addition);font-style:italic;font-weight:600;line-height:1.85">${lbl}${filtered}</p>`;
+          }
+        }
+      }
+
       if (shouldShow) {
         // ✅ Green block – say this today
         const lbl = label
@@ -825,8 +876,6 @@ async function _fetchSectionHtml(s, _unused, yaalehOccasion) {
   if (typeof wrapSeasonalParagraphs === 'function' && !s.isAddition) {
     html = wrapSeasonalParagraphs(html, false);
   }
-  // Fix inline seasonal words that Sefaria puts in same paragraph (מוריד הטל / משיב הרוח, ותן ברכה / ותן טל)
-  html = _fixAmidaSeasonalWords(html);
   _putCache(s.ref, html);
   console.log('[Siddur] 🌐 fetched-network:', s.label, '→', paragraphs.length, 'paragraphs,', flat.length, 'verses');
   return html;

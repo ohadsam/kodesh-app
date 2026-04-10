@@ -1271,7 +1271,20 @@ async function loadRambamYomi() {
     subEl.textContent = item.heRef || item.ref;
 
     const data = await sefariaText(item.ref, 400);
-    _rambamFlat = heFlat(data);
+    // Store per-halacha (not flat sentences) so Steinsaltz index aligns 1:1
+    // data.he is 2D: he[halacha_idx][sentence_idx]
+    // Each halacha = one entry in _rambamFlat (sentences joined)
+    const rawHe = data?.he;
+    if (Array.isArray(rawHe) && Array.isArray(rawHe[0])) {
+      // 2D array: group sentences per halacha
+      _rambamFlat = rawHe.map(halacha =>
+        (Array.isArray(halacha) ? halacha : [halacha])
+          .filter(Boolean).join(' ')
+      ).filter(Boolean);
+    } else {
+      // 1D array: already one entry per halacha
+      _rambamFlat = (Array.isArray(rawHe) ? rawHe : []).filter(Boolean);
+    }
     if (!_rambamFlat.length) throw new Error('אין טקסט עברי');
 
     _renderRambamButtons();
