@@ -651,54 +651,51 @@ function _renderParagraphs(paragraphs, isAdd) {
       const shouldShow = _shouldShowSeasonalLabel(label);
 
       // ── Special handling for חורף/קיץ: both phrases may be in ONE block ──
-      // Sefaria puts "משיב הרוח ומוריד הגשם מוריד הטל" in one \uE002חורף block.
-      // We extract only the seasonally-correct phrase and show it plainly.
       if (label === 'חורף' || label === 'קיץ') {
         const plain = content.replace(/<[^>]+>/g, '').replace(/[\u0591-\u05C7]/g, '');
-
-        // Detect both phrases in this block
         const hasGeshem = /משיב הרוח|מוריד הגשם/.test(plain);
         const hasTal    = /מוריד הטל/.test(plain);
+        const hasMatar  = /ותן טל ומטר/.test(plain);
+        const hasBracha = /ותן ברכה/.test(plain);
+
+        console.log('[Siddur-Seasonal] label=', label, '| winter=', isWinter,
+          '| hasGeshem=', hasGeshem, '| hasTal=', hasTal,
+          '| hasMatar=', hasMatar, '| hasBracha=', hasBracha,
+          '| plain=', plain.slice(0, 80));
 
         if (hasGeshem && hasTal) {
-          // Both in one block — extract the correct one and show ONLY that
           if (isWinter) {
-            // Summer phrase → keep משיב הרוח, strip out מוריד הטל entirely
             const filtered = content
-              .replace(/מוֹרִיד הַטָּל/g, '')
-              .replace(/מוריד הטל/g, '')
+              .replace(/מוֹרִיד הַטָּל/g, '').replace(/מוריד הטל/g, '')
               .replace(/\s{2,}/g, ' ').trim();
-            const lbl = `<span style="display:block;font-size:9px;font-family:'Heebo',sans-serif;color:var(--addition);font-weight:700;margin-bottom:2px;opacity:.9">✅ חורף</span>`;
+            console.log('[Siddur-Seasonal] WINTER: kept משיב הרוח, removed מוריד הטל. filtered=', filtered.replace(/<[^>]+>/g,'').slice(0,60));
+            const lbl = `<span style="display:block;font-size:9px;font-family:'Heebo',sans-serif;color:var(--addition);font-weight:700;margin-bottom:2px;opacity:.9">✅ חורף – משיב הרוח ומוריד הגשם</span>`;
             return `<p style="display:block;margin:4px 0 8px 0;padding:6px 10px 5px;background:var(--addition-bg);border-right:3px solid var(--addition);border-radius:0 6px 6px 0;font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);color:var(--addition);font-style:italic;font-weight:600;line-height:1.85">${lbl}${filtered}</p>`;
           } else {
-            // Summer: keep only מוריד הטל, strip out משיב הרוח
             const filtered = content
-              .replace(/מַשִּׁיב הָרוּחַ וּמוֹרִיד הַגֶּשֶׁם/g, '')
-              .replace(/משיב הרוח ומוריד הגשם/g, '')
+              .replace(/מַשִּׁיב הָרוּחַ וּמוֹרִיד הַגֶּשֶׁם/g, '').replace(/משיב הרוח ומוריד הגשם/g, '')
               .replace(/\s{2,}/g, ' ').trim();
-            const lbl = `<span style="display:block;font-size:9px;font-family:'Heebo',sans-serif;color:var(--addition);font-weight:700;margin-bottom:2px;opacity:.9">✅ קיץ</span>`;
+            console.log('[Siddur-Seasonal] SUMMER: kept מוריד הטל, removed משיב הרוח. filtered=', filtered.replace(/<[^>]+>/g,'').slice(0,60));
+            const lbl = `<span style="display:block;font-size:9px;font-family:'Heebo',sans-serif;color:var(--addition);font-weight:700;margin-bottom:2px;opacity:.9">✅ קיץ – מוריד הטל</span>`;
             return `<p style="display:block;margin:4px 0 8px 0;padding:6px 10px 5px;background:var(--addition-bg);border-right:3px solid var(--addition);border-radius:0 6px 6px 0;font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);color:var(--addition);font-style:italic;font-weight:600;line-height:1.85">${lbl}${filtered}</p>`;
           }
         }
-        // Single phrase block → fall through to normal shouldShow logic below
-      }
 
-      // ── Same for ותן ברכה / ותן טל ומטר ──
-      if (label === 'חורף' || label === 'קיץ') {
-        const plain = content.replace(/<[^>]+>/g, '').replace(/[\u0591-\u05C7]/g, '');
-        const hasMatar  = /ותן טל ומטר/.test(plain);
-        const hasBracha = /ותן ברכה/.test(plain);
         if (hasMatar && hasBracha) {
           if (isWinter) {
             const filtered = content.replace(/וְתֵן בְּרָכָה/g,'').replace(/ותן ברכה/g,'').replace(/\s{2,}/g,' ').trim();
-            const lbl = `<span style="display:block;font-size:9px;font-family:'Heebo',sans-serif;color:var(--addition);font-weight:700;margin-bottom:2px;opacity:.9">✅ חורף</span>`;
+            console.log('[Siddur-Seasonal] WINTER: kept ותן טל ומטר, removed ותן ברכה');
+            const lbl = `<span style="display:block;font-size:9px;font-family:'Heebo',sans-serif;color:var(--addition);font-weight:700;margin-bottom:2px;opacity:.9">✅ חורף – ותן טל ומטר לברכה</span>`;
             return `<p style="display:block;margin:4px 0 8px 0;padding:6px 10px 5px;background:var(--addition-bg);border-right:3px solid var(--addition);border-radius:0 6px 6px 0;font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);color:var(--addition);font-style:italic;font-weight:600;line-height:1.85">${lbl}${filtered}</p>`;
           } else {
             const filtered = content.replace(/וְתֵן טַל וּמָטָר לִבְרָכָה/g,'').replace(/ותן טל ומטר לברכה/g,'').replace(/\s{2,}/g,' ').trim();
-            const lbl = `<span style="display:block;font-size:9px;font-family:'Heebo',sans-serif;color:var(--addition);font-weight:700;margin-bottom:2px;opacity:.9">✅ קיץ</span>`;
+            console.log('[Siddur-Seasonal] SUMMER: kept ותן ברכה, removed ותן טל ומטר');
+            const lbl = `<span style="display:block;font-size:9px;font-family:'Heebo',sans-serif;color:var(--addition);font-weight:700;margin-bottom:2px;opacity:.9">✅ קיץ – ותן ברכה</span>`;
             return `<p style="display:block;margin:4px 0 8px 0;padding:6px 10px 5px;background:var(--addition-bg);border-right:3px solid var(--addition);border-radius:0 6px 6px 0;font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);color:var(--addition);font-style:italic;font-weight:600;line-height:1.85">${lbl}${filtered}</p>`;
           }
         }
+
+        console.log('[Siddur-Seasonal] single-phrase block, shouldShow=', shouldShow, 'content=', plain.slice(0,50));
       }
 
       if (shouldShow) {

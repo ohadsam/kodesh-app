@@ -1302,7 +1302,8 @@ function _renderRambamButtons() {
   if (!btnWrap) return;
   btnWrap.innerHTML = `
     <div class="aliya-tab ${_rambamView==='text'?'active':''}" onclick="switchRambamView('text')">📖 רמב"ם</div>
-    <div class="aliya-tab ${_rambamView==='steinsaltz'?'active':''}" onclick="switchRambamView('steinsaltz')">📚 שטיינזלץ</div>
+    <div class="aliya-tab ${_rambamView==='steinsaltz'?'active':''}" onclick="switchRambamView('steinsaltz')">📚 רמב"ם + שטיינזלץ</div>
+    <div class="aliya-tab ${_rambamView==='steinsaltz_only'?'active':''}" onclick="switchRambamView('steinsaltz_only')">📋 שטיינזלץ בלבד</div>
   `;
 }
 
@@ -1315,79 +1316,90 @@ async function switchRambamView(view) {
   el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px">⏳ טוען פירוש שטיינזלץ...</div>';
   try {
     const commentaryRef = `Steinsaltz on ${_rambamRef}`;
-    console.log('[RambamYomi] loading inline:', commentaryRef);
+    console.log('[RambamYomi] loading:', view, '|', commentaryRef);
     const data = await sefariaText(commentaryRef, 300);
 
-    // DEBUG: log full structure so we can understand the shape
     const he = data?.he;
-    console.log('[RambamYomi] Steinsaltz data.he type:', Array.isArray(he) ? 'array' : typeof he,
-                '| length:', Array.isArray(he) ? he.length : 'N/A');
-    if (Array.isArray(he)) {
-      he.forEach((entry, i) => {
-        const isArr = Array.isArray(entry);
-        const preview = isArr
-          ? `[${entry.length} items] first: ${String(entry[0]||'').replace(/<[^>]+>/g,'').slice(0,60)}`
-          : String(entry||'').replace(/<[^>]+>/g,'').slice(0,80);
-        console.log(`[RambamYomi] he[${i}] isArray=${isArr}: ${preview}`);
-      });
-    }
-    console.log('[RambamYomi] _rambamFlat length:', _rambamFlat.length,
-                '| sample[0]:', String(_rambamFlat[0]||'').replace(/<[^>]+>/g,'').slice(0,60));
+    console.log('[RambamYomi] Steinsaltz he type:', Array.isArray(he)?'array':typeof he,
+                '| length:', Array.isArray(he)?he.length:'N/A',
+                '| _rambamFlat:', _rambamFlat.length);
 
     if (!Array.isArray(he) || !he.length) throw new Error('אין פירוש שטיינזלץ זמין');
 
-    // Sefaria Steinsaltz structure: he is 1D array of strings (one per halacha)
-    // OR he is 2D array where he[i] = array of comment strings for halacha i
-    // Detect which:
-    const isNested = Array.isArray(he[0]);
-    console.log('[RambamYomi] structure: isNested=', isNested);
-
-    // Build per-halacha strings aligned to _rambamFlat
-    const byHalacha = he.map((entry, i) => {
+    // Each he[i] = commentary on one word/phrase in order (may be per-word, not per-halacha)
+    const stEntries = he.map((entry, i) => {
       if (!entry) return '';
       if (Array.isArray(entry)) {
-        // Nested: join all comment strings for this halacha
-        const joined = entry.flat(Infinity).filter(Boolean)
+        return entry.flat(Infinity).filter(Boolean)
           .map(s => String(s).replace(/<b>/g,'**').replace(/<\/b>/g,'**').replace(/<[^>]+>/g,'').trim())
-          .filter(Boolean).join('  ');
-        console.log(`[RambamYomi] byHalacha[${i}] (nested, ${entry.length} parts):`, joined.slice(0,80));
-        return joined;
+          .filter(Boolean).join(' ');
       }
-      const str = String(entry).replace(/<b>/g,'**').replace(/<\/b>/g,'**').replace(/<[^>]+>/g,'').trim();
-      console.log(`[RambamYomi] byHalacha[${i}] (flat):`, str.slice(0,80));
-      return str;
-    });
+      return String(entry).replace(/<b>/g,'**').replace(/<\/b>/g,'**').replace(/<[^>]+>/g,'').trim();
+    }).filter(Boolean);
 
-    if (!byHalacha.some(Boolean)) throw new Error('אין פירוש שטיינזלץ זמין');
+    console.log('[RambamYomi] stEntries count:', stEntries.length);
+    stEntries.forEach((e,i) => console.log(`[RambamYomi] st[${i}]:`, e.slice(0,100)));
 
     el.className = 'content-text';
-    el.innerHTML = _rambamFlat.map((v, i) => {
-      const stRaw = byHalacha[i] || '';
-      // Format: bold markers → styled spans
-      const stText = stRaw.replace(/\*\*([^*]+)\*\*/g,
-        '<strong style="color:var(--cream);font-style:normal">$1</strong>');
-      const stHtml = stText
-        ? `<div style="margin-top:6px;padding:6px 10px;
-            background:rgba(126,214,160,.07);
-            border-right:2px solid var(--addition);border-radius:0 5px 5px 0;
-            color:var(--addition);font-size:calc(var(--font-size)*0.84);
-            font-style:italic;line-height:1.85">
-            <span style="font-size:9px;font-weight:700;display:block;margin-bottom:2px;opacity:.8">📚 שטיינזלץ</span>
-            ${stText}</div>`
-        : '';
-      return `<div style="margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.05)">
-        <div><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}</div>
-        ${stHtml}
-      </div>`;
-    }).join('');
-    console.log('[RambamYomi] steinsaltz rendered:', byHalacha.filter(Boolean).length,
-                'commentaries for', _rambamFlat.length, 'halachot');
+
+    if (view === 'steinsaltz_only') {
+      // ── Standalone: show ALL Steinsaltz entries sequentially ──
+      el.innerHTML = `
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px;padding:8px;
+          background:rgba(126,214,160,.05);border-radius:8px;border-right:3px solid var(--addition)">
+          📚 פירוש שטיינזלץ – ${he.length} פירושים על ${data?.heRef || _rambamRef}
+        </div>` +
+        stEntries.map((st, i) => {
+          const formatted = st.replace(/\*\*([^*]+)\*\*/g,
+            '<strong style="color:var(--cream);font-style:normal;font-size:1.05em">$1</strong> —');
+          return `<div style="margin-bottom:14px;padding:8px 12px;
+            background:rgba(126,214,160,.06);
+            border-right:2px solid var(--addition);border-radius:0 6px 6px 0">
+            <span style="font-size:10px;color:var(--gold-dim);display:block;margin-bottom:4px">${i+1}</span>
+            <span style="color:var(--addition);font-style:italic;line-height:1.85;
+              font-size:var(--font-size)">${formatted}</span>
+          </div>`;
+        }).join('');
+
+    } else {
+      // ── Inline: try to align Steinsaltz to Rambam halachot ──
+      // Since Steinsaltz may have different count than halachot, we show best-effort:
+      // If counts match → 1:1. If not → append all remaining Steinsaltz after last halacha.
+      el.innerHTML = _rambamFlat.map((v, i) => {
+        const stRaw = stEntries[i] || '';
+        const stText = stRaw.replace(/\*\*([^*]+)\*\*/g,
+          '<strong style="color:var(--cream);font-style:normal">$1</strong> —');
+        const stHtml = stText
+          ? `<div style="margin-top:6px;padding:6px 10px;
+              background:rgba(126,214,160,.07);
+              border-right:2px solid var(--addition);border-radius:0 5px 5px 0;
+              color:var(--addition);font-size:calc(var(--font-size)*0.84);
+              font-style:italic;line-height:1.85">
+              <span style="font-size:9px;font-weight:700;display:block;margin-bottom:2px;opacity:.8">📚 שטיינזלץ</span>
+              ${stText}</div>`
+          : '';
+        return `<div style="margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.05)">
+          <div><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}</div>
+          ${stHtml}
+        </div>`;
+      }).join('') +
+      // If more Steinsaltz entries than rambam entries, show the rest
+      (stEntries.length > _rambamFlat.length
+        ? `<div style="margin-top:12px;padding:8px 12px;background:rgba(126,214,160,.05);border-radius:8px;border-right:3px solid var(--addition)">
+            <div style="font-size:10px;color:var(--muted);margin-bottom:8px">📚 פירושים נוספים מהשטיינזלץ</div>` +
+          stEntries.slice(_rambamFlat.length).map((st, i) => {
+            const formatted = st.replace(/\*\*([^*]+)\*\*/g,'<strong style="color:var(--cream);font-style:normal">$1</strong> —');
+            return `<div style="margin-bottom:10px;color:var(--addition);font-style:italic;font-size:calc(var(--font-size)*0.84);line-height:1.85">${formatted}</div>`;
+          }).join('') + `</div>`
+        : '');
+    }
+
+    console.log('[RambamYomi] rendered view=', view, '| st=', stEntries.length, 'rambam=', _rambamFlat.length);
   } catch(e) {
     console.warn('[RambamYomi] commentary error:', e.message);
-    el.innerHTML = `<div style="color:var(--muted);text-align:center;padding:20px">⚠️ ${e.message}<br><small>${e.stack||''}</small></div>`;
+    el.innerHTML = `<div style="color:var(--muted);text-align:center;padding:20px">⚠️ ${e.message}</div>`;
   }
 }
-
 function _renderRambamContent() {
   const el = document.getElementById('rambam-content');
   el.className = 'content-text';
