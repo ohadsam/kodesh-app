@@ -775,29 +775,38 @@ function _fixAmidaSeasonalWords(html) {
   if (!html) return html;
   const winter = (typeof _isWinterSeason === 'function') ? _isWinterSeason() : false;
 
-  const sayBlock = (inner, label) =>
+  // ── Helper: wrap an inline phrase with a colored label ──────────────
+  const sayInline = (t, lbl) =>
+    `<span style="background:rgba(61,140,90,.16);padding:1px 5px;border-radius:3px;` +
+    `color:var(--addition);font-weight:700" title="${lbl}">✅ ${t}</span>`;
+  const skipInline = (t, lbl) =>
+    `<span style="color:rgba(180,80,60,.5);text-decoration:line-through;font-size:.9em"` +
+    ` title="${lbl}">❌ ${t}</span>`;
+
+  // ── Helper: wrap full <p> in green/red block ──────────────────────
+  const sayBlock = (inner, lbl) =>
     `<p style="display:block;margin:4px 0 8px 0;padding:6px 10px 5px;` +
     `background:var(--addition-bg);border-right:3px solid var(--addition);` +
     `border-radius:0 6px 6px 0;font-family:'Frank Ruhl Libre',serif;` +
     `font-size:var(--font-size);color:var(--addition);font-style:italic;font-weight:600;line-height:1.85">` +
     `<span style="display:block;font-size:9px;font-family:'Heebo',sans-serif;font-weight:700;` +
-    `margin-bottom:3px;opacity:.9">✅ ${label}</span>${inner}</p>`;
+    `margin-bottom:3px;opacity:.9">✅ ${lbl}</span>${inner}</p>`;
 
-  const skipBlock = (inner, label) =>
+  const skipBlock = (inner, lbl) =>
     `<p style="display:block;margin:4px 0 8px 0;padding:6px 10px 5px;` +
     `background:rgba(180,80,60,.07);border-right:3px solid rgba(180,80,60,.3);` +
     `border-radius:0 6px 6px 0;font-family:'Frank Ruhl Libre',serif;` +
     `font-size:calc(var(--font-size)*0.88);color:rgba(180,80,60,.5);` +
     `font-style:italic;line-height:1.85;text-decoration:line-through">` +
     `<span style="display:block;font-size:9px;font-family:'Heebo',sans-serif;font-weight:700;` +
-    `margin-bottom:3px;opacity:.9;text-decoration:none;color:#c87060">❌ ${label} – לא אומרים</span>` +
+    `margin-bottom:3px;opacity:.9;text-decoration:none;color:#c87060">❌ ${lbl} – לא אומרים</span>` +
     `${inner}</p>`;
 
   const stripN = t => t.replace(/[\u0591-\u05C7]/g, '').replace(/\s+/g, ' ').trim();
 
   console.log('[SSF] winter=', winter, 'html.len=', html.length);
 
-  // Split into <p> blocks and process each
+  // Split into <p> blocks
   const parts = html.split(/(?=<p[ >])/);
   const result = parts.map(part => {
     if (!part.startsWith('<p')) return part;
@@ -807,27 +816,24 @@ function _fixAmidaSeasonalWords(html) {
     const [, pOpen, inner, pClose] = innerMatch;
     const plain = stripN(inner.replace(/<[^>]+>/g, ''));
 
-    // ── גבורות: מוריד הטל + משיב הרוח (3 separate verses joined into one paragraph) ──
-    // Sefaria sends: verse[27]=מוריד הטל, verse[28]=משיב הרוח, verse[29]=ומוריד הגשם
-    // buildParagraphs joins them: "מוריד הטל משיב הרוח ומוריד הגשם"
+    // ── גבורות: מוריד הטל + משיב הרוח ──────────────────────────────
+    // verses 27+28+29 are joined: "מוריד הטל משיב הרוח ומוריד הגשם"
     const hasTal    = plain.includes('מוריד הטל');
     const hasGeshem = plain.includes('משיב הרוח');
 
     if (hasTal || hasGeshem) {
       if (winter) {
         // Keep משיב הרוח ומוריד הגשם, remove מוריד הטל
-        // The paragraph contains "מוריד הטל משיב הרוח ומוריד הגשם"
-        // Strip מוריד הטל from the beginning
         const cleaned = inner.replace(
-          /מ[\u0591-\u05C7]*ו[\u0591-\u05C7]*ר[\u0591-\u05C7]*י[\u0591-\u05C7]*ד[\u0591-\u05C7]*\s+ה[\u0591-\u05C7]*ט[\u0591-\u05C7]*ל[\u0591-\u05C7]*/,
+          /מ[\u0591-\u05C7]*ו[\u0591-\u05C7]*ר[\u0591-\u05C7]*י[\u0591-\u05C7]*ד[\u0591-\u05C7]*\s+ה[\u0591-\u05C7]*ט[\u0591-\u05C7]*ל[\u0591-\u05C7]*/g,
           ''
-        ).replace(/^\s+/, '');
+        ).replace(/^\s+/, '').trim();
         console.log('[SSF] WINTER: kept משיב הרוח, text=', cleaned.replace(/<[^>]+>/g,'').slice(0,40));
         return sayBlock(cleaned, 'חורף – משיב הרוח ומוריד הגשם');
       } else {
         // Summer: keep מוריד הטל, remove משיב הרוח ומוריד הגשם
         const cleaned = inner.replace(
-          /\s*מ[\u0591-\u05C7]*ש[\u0591-\u05C7]*י[\u0591-\u05C7]*ב[\u0591-\u05C7]*\s+ה[\u0591-\u05C7]*ר[\u0591-\u05C7]*ו[\u0591-\u05C7]*ח[\u0591-\u05C7]*\s+ו[\u0591-\u05C7]*מ[\u0591-\u05C7]*ו[\u0591-\u05C7]*ר[\u0591-\u05C7]*י[\u0591-\u05C7]*ד[\u0591-\u05C7]*\s+ה[\u0591-\u05C7]*ג[\u0591-\u05C7]*ש[\u0591-\u05C7]*ם[\u0591-\u05C7]*/g,
+          /\s*מ[\u0591-\u05C7]*ש[\u0591-\u05C7]*י[\u0591-\u05C7]*ב[\u0591-\u05C7]*\s+ה[\u0591-\u05C7]*ר[\u0591-\u05C7]*ו[\u0591-\u05C7]*ח[\u0591-\u05C7]*(?:\s+ו[\u0591-\u05C7]*מ[\u0591-\u05C7]*ו[\u0591-\u05C7]*ר[\u0591-\u05C7]*י[\u0591-\u05C7]*ד[\u0591-\u05C7]*\s+ה[\u0591-\u05C7]*ג[\u0591-\u05C7]*ש[\u0591-\u05C7]*ם[\u0591-\u05C7]*)?/g,
           ''
         ).replace(/:\s*$/, '').trim();
         console.log('[SSF] SUMMER: kept מוריד הטל, text=', cleaned.replace(/<[^>]+>/g,'').slice(0,40));
@@ -835,30 +841,32 @@ function _fixAmidaSeasonalWords(html) {
       }
     }
 
-    // ── ברכת השנים: ותן ברכה / ותן טל ומטר ──────────────────────────────
-    // Sefaria only sends "ותן ברכה" as a verse — never "ותן טל ומטר"
-    // Skip if already handled by _renderParagraphs (has addition-bg class/style)
-    const alreadyHandled = part.includes('addition-bg') || part.includes('addition');
+    // ── ברכת השנים: ותן ברכה (inline marking, NOT full-paragraph wrap) ──
+    // Sefaria sends ותן ברכה as part of a LONG paragraph (all of ברך עלינו).
+    // We mark only the phrase inline — don't wrap the whole paragraph.
     const hasBracha = plain.includes('ותן ברכה');
-    if (hasBracha && !alreadyHandled) {
+    if (hasBracha) {
       if (winter) {
-        // Replace ALL occurrences of ותן ברכה with ותן טל ומטר לברכה
+        // Winter: replace "ותן ברכה" phrase inline with "ותן טל ומטר לברכה"
         const brachaRE = /ו[\u0591-\u05C7]*ת[\u0591-\u05C7]*ן[\u0591-\u05C7]*\s+ב[\u0591-\u05C7]*ר[\u0591-\u05C7]*כ[\u0591-\u05C7]*ה[\u0591-\u05C7]*/g;
-        const winterText = inner.replace(brachaRE, 'וְתֵן טַל וּמָטָר לִבְרָכָה');
-        console.log('[SSF] WINTER: replaced ותן ברכה → ותן טל ומטר, text=', winterText.replace(/<[^>]+>/g,'').slice(0,60));
-        return sayBlock(winterText, 'חורף – ותן טל ומטר לברכה');
+        const newInner = inner.replace(brachaRE,
+          sayInline('וְתֵן טַל וּמָטָר לִבְרָכָה', 'אומרים בחורף'));
+        console.log('[SSF] WINTER: inline ותן ברכה → ותן טל ומטר');
+        return pOpen + newInner + pClose;
       } else {
-        console.log('[SSF] SUMMER: keeping ותן ברכה');
-        return sayBlock(inner, 'קיץ – ותן ברכה');
+        // Summer: mark ותן ברכה inline in green
+        const brachaRE = /ו[\u0591-\u05C7]*ת[\u0591-\u05C7]*ן[\u0591-\u05C7]*\s+ב[\u0591-\u05C7]*ר[\u0591-\u05C7]*כ[\u0591-\u05C7]*ה[\u0591-\u05C7]*/g;
+        const newInner = inner.replace(brachaRE,
+          m => sayInline(m, 'אומרים בקיץ'));
+        console.log('[SSF] SUMMER: inline ✅ ותן ברכה');
+        return pOpen + newInner + pClose;
       }
     }
 
     return part;
   });
 
-  const finalHtml = result.join('');
-  console.log('[SSF] done. found TAL/GESHEM or BRACHA modified');
-  return finalHtml;
+  return result.join('');
 }
 
 // Strip a Hebrew phrase (ignoring nikud) from an HTML string
