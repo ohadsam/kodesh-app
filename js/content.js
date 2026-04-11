@@ -1025,8 +1025,10 @@ async function loadIgeret() {
 // DAF YOMI (Babylonian Talmud)
 // ═══════════════════════════════════════════
 let _dafRef = null;
-let _dafView = 'text'; // 'text' | 'rashi' | 'steinsaltz'
-let _dafFlat = [];
+let _dafView = 'text'; // 'text' | 'rashi' | 'tosafot' | 'rashi_tosafot' | 'steinsaltz'
+let _dafFlat  = [];
+let _dafRashiFlat   = null; // cached per daf
+let _dafTosafotFlat = null;
 
 // Build Sefaria Calendars API URL with the current target date for day navigation support
 function _sefariaCalendarUrl() {
@@ -1039,6 +1041,8 @@ async function loadDafYomi() {
   const subEl  = document.getElementById('daf-subtitle');
   el.className = 'content-text loading'; el.textContent = 'טוען דף יומי...';
   _dafView = 'text';
+  _dafRashiFlat   = null;  // reset cache for new daf
+  _dafTosafotFlat = null;
   try {
     console.log('[DafYomi] fetching calendar...');
     const cal  = await fetchWithDelay(_sefariaCalendarUrl());
@@ -1071,9 +1075,51 @@ function _renderDafButtons() {
   if (!btnWrap) return;
   btnWrap.innerHTML = `
     <div class="aliya-tab ${_dafView==='text'?'active':''}" onclick="switchDafView('text')">📖 גמרא</div>
-    <div class="aliya-tab ${_dafView==='rashi'?'active':''}" onclick="switchDafView('rashi')">📝 גמרא + רש"י</div>
+    <div class="aliya-tab ${_dafView==='rashi'?'active':''}" onclick="switchDafView('rashi')">📝 + רש"י</div>
+    <div class="aliya-tab ${_dafView==='tosafot'?'active':''}" onclick="switchDafView('tosafot')">📋 + תוספות</div>
+    <div class="aliya-tab ${_dafView==='rashi_tosafot'?'active':''}" onclick="switchDafView('rashi_tosafot')">📝📋 רש"י + תוס'</div>
     <div class="aliya-tab ${_dafView==='steinsaltz'?'active':''}" onclick="switchDafView('steinsaltz')">📚 שטיינזלץ</div>
   `;
+}
+
+// Fetch and cache a Daf commentary type
+async function _fetchDafCommentary(type) {
+  const cached = type === 'rashi' ? _dafRashiFlat : _dafTosafotFlat;
+  if (cached) return cached;
+  const ref = type === 'rashi' ? `Rashi on ${_dafRef}` : `Tosafot on ${_dafRef}`;
+  console.log('[DafYomi] fetching', ref);
+  const data = await sefariaText(ref, 200);
+  const flat = heFlat(data).filter(Boolean);
+  if (type === 'rashi') _dafRashiFlat = flat; else _dafTosafotFlat = flat;
+  return flat;
+}
+
+// Render gemara with optional rashi (green) and tosafot (blue) inline
+function _renderDafInline(rashiFlat, tosafotFlat) {
+  return _dafFlat.map((v, i) => {
+    let extras = '';
+    if (rashiFlat && rashiFlat[i]) {
+      const t = typeof rashiFlat[i] === 'string' ? rashiFlat[i]
+        : (Array.isArray(rashiFlat[i]) ? rashiFlat[i].flat().filter(Boolean).join(' ') : '');
+      if (t) extras += `<div style="margin-top:5px;padding:4px 9px;
+        background:rgba(126,214,160,.08);border-right:2px solid var(--addition);
+        border-radius:0 4px 4px 0;color:var(--addition);
+        font-size:calc(var(--font-size)*0.83);font-style:italic;line-height:1.75">
+        <span style="font-size:9px;font-weight:700;margin-left:5px;opacity:.85">📝 רש"י</span>${t.replace(/<[^>]+>/g,'')}</div>`;
+    }
+    if (tosafotFlat && tosafotFlat[i]) {
+      const t = typeof tosafotFlat[i] === 'string' ? tosafotFlat[i]
+        : (Array.isArray(tosafotFlat[i]) ? tosafotFlat[i].flat().filter(Boolean).join(' ') : '');
+      if (t) extras += `<div style="margin-top:5px;padding:4px 9px;
+        background:rgba(122,184,214,.08);border-right:2px solid #7ab8d6;
+        border-radius:0 4px 4px 0;color:#7ab8d6;
+        font-size:calc(var(--font-size)*0.83);font-style:italic;line-height:1.75">
+        <span style="font-size:9px;font-weight:700;margin-left:5px;opacity:.85">📋 תוספות</span>${t.replace(/<[^>]+>/g,'')}</div>`;
+    }
+    return `<div style="margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.04)">
+      <span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}${extras}
+    </div>`;
+  }).join('');
 }
 
 async function switchDafView(view) {
@@ -1081,40 +1127,39 @@ async function switchDafView(view) {
   _renderDafButtons();
   const el = document.getElementById('daf-content');
   if (view === 'text') { _renderDafContent(); return; }
-
   if (!_dafRef) return;
   el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px">⏳ טוען פירוש...</div>';
-
   try {
-    const commentaryRef = view === 'rashi' ? `Rashi on ${_dafRef}` : `Steinsaltz on ${_dafRef}`;
-    console.log(`[DafYomi] loading commentary: ${commentaryRef}`);
-    const data = await sefariaText(commentaryRef, 300);
-    const flat = heFlat(data).filter(Boolean);
-
     el.className = 'content-text';
-    if (view === 'rashi' && flat.length) {
-      // Inline Rashi: show gemara text with Rashi embedded after each section
-      el.innerHTML = _dafFlat.map((v, i) => {
-        const rashiText = (flat[i] && typeof flat[i] === 'string') ? flat[i] : 
-                          (Array.isArray(flat[i]) ? flat[i].flat().filter(Boolean).join(' ') : '');
-        const rashiHtml = rashiText ? 
-          `<span style="color:var(--addition);font-size:calc(var(--font-size) * 0.82);font-style:italic"> (רש"י: ${rashiText.replace(/<[^>]+>/g,'')})</span>` : '';
-        return `<div style="margin-bottom:10px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}${rashiHtml}</div>`;
-      }).join('');
-    } else if (flat.length) {
+    if (view === 'rashi') {
+      const flat = await _fetchDafCommentary('rashi');
+      if (!flat.length) throw new Error('אין רש"י זמין');
+      el.innerHTML = _renderDafInline(flat, null);
+    } else if (view === 'tosafot') {
+      const flat = await _fetchDafCommentary('tosafot');
+      if (!flat.length) throw new Error('אין תוספות זמין');
+      el.innerHTML = _renderDafInline(null, flat);
+    } else if (view === 'rashi_tosafot') {
+      const [r, t] = await Promise.all([
+        _fetchDafCommentary('rashi').catch(() => []),
+        _fetchDafCommentary('tosafot').catch(() => []),
+      ]);
+      if (!r.length && !t.length) throw new Error('אין רש"י ותוספות זמין');
+      el.innerHTML = _renderDafInline(r, t);
+    } else if (view === 'steinsaltz') {
+      const data = await sefariaText(`Steinsaltz on ${_dafRef}`, 300);
+      const flat = heFlat(data).filter(Boolean);
+      if (!flat.length) throw new Error('אין שטיינזלץ זמין');
       el.innerHTML = flat.map((v,i) =>
         `<div style="margin-bottom:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04)">
-          <span style="color:var(--gold-dim);font-size:11px">${i+1} </span>
-          <span style="line-height:1.85">${v}</span>
+          <span style="color:var(--gold-dim);font-size:11px">${i+1} </span><span style="line-height:1.85">${v}</span>
         </div>`
       ).join('');
-    } else {
-      throw new Error('אין פירוש זמין');
     }
-    console.log(`[DafYomi] ${view} loaded: ${flat.length} entries`);
+    console.log(`[DafYomi] ${view} rendered`);
   } catch(e) {
     console.warn('[DafYomi] commentary error:', e.message);
-    el.innerHTML = `<div style="color:var(--muted);text-align:center;padding:20px">⚠️ ${e.message}<br><small>ייתכן שאין ${view === 'rashi' ? 'רש"י' : 'שטיינזלץ'} לדף זה בספריא</small></div>`;
+    el.innerHTML = `<div style="color:var(--muted);text-align:center;padding:20px">⚠️ ${e.message}</div>`;
   }
 }
 
@@ -1310,6 +1355,8 @@ async function loadRambamYomi() {
   const subEl = document.getElementById('rambam-subtitle');
   el.className = 'content-text loading'; el.textContent = 'טוען רמב"ם יומי...';
   _rambamView = 'text';
+  // Store all chapter refs for Steinsaltz fetching
+  window._rambamChapterRefs = [];
   try {
     console.log('[RambamYomi] fetching calendar...');
     const cal = await fetchWithDelay(_sefariaCalendarUrl());
@@ -1320,49 +1367,62 @@ async function loadRambamYomi() {
     );
     if (!item) throw new Error('לא נמצא רמב"ם יומי בלוח');
     _rambamRef = item.ref;
-    console.log('[RambamYomi] ref:', item.ref, 'he:', item.heRef);
+    console.log('[RambamYomi] ref:', item.ref, 'he:', item.heRef,
+                'displayValue:', item.displayValue, 'url:', item.url);
     subEl.textContent = item.heRef || item.ref;
 
-    const data = await sefariaText(item.ref, 400);
-    // data.he shape: either 1D (sentences) or 2D (halachot × sentences)
-    const rawHe = data?.he;
-    const is2D = Array.isArray(rawHe) && rawHe.length > 0 && Array.isArray(rawHe[0]);
-    console.log('[RambamYomi] data.he shape:', is2D ? '2D' : '1D',
-                '| length:', Array.isArray(rawHe) ? rawHe.length : 'N/A',
-                '| ref:', item.ref);
+    // The daily Rambam may span multiple chapters.
+    // Sefaria ref may be "Book Chapter" or "Book Chapter-Chapter2".
+    // Parse all chapter refs from the item.
+    const refs = _parseRambamDailyRefs(item);
+    console.log('[RambamYomi] chapter refs:', refs);
+    window._rambamChapterRefs = refs;
 
-    if (is2D) {
-      // 2D: each element = one halacha, join its sentences
-      _rambamFlat = rawHe.map((halacha, i) => {
-        const sentences = (Array.isArray(halacha) ? halacha : [halacha]).filter(Boolean);
-        const joined = sentences.join(' ');
-        console.log(`[RambamYomi] halacha[${i}] ${sentences.length} sentences: ${joined.replace(/<[^>]+>/g,'').slice(0,60)}`);
-        return joined;
-      }).filter(Boolean);
-    } else {
-      // 1D: each element is a sentence — treat all as ONE halacha (daily portion is one halacha)
-      // This handles refs like "Mishneh Torah, Book 1, Chapter 5:3" (single halacha)
-      const allSentences = (Array.isArray(rawHe) ? rawHe : []).filter(Boolean);
-      // If ref has a colon (halacha number), it's a single halacha → group all sentences
-      if (_rambamRef.includes(':')) {
-        _rambamFlat = [allSentences.join(' ')].filter(Boolean);
-        console.log('[RambamYomi] single halacha ref, joined', allSentences.length, 'sentences');
+    // Fetch all chapters and combine
+    _rambamFlat = [];
+    for (const ref of refs) {
+      const data = await sefariaText(ref, 200);
+      const rawHe = data?.he;
+      const is2D = Array.isArray(rawHe) && rawHe.length > 0 && Array.isArray(rawHe[0]);
+      console.log('[RambamYomi] ref', ref, 'shape:', is2D?'2D':'1D', 'length:', Array.isArray(rawHe)?rawHe.length:'N/A');
+      let chapterHalachot;
+      if (is2D) {
+        chapterHalachot = rawHe.map(h =>
+          (Array.isArray(h) ? h : [h]).filter(Boolean).join(' ')
+        ).filter(Boolean);
       } else {
-        // Chapter ref without halacha number — sentences are individual halachot
-        _rambamFlat = allSentences;
-        console.log('[RambamYomi] chapter ref, treating each sentence as halacha:', allSentences.length);
+        chapterHalachot = (Array.isArray(rawHe) ? rawHe : []).filter(Boolean);
       }
+      _rambamFlat.push(...chapterHalachot);
     }
-    if (!_rambamFlat.length) throw new Error('אין טקסט עברי');
 
+    if (!_rambamFlat.length) throw new Error('אין טקסט עברי');
     _renderRambamButtons();
     _renderRambamContent();
     updateDoneButton('rambam', item.ref);
-    console.log(`[RambamYomi] OK – ${_rambamFlat.length} sections`);
+    console.log(`[RambamYomi] OK – ${_rambamFlat.length} sections from ${refs.length} chapters`);
   } catch(e) {
     console.error('[RambamYomi] error:', e);
     el.textContent = 'שגיאה בטעינה: ' + e.message;
   }
+}
+
+// Parse the daily Rambam ref(s) — handles single chapter and ranges like "Chapter 5-6"
+function _parseRambamDailyRefs(item) {
+  const ref = item.ref || '';
+  // Check if it's a range: "Mishneh Torah, Book Chapter-Chapter2"
+  // e.g. "Mishneh Torah, Prayer and the Priestly Blessing 5-6"
+  const rangeMatch = ref.match(/^(.+?)\s+(\d+)-(\d+)$/);
+  if (rangeMatch) {
+    const base = rangeMatch[1];
+    const from = parseInt(rangeMatch[2]);
+    const to   = parseInt(rangeMatch[3]);
+    const refs = [];
+    for (let i = from; i <= to; i++) refs.push(`${base} ${i}`);
+    return refs;
+  }
+  // Single chapter
+  return [ref];
 }
 
 function _renderRambamButtons() {
@@ -1384,33 +1444,45 @@ async function switchRambamView(view) {
   el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px">⏳ טוען פירוש שטיינזלץ...</div>';
   try {
     const commentaryRef = `Steinsaltz on ${_rambamRef}`;
-    console.log('[RambamYomi] loading:', view, '|', commentaryRef);
-    const data = await sefariaText(commentaryRef, 300);
+    console.log('[RambamYomi] loading:', view, '| base ref:', _rambamRef);
+    console.log('[RambamYomi] all chapter refs:', window._rambamChapterRefs);
 
-    const he = data?.he;
-    console.log('[RambamYomi] Steinsaltz he type:', Array.isArray(he)?'array':typeof he,
-                '| length:', Array.isArray(he)?he.length:'N/A',
-                '| _rambamFlat:', _rambamFlat.length);
+    // Fetch Steinsaltz for ALL chapters in the daily portion
+    const allChapterRefs = (window._rambamChapterRefs && window._rambamChapterRefs.length)
+      ? window._rambamChapterRefs : [_rambamRef];
 
-    if (!Array.isArray(he) || !he.length) throw new Error('אין פירוש שטיינזלץ זמין');
+    const allStEntries = [];
+    for (const chRef of allChapterRefs) {
+      const stRef = `Steinsaltz on ${chRef}`;
+      console.log('[RambamYomi] fetching:', stRef);
+      try {
+        const data = await sefariaText(stRef, 100);
+        const he = data?.he;
+        if (!Array.isArray(he) || !he.length) {
+          console.log('[RambamYomi] no Steinsaltz for', chRef);
+          continue;
+        }
+        he.forEach((entry, i) => {
+          if (!entry) return;
+          const raw = Array.isArray(entry)
+            ? entry.flat(Infinity).filter(Boolean).join(' ')
+            : String(entry);
+          const kwMatch = raw.match(/<b>([\s\S]*?)<\/b>/);
+          const keyword = kwMatch
+            ? kwMatch[1].replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim() : '';
+          const text = raw
+            .replace(/<b>/g,'**').replace(/<\/b>/g,'**')
+            .replace(/<[^>]+>/g,'').trim();
+          console.log(`[RambamYomi] ${chRef} st[${i}] kw="${keyword.slice(0,30)}" txt="${text.slice(0,60)}"`);
+          allStEntries.push({ keyword, text, chRef });
+        });
+      } catch(e) {
+        console.warn('[RambamYomi] Steinsaltz error for', chRef, ':', e.message);
+      }
+    }
 
-    // Parse each Steinsaltz entry: extract keyword (bold) + explanation
-    const stEntries = he.map((entry, i) => {
-      if (!entry) return null;
-      const raw = Array.isArray(entry)
-        ? entry.flat(Infinity).filter(Boolean).join(' ')
-        : String(entry);
-      // Extract bold keyword(s) and the rest
-      const keywordMatch = raw.match(/<b>([\s\S]*?)<\/b>/);
-      const keyword = keywordMatch
-        ? keywordMatch[1].replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim()
-        : '';
-      const text = raw
-        .replace(/<b>/g,'**').replace(/<\/b>/g,'**')
-        .replace(/<[^>]+>/g,'').trim();
-      console.log(`[RambamYomi] st[${i}] keyword="${keyword.slice(0,30)}" text="${text.slice(0,80)}"`);
-      return { keyword, text, raw };
-    }).filter(Boolean);
+    if (!allStEntries.length) throw new Error('אין פירוש שטיינזלץ זמין');
+    const stEntries = allStEntries;
 
     console.log('[RambamYomi] stEntries count:', stEntries.length);
 
