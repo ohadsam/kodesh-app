@@ -837,19 +837,17 @@ function _fixAmidaSeasonalWords(html) {
 
     // ── ברכת השנים: ותן ברכה / ותן טל ומטר ──────────────────────────────
     // Sefaria only sends "ותן ברכה" as a verse — never "ותן טל ומטר"
-    // In winter: replace "ותן ברכה" with "ותן טל ומטר לברכה"
+    // Skip if already handled by _renderParagraphs (has addition-bg class/style)
+    const alreadyHandled = part.includes('addition-bg') || part.includes('addition');
     const hasBracha = plain.includes('ותן ברכה');
-    if (hasBracha) {
+    if (hasBracha && !alreadyHandled) {
       if (winter) {
-        // Replace ותן ברכה with ותן טל ומטר לברכה (green block)
-        const winterText = inner.replace(
-          /ו[\u0591-\u05C7]*ת[\u0591-\u05C7]*ן[\u0591-\u05C7]*\s+ב[\u0591-\u05C7]*ר[\u0591-\u05C7]*כ[\u0591-\u05C7]*ה[\u0591-\u05C7]*/,
-          'וְתֵן טַל וּמָטָר לִבְרָכָה'
-        );
-        console.log('[SSF] WINTER: replaced ותן ברכה → ותן טל ומטר');
+        // Replace ALL occurrences of ותן ברכה with ותן טל ומטר לברכה
+        const brachaRE = /ו[\u0591-\u05C7]*ת[\u0591-\u05C7]*ן[\u0591-\u05C7]*\s+ב[\u0591-\u05C7]*ר[\u0591-\u05C7]*כ[\u0591-\u05C7]*ה[\u0591-\u05C7]*/g;
+        const winterText = inner.replace(brachaRE, 'וְתֵן טַל וּמָטָר לִבְרָכָה');
+        console.log('[SSF] WINTER: replaced ותן ברכה → ותן טל ומטר, text=', winterText.replace(/<[^>]+>/g,'').slice(0,60));
         return sayBlock(winterText, 'חורף – ותן טל ומטר לברכה');
       } else {
-        // Summer: keep ותן ברכה as-is (green block)
         console.log('[SSF] SUMMER: keeping ותן ברכה');
         return sayBlock(inner, 'קיץ – ותן ברכה');
       }

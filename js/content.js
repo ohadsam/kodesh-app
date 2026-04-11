@@ -1447,34 +1447,58 @@ async function switchRambamView(view) {
     console.log('[RambamYomi] all chapter refs:', window._rambamChapterRefs);
 
     // Fetch Steinsaltz for ALL chapters in the daily portion
+    // KEY FIX: Sefaria treats "Steinsaltz on Book Chapter" as halacha ref, not chapter.
+    // We must use "Steinsaltz on Book Chapter:1-N" to get all halachot in chapter.
     const allChapterRefs = (window._rambamChapterRefs && window._rambamChapterRefs.length)
       ? window._rambamChapterRefs : [_rambamRef];
 
     const allStEntries = [];
     for (const chRef of allChapterRefs) {
-      const stRef = `Steinsaltz on ${chRef}`;
-      console.log('[RambamYomi] fetching:', stRef);
+      // Use range ref to get all halachot: "Steinsaltz on Book Chapter:1-30"
+      const halachaCount = _rambamFlat.length || 25;
+      const rangeRef = `Steinsaltz on ${chRef}:1-${halachaCount}`;
+      console.log('[RambamYomi] fetching Steinsaltz range:', rangeRef);
       try {
-        const data = await sefariaText(stRef, 100);
-        const he = data?.he;
+        const data = await sefariaText(rangeRef, 100);
+        let he = data?.he;
+
+        // Fallback: if range returns nothing, try without range
+        if (!Array.isArray(he) || !he.length) {
+          console.log('[RambamYomi] range empty, trying plain ref:', `Steinsaltz on ${chRef}`);
+          const d2 = await sefariaText(`Steinsaltz on ${chRef}`, 100);
+          he = d2?.he;
+        }
         if (!Array.isArray(he) || !he.length) {
           console.log('[RambamYomi] no Steinsaltz for', chRef);
           continue;
         }
-        he.forEach((entry, i) => {
-          if (!entry) return;
-          const raw = Array.isArray(entry)
-            ? entry.flat(Infinity).filter(Boolean).join(' ')
-            : String(entry);
-          const kwMatch = raw.match(/<b>([\s\S]*?)<\/b>/);
-          const keyword = kwMatch
-            ? kwMatch[1].replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim() : '';
-          const text = raw
-            .replace(/<b>/g,'**').replace(/<\/b>/g,'**')
-            .replace(/<[^>]+>/g,'').trim();
-          console.log(`[RambamYomi] ${chRef} st[${i}] kw="${keyword.slice(0,30)}" txt="${text.slice(0,60)}"`);
-          allStEntries.push({ keyword, text, chRef });
-        });
+
+        const is2D = Array.isArray(he[0]);
+        console.log('[RambamYomi]', chRef, 'shape:', is2D ? '2D halachaXentry' : '1D flat', 'len:', he.length);
+
+        if (is2D) {
+          // 2D: he[halachaIdx] = [entry1, entry2, ...] for that halacha
+          he.forEach((halachaArr, halachaIdx) => {
+            if (!Array.isArray(halachaArr)) return;
+            halachaArr.filter(Boolean).forEach(entry => {
+              const raw = String(entry);
+              const kwMatch = raw.match(/<b>([\s\S]*?)<\/b>/);
+              const keyword = kwMatch ? kwMatch[1].replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim() : '';
+              const text = raw.replace(/<b>/g,'**').replace(/<\/b>/g,'**').replace(/<[^>]+>/g,'').trim();
+              allStEntries.push({ keyword, text, chRef, halachaIdx });
+            });
+          });
+        } else {
+          // 1D: flat list — each entry is one keyword-comment
+          he.filter(Boolean).forEach((entry, i) => {
+            const raw = Array.isArray(entry) ? entry.flat(Infinity).join(' ') : String(entry);
+            const kwMatch = raw.match(/<b>([\s\S]*?)<\/b>/);
+            const keyword = kwMatch ? kwMatch[1].replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim() : '';
+            const text = raw.replace(/<b>/g,'**').replace(/<\/b>/g,'**').replace(/<[^>]+>/g,'').trim();
+            console.log(`[RambamYomi] ${chRef} st[${i}] kw="${keyword.slice(0,30)}" txt="${text.slice(0,60)}"`);
+            allStEntries.push({ keyword, text, chRef });
+          });
+        }
       } catch(e) {
         console.warn('[RambamYomi] Steinsaltz error for', chRef, ':', e.message);
       }
