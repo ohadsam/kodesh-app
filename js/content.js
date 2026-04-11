@@ -1367,8 +1367,7 @@ async function loadRambamYomi() {
     );
     if (!item) throw new Error('לא נמצא רמב"ם יומי בלוח');
     _rambamRef = item.ref;
-    console.log('[RambamYomi] ref:', item.ref, 'he:', item.heRef,
-                'displayValue:', item.displayValue, 'url:', item.url);
+    console.log('[RambamYomi] FULL item:', JSON.stringify(item, null, 2).slice(0, 800));
     subEl.textContent = item.heRef || item.ref;
 
     // The daily Rambam may span multiple chapters.
@@ -1489,30 +1488,43 @@ async function switchRambamView(view) {
     // Strip nikud for comparison
     const stripN = s => s.replace(/[\u0591-\u05C7]/g,'').replace(/\s+/g,' ').trim();
     const rambamStripped = _rambamFlat.map(v => stripN(v.replace(/<[^>]+>/g,'')));
+    // Also build a combined full-text for fallback searching
+    const fullRambamText = rambamStripped.join(' ');
 
     // For each Steinsaltz entry, find which Rambam halacha contains its keyword
-    // Build map: halacha_index → [steinsaltz entries]
     const halachaToSt = {};
+    let lastMatchIdx = 0; // for sequential fallback
     stEntries.forEach(st => {
       const kw = stripN(st.keyword);
       if (!kw) return;
-      // Find the halacha containing this keyword
       let bestIdx = -1;
-      for (let i = 0; i < rambamStripped.length; i++) {
+      // Search all halachot (start from lastMatchIdx to maintain order)
+      for (let i = lastMatchIdx; i < rambamStripped.length; i++) {
         if (rambamStripped[i].includes(kw)) { bestIdx = i; break; }
       }
-      // Fallback: partial match on first 5 chars
-      if (bestIdx < 0 && kw.length >= 3) {
-        const partial = kw.slice(0,5);
+      // If not found from lastMatch, search from beginning
+      if (bestIdx < 0) {
         for (let i = 0; i < rambamStripped.length; i++) {
-          if (rambamStripped[i].includes(partial)) { bestIdx = i; break; }
+          if (rambamStripped[i].includes(kw)) { bestIdx = i; break; }
         }
       }
-      console.log(`[RambamYomi] keyword="${kw.slice(0,20)}" → halacha[${bestIdx}]`);
-      if (bestIdx >= 0) {
-        if (!halachaToSt[bestIdx]) halachaToSt[bestIdx] = [];
-        halachaToSt[bestIdx].push(st.text);
+      // Partial match: first 4 chars of each word in keyword
+      if (bestIdx < 0 && kw.length >= 3) {
+        const firstWord = kw.split(' ')[0].slice(0, 4);
+        for (let i = lastMatchIdx; i < rambamStripped.length; i++) {
+          if (rambamStripped[i].includes(firstWord)) { bestIdx = i; break; }
+        }
       }
+      // Final fallback: use lastMatchIdx (sequential assignment)
+      if (bestIdx < 0) {
+        bestIdx = Math.min(lastMatchIdx, rambamStripped.length - 1);
+        console.log(`[RambamYomi] keyword="${kw.slice(0,20)}" → FALLBACK halacha[${bestIdx}]`);
+      } else {
+        lastMatchIdx = bestIdx;
+        console.log(`[RambamYomi] keyword="${kw.slice(0,20)}" → halacha[${bestIdx}]`);
+      }
+      if (!halachaToSt[bestIdx]) halachaToSt[bestIdx] = [];
+      halachaToSt[bestIdx].push(st.text);
     });
 
     el.className = 'content-text';
@@ -1522,7 +1534,7 @@ async function switchRambamView(view) {
       el.innerHTML = `
         <div style="font-size:11px;color:var(--muted);margin-bottom:12px;padding:8px;
           background:rgba(126,214,160,.05);border-radius:8px;border-right:3px solid var(--addition)">
-          📚 פירוש שטיינזלץ – ${stEntries.length} פירושים על ${data?.heRef || _rambamRef}
+          📚 פירוש שטיינזלץ – ${stEntries.length} פירושים על ${_rambamRef}
         </div>` +
         stEntries.map((st, i) => {
           const formatted = st.text.replace(/\*\*([^*]+)\*\*/g,

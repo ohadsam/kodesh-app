@@ -775,143 +775,95 @@ function _fixAmidaSeasonalWords(html) {
   if (!html) return html;
   const winter = (typeof _isWinterSeason === 'function') ? _isWinterSeason() : false;
 
-  const sayGreen = (t, lbl) =>
-    `<span style="background:rgba(61,140,90,.18);padding:1px 4px;border-radius:3px;` +
-    `color:var(--addition);font-weight:700" title="${lbl}">✅ ${t}</span>`;
-  const hide = () => '';
+  const sayBlock = (inner, label) =>
+    `<p style="display:block;margin:4px 0 8px 0;padding:6px 10px 5px;` +
+    `background:var(--addition-bg);border-right:3px solid var(--addition);` +
+    `border-radius:0 6px 6px 0;font-family:'Frank Ruhl Libre',serif;` +
+    `font-size:var(--font-size);color:var(--addition);font-style:italic;font-weight:600;line-height:1.85">` +
+    `<span style="display:block;font-size:9px;font-family:'Heebo',sans-serif;font-weight:700;` +
+    `margin-bottom:3px;opacity:.9">✅ ${label}</span>${inner}</p>`;
 
-  // Strategy: work on raw text (strip HTML) to find matches, then do replacement in HTML
-  // because HTML tags may be interspersed between Hebrew letters/nikud
-  const rawText = html.replace(/<[^>]+>/g, '');
-  const stripN  = t => t.replace(/[\u0591-\u05C7]/g, '');
-  const plainText = stripN(rawText);
+  const skipBlock = (inner, label) =>
+    `<p style="display:block;margin:4px 0 8px 0;padding:6px 10px 5px;` +
+    `background:rgba(180,80,60,.07);border-right:3px solid rgba(180,80,60,.3);` +
+    `border-radius:0 6px 6px 0;font-family:'Frank Ruhl Libre',serif;` +
+    `font-size:calc(var(--font-size)*0.88);color:rgba(180,80,60,.5);` +
+    `font-style:italic;line-height:1.85;text-decoration:line-through">` +
+    `<span style="display:block;font-size:9px;font-family:'Heebo',sans-serif;font-weight:700;` +
+    `margin-bottom:3px;opacity:.9;text-decoration:none;color:#c87060">❌ ${label} – לא אומרים</span>` +
+    `${inner}</p>`;
 
-  console.log('[SSF] winter=', winter, '| html.len=', html.length);
-  console.log('[SSF] plainText excerpt:', plainText.slice(0, 200).replace(/\s+/g, ' '));
+  const stripN = t => t.replace(/[\u0591-\u05C7]/g, '').replace(/\s+/g, ' ').trim();
 
-  // Check what's present in plain text
-  const hasTal    = /מוריד הטל/.test(plainText);
-  const hasGeshem = /משיב הרוח/.test(plainText);
-  const hasMatar  = /ותן טל ומטר/.test(plainText);
-  const hasBracha = plainText.includes('ותן ברכה');
-  console.log('[SSF] found: TAL=', hasTal, 'GESHEM=', hasGeshem, 'MATAR=', hasMatar, 'BRACHA=', hasBracha);
+  console.log('[SSF] winter=', winter, 'html.len=', html.length);
 
-  if (!hasTal && !hasGeshem && !hasMatar && !hasBracha) return html; // nothing to replace
-
-  // Replace in HTML: find the <p> elements containing these phrases and wrap them
-  // We process each <p>...</p> block separately
+  // Split into <p> blocks and process each
   const parts = html.split(/(?=<p[ >])/);
   const result = parts.map(part => {
     if (!part.startsWith('<p')) return part;
-    const partPlain = stripN(part.replace(/<[^>]+>/g, ''));
 
-    // ── מוריד הטל / משיב הרוח ──────────────────────────────────────
-    if (/מוריד הטל/.test(partPlain) || /משיב הרוח/.test(partPlain)) {
-      const innerMatch = part.match(/<p([^>]*)>([\s\S]*?)<\/p>/);
-      if (!innerMatch) return part;
-      const attrs = innerMatch[1], inner = innerMatch[2];
-      const innerPlain = stripN(inner.replace(/<[^>]+>/g, ''));
+    const innerMatch = part.match(/^(<p[^>]*>)([\s\S]*?)(<\/p>)$/);
+    if (!innerMatch) return part;
+    const [, pOpen, inner, pClose] = innerMatch;
+    const plain = stripN(inner.replace(/<[^>]+>/g, ''));
 
-      const hasBothGT = /משיב הרוח/.test(innerPlain);
-      const hasBothTL = /מוריד הטל/.test(innerPlain);
+    // ── גבורות: מוריד הטל + משיב הרוח (3 separate verses joined into one paragraph) ──
+    // Sefaria sends: verse[27]=מוריד הטל, verse[28]=משיב הרוח, verse[29]=ומוריד הגשם
+    // buildParagraphs joins them: "מוריד הטל משיב הרוח ומוריד הגשם"
+    const hasTal    = plain.includes('מוריד הטל');
+    const hasGeshem = plain.includes('משיב הרוח');
 
-      if (hasBothGT && hasBothTL) {
-        // Both in one paragraph — strip the wrong one from inner HTML
-        if (winter) {
-          // Keep mashiv haruach, remove morid hatal
-          // Find and remove מוריד הטל span/text
-          const newInner = _stripPhrase(inner, 'מוריד הטל');
-          console.log('[SSF] WINTER: removed מוריד הטל from combined block');
-          return `<p${attrs} style="background:var(--addition-bg);border-right:3px solid var(--addition);border-radius:0 6px 6px 0;padding:6px 10px;margin:4px 0 8px;color:var(--addition);font-style:italic;font-weight:600">` +
-                 `<span style="display:block;font-size:9px;font-weight:700;margin-bottom:2px;opacity:.9">✅ חורף – משיב הרוח ומוריד הגשם</span>` +
-                 newInner + `</p>`;
-        } else {
-          // Keep morid hatal, remove mashiv haruach
-          const newInner = _stripPhrase(inner, 'משיב הרוח ומוריד הגשם');
-          console.log('[SSF] SUMMER: removed משיב הרוח from combined block');
-          return `<p${attrs} style="background:var(--addition-bg);border-right:3px solid var(--addition);border-radius:0 6px 6px 0;padding:6px 10px;margin:4px 0 8px;color:var(--addition);font-style:italic;font-weight:600">` +
-                 `<span style="display:block;font-size:9px;font-weight:700;margin-bottom:2px;opacity:.9">✅ קיץ – מוריד הטל</span>` +
-                 newInner + `</p>`;
-        }
-      } else if (hasBothGT && winter) {
-        console.log('[SSF] WINTER single-block: showing משיב הרוח');
-        return `<p${attrs} style="background:var(--addition-bg);border-right:3px solid var(--addition);border-radius:0 6px 6px 0;padding:6px 10px;margin:4px 0 8px;color:var(--addition);font-style:italic;font-weight:600">` +
-               `<span style="display:block;font-size:9px;font-weight:700;margin-bottom:2px;opacity:.9">✅ חורף</span>${inner}</p>`;
-      } else if (hasBothGT && !winter) {
-        console.log('[SSF] SUMMER single-block: hiding משיב הרוח');
-        return `<p${attrs} style="background:rgba(180,80,60,.07);border-right:3px solid rgba(180,80,60,.3);border-radius:0 6px 6px 0;padding:6px 10px;margin:4px 0 8px;font-size:.9em;color:rgba(180,80,60,.5);text-decoration:line-through">` +
-               `<span style="display:block;font-size:9px;font-weight:700;text-decoration:none;color:#c87060;margin-bottom:2px">❌ לא אומרים בקיץ</span>${inner}</p>`;
-      } else if (hasBothTL && !winter) {
-        console.log('[SSF] SUMMER single-block: showing מוריד הטל');
-        return `<p${attrs} style="background:var(--addition-bg);border-right:3px solid var(--addition);border-radius:0 6px 6px 0;padding:6px 10px;margin:4px 0 8px;color:var(--addition);font-style:italic;font-weight:600">` +
-               `<span style="display:block;font-size:9px;font-weight:700;margin-bottom:2px;opacity:.9">✅ קיץ</span>${inner}</p>`;
-      } else if (hasBothTL && winter) {
-        console.log('[SSF] WINTER single-block: hiding מוריד הטל');
-        return `<p${attrs} style="background:rgba(180,80,60,.07);border-right:3px solid rgba(180,80,60,.3);border-radius:0 6px 6px 0;padding:6px 10px;margin:4px 0 8px;font-size:.9em;color:rgba(180,80,60,.5);text-decoration:line-through">` +
-               `<span style="display:block;font-size:9px;font-weight:700;text-decoration:none;color:#c87060;margin-bottom:2px">❌ לא אומרים בחורף</span>${inner}</p>`;
+    if (hasTal || hasGeshem) {
+      if (winter) {
+        // Keep משיב הרוח ומוריד הגשם, remove מוריד הטל
+        // The paragraph contains "מוריד הטל משיב הרוח ומוריד הגשם"
+        // Strip מוריד הטל from the beginning
+        const cleaned = inner.replace(
+          /מ[\u0591-\u05C7]*ו[\u0591-\u05C7]*ר[\u0591-\u05C7]*י[\u0591-\u05C7]*ד[\u0591-\u05C7]*\s+ה[\u0591-\u05C7]*ט[\u0591-\u05C7]*ל[\u0591-\u05C7]*/,
+          ''
+        ).replace(/^\s+/, '');
+        console.log('[SSF] WINTER: kept משיב הרוח, text=', cleaned.replace(/<[^>]+>/g,'').slice(0,40));
+        return sayBlock(cleaned, 'חורף – משיב הרוח ומוריד הגשם');
+      } else {
+        // Summer: keep מוריד הטל, remove משיב הרוח ומוריד הגשם
+        const cleaned = inner.replace(
+          /\s*מ[\u0591-\u05C7]*ש[\u0591-\u05C7]*י[\u0591-\u05C7]*ב[\u0591-\u05C7]*\s+ה[\u0591-\u05C7]*ר[\u0591-\u05C7]*ו[\u0591-\u05C7]*ח[\u0591-\u05C7]*\s+ו[\u0591-\u05C7]*מ[\u0591-\u05C7]*ו[\u0591-\u05C7]*ר[\u0591-\u05C7]*י[\u0591-\u05C7]*ד[\u0591-\u05C7]*\s+ה[\u0591-\u05C7]*ג[\u0591-\u05C7]*ש[\u0591-\u05C7]*ם[\u0591-\u05C7]*/g,
+          ''
+        ).replace(/:\s*$/, '').trim();
+        console.log('[SSF] SUMMER: kept מוריד הטל, text=', cleaned.replace(/<[^>]+>/g,'').slice(0,40));
+        return sayBlock(cleaned, 'קיץ – מוריד הטל');
       }
     }
 
-    // ── ותן טל ומטר / ותן ברכה ──────────────────────────────────────
-    if (/ותן טל ומטר/.test(partPlain) || /ותן ברכה/.test(partPlain)) {
-      const innerMatch = part.match(/<p([^>]*)>([\s\S]*?)<\/p>/);
-      if (!innerMatch) return part;
-      const attrs = innerMatch[1], inner = innerMatch[2];
-      const innerPlain = stripN(inner.replace(/<[^>]+>/g, ''));
-      const hasBothM = /ותן טל ומטר/.test(innerPlain);
-      const hasBothB = /ותן ברכה/.test(innerPlain);
-
-      if (hasBothM && hasBothB) {
-        if (winter) {
-          const newInner = _stripPhrase(inner, 'ותן ברכה');
-          console.log('[SSF] WINTER: removed ותן ברכה, showing ותן טל ומטר');
-          return `<p${attrs} style="background:var(--addition-bg);border-right:3px solid var(--addition);border-radius:0 6px 6px 0;padding:6px 10px;margin:4px 0 8px;color:var(--addition);font-style:italic;font-weight:600">` +
-                 `<span style="display:block;font-size:9px;font-weight:700;margin-bottom:2px;opacity:.9">✅ חורף – ותן טל ומטר לברכה</span>${newInner}</p>`;
-        } else {
-          const newInner = _stripPhrase(inner, 'ותן טל ומטר לברכה');
-          console.log('[SSF] SUMMER: removed ותן טל ומטר, showing ותן ברכה');
-          return `<p${attrs} style="background:var(--addition-bg);border-right:3px solid var(--addition);border-radius:0 6px 6px 0;padding:6px 10px;margin:4px 0 8px;color:var(--addition);font-style:italic;font-weight:600">` +
-                 `<span style="display:block;font-size:9px;font-weight:700;margin-bottom:2px;opacity:.9">✅ קיץ – ותן ברכה</span>${newInner}</p>`;
-        }
-      } else if (hasBothM) {
-        if (winter) {
-          return `<p${attrs} style="background:var(--addition-bg);border-right:3px solid var(--addition);border-radius:0 6px 6px 0;padding:6px 10px;margin:4px 0 8px;color:var(--addition);font-style:italic;font-weight:600"><span style="display:block;font-size:9px;font-weight:700;margin-bottom:2px;opacity:.9">✅ חורף</span>${inner}</p>`;
-        } else {
-          return `<p${attrs} style="background:rgba(180,80,60,.07);border-right:3px solid rgba(180,80,60,.3);border-radius:0 6px 6px 0;padding:6px 10px;margin:4px 0 8px;font-size:.9em;color:rgba(180,80,60,.5);text-decoration:line-through"><span style="display:block;font-size:9px;font-weight:700;text-decoration:none;color:#c87060;margin-bottom:2px">❌ לא אומרים בקיץ</span>${inner}</p>`;
-        }
-      } else if (hasBothB) {
-        if (!winter) {
-          return `<p${attrs} style="background:var(--addition-bg);border-right:3px solid var(--addition);border-radius:0 6px 6px 0;padding:6px 10px;margin:4px 0 8px;color:var(--addition);font-style:italic;font-weight:600"><span style="display:block;font-size:9px;font-weight:700;margin-bottom:2px;opacity:.9">✅ קיץ</span>${inner}</p>`;
-        } else {
-          return `<p${attrs} style="background:rgba(180,80,60,.07);border-right:3px solid rgba(180,80,60,.3);border-radius:0 6px 6px 0;padding:6px 10px;margin:4px 0 8px;font-size:.9em;color:rgba(180,80,60,.5);text-decoration:line-through"><span style="display:block;font-size:9px;font-weight:700;text-decoration:none;color:#c87060;margin-bottom:2px">❌ לא אומרים בחורף</span>${inner}</p>`;
-        }
+    // ── ברכת השנים: ותן ברכה / ותן טל ומטר ──────────────────────────────
+    // Sefaria only sends "ותן ברכה" as a verse — never "ותן טל ומטר"
+    // In winter: replace "ותן ברכה" with "ותן טל ומטר לברכה"
+    const hasBracha = plain.includes('ותן ברכה');
+    if (hasBracha) {
+      if (winter) {
+        // Replace ותן ברכה with ותן טל ומטר לברכה (green block)
+        const winterText = inner.replace(
+          /ו[\u0591-\u05C7]*ת[\u0591-\u05C7]*ן[\u0591-\u05C7]*\s+ב[\u0591-\u05C7]*ר[\u0591-\u05C7]*כ[\u0591-\u05C7]*ה[\u0591-\u05C7]*/,
+          'וְתֵן טַל וּמָטָר לִבְרָכָה'
+        );
+        console.log('[SSF] WINTER: replaced ותן ברכה → ותן טל ומטר');
+        return sayBlock(winterText, 'חורף – ותן טל ומטר לברכה');
+      } else {
+        // Summer: keep ותן ברכה as-is (green block)
+        console.log('[SSF] SUMMER: keeping ותן ברכה');
+        return sayBlock(inner, 'קיץ – ותן ברכה');
       }
     }
+
     return part;
   });
 
-  return result.join('');
+  const finalHtml = result.join('');
+  console.log('[SSF] done. found TAL/GESHEM or BRACHA modified');
+  return finalHtml;
 }
 
 // Strip a Hebrew phrase (ignoring nikud) from an HTML string
-function _stripPhrase(html, phrase) {
-  // Build nikud-aware regex for the phrase
-  const N = '[\u0591-\u05C7]*';
-  const letters = phrase.replace(/[\u0591-\u05C7]/g,'').split('');
-  const pattern = letters.map(c => {
-    if (c === ' ') return '\\s+';
-    // Escape regex special chars
-    const escaped = c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    return escaped + N;
-  }).join('');
-  try {
-    const re = new RegExp(pattern, 'g');
-    return html.replace(re, '');
-  } catch(e) {
-    // Fallback: simple string search on stripped text
-    return html;
-  }
-}
 
 // Fetch a single section and return rendered HTML
 // Returns ONLY the inner text content (no wrapper div with condition label)
