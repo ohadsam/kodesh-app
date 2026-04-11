@@ -858,6 +858,15 @@ async function _fetchSectionHtml(s, _unused, yaalehOccasion) {
 
   const data = await sefariaText(s.ref, 0);
   const flat = heFlat(data).map(cleanSefariaHtml).filter(Boolean);
+  // DEBUG: log raw verses that contain seasonal keywords before cleaning
+  if (s.label === 'שמונה עשרה') {
+    const rawFlat = heFlat(data);
+    rawFlat.forEach((v, i) => {
+      if (typeof v === 'string' && (v.includes('small') || v.includes('חורף') || v.includes('קיץ') || v.includes('מוריד') || v.includes('משיב') || v.includes('ותן'))) {
+        console.log(`[SiddurRaw] verse[${i}] seasonal candidate:`, v.slice(0, 200));
+      }
+    });
+  }
   if (!flat.length) return '<span style="color:var(--muted)">(אין טקסט זמין)</span>';
 
   const paragraphs = buildParagraphs(flat);

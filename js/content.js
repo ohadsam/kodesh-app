@@ -1187,22 +1187,69 @@ async function switchMishnaView(view) {
     const commentaryRef = `Bartenura on ${_mishnaRef}`;
     console.log(`[MishnaYomi] loading commentary: ${commentaryRef}`);
     const data = await sefariaText(commentaryRef, 300);
-    const flat = heFlat(data).filter(Boolean);
+    const he = data?.he;
+
+    console.log('[MishnaYomi] Bartenura he type:', Array.isArray(he)?'array':typeof he,
+                '| length:', Array.isArray(he)?he.length:'N/A',
+                '| _mishnaFlat:', _mishnaFlat.length);
+
+    if (!Array.isArray(he) || !he.length) throw new Error('אין פירוש ברטנורא זמין');
+
+    // Parse Bartenura entries: each has bold keyword + explanation
+    const btEntries = he.map((entry, i) => {
+      if (!entry) return null;
+      const raw = Array.isArray(entry)
+        ? entry.flat(Infinity).filter(Boolean).join(' ')
+        : String(entry);
+      const kwMatch = raw.match(/<b>([\s\S]*?)<\/b>/);
+      const keyword = kwMatch ? kwMatch[1].replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim() : '';
+      const text = raw.replace(/<b>/g,'**').replace(/<\/b>/g,'**').replace(/<[^>]+>/g,'').trim();
+      console.log(`[MishnaYomi] bt[${i}] keyword="${keyword.slice(0,30)}" text="${text.slice(0,60)}"`);
+      return { keyword, text };
+    }).filter(Boolean);
+
+    // Match each Bartenura entry to the mishna segment containing its keyword
+    const stripN = s => s.replace(/[\u0591-\u05C7]/g,'').replace(/\s+/g,' ').trim();
+    const mishnaStripped = _mishnaFlat.map(v => stripN(v.replace(/<[^>]+>/g,'')));
+
+    const segTobt = {};
+    btEntries.forEach(bt => {
+      const kw = stripN(bt.keyword);
+      if (!kw) return;
+      let bestIdx = -1;
+      for (let i = 0; i < mishnaStripped.length; i++) {
+        if (mishnaStripped[i].includes(kw)) { bestIdx = i; break; }
+      }
+      if (bestIdx < 0 && kw.length >= 3) {
+        const partial = kw.slice(0,4);
+        for (let i = 0; i < mishnaStripped.length; i++) {
+          if (mishnaStripped[i].includes(partial)) { bestIdx = i; break; }
+        }
+      }
+      if (bestIdx >= 0) {
+        if (!segTobt[bestIdx]) segTobt[bestIdx] = [];
+        segTobt[bestIdx].push(bt.text);
+      }
+    });
 
     el.className = 'content-text';
-    if (flat.length) {
-      // Inline Bartenura: show mishna text with commentary embedded
-      el.innerHTML = _mishnaFlat.map((v, i) => {
-        const bartText = (flat[i] && typeof flat[i] === 'string') ? flat[i] :
-                         (Array.isArray(flat[i]) ? flat[i].flat().filter(Boolean).join(' ') : '');
-        const bartHtml = bartText ?
-          `<span style="color:#7ab8d6;font-size:calc(var(--font-size) * 0.82);font-style:italic"> (ברטנורא: ${bartText.replace(/<[^>]+>/g,'')})</span>` : '';
-        return `<div style="margin-bottom:10px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}${bartHtml}</div>`;
-      }).join('');
-    } else {
-      throw new Error('אין פירוש ברטנורא זמין');
-    }
-    console.log(`[MishnaYomi] bartenura loaded: ${flat.length} entries`);
+    el.innerHTML = _mishnaFlat.map((v, i) => {
+      const matched = segTobt[i] || [];
+      const bartHtml = matched.length
+        ? `<div style="margin-top:6px;padding:5px 10px;
+            background:rgba(122,184,214,.07);
+            border-right:2px solid #7ab8d6;border-radius:0 5px 5px 0;
+            color:#7ab8d6;font-size:calc(var(--font-size)*0.84);
+            font-style:italic;line-height:1.8">
+            <span style="font-size:9px;font-weight:700;display:block;margin-bottom:2px;opacity:.8">📝 ברטנורא</span>
+            ${matched.map(t => t.replace(/\*\*([^*]+)\*\*/g,'<strong style="color:var(--cream);font-style:normal">$1</strong> —')).join('<br>')}
+          </div>`
+        : '';
+      return `<div style="margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.04)">
+        <span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}${bartHtml}
+      </div>`;
+    }).join('');
+    console.log(`[MishnaYomi] bartenura matched: ${Object.keys(segTobt).length} of ${_mishnaFlat.length} segments`);
   } catch(e) {
     console.warn('[MishnaYomi] commentary error:', e.message);
     el.innerHTML = `<div style="color:var(--muted);text-align:center;padding:20px">⚠️ ${e.message}</div>`;
@@ -1347,31 +1394,66 @@ async function switchRambamView(view) {
 
     if (!Array.isArray(he) || !he.length) throw new Error('אין פירוש שטיינזלץ זמין');
 
-    // Each he[i] = commentary on one word/phrase in order (may be per-word, not per-halacha)
+    // Parse each Steinsaltz entry: extract keyword (bold) + explanation
     const stEntries = he.map((entry, i) => {
-      if (!entry) return '';
-      if (Array.isArray(entry)) {
-        return entry.flat(Infinity).filter(Boolean)
-          .map(s => String(s).replace(/<b>/g,'**').replace(/<\/b>/g,'**').replace(/<[^>]+>/g,'').trim())
-          .filter(Boolean).join(' ');
-      }
-      return String(entry).replace(/<b>/g,'**').replace(/<\/b>/g,'**').replace(/<[^>]+>/g,'').trim();
+      if (!entry) return null;
+      const raw = Array.isArray(entry)
+        ? entry.flat(Infinity).filter(Boolean).join(' ')
+        : String(entry);
+      // Extract bold keyword(s) and the rest
+      const keywordMatch = raw.match(/<b>([\s\S]*?)<\/b>/);
+      const keyword = keywordMatch
+        ? keywordMatch[1].replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim()
+        : '';
+      const text = raw
+        .replace(/<b>/g,'**').replace(/<\/b>/g,'**')
+        .replace(/<[^>]+>/g,'').trim();
+      console.log(`[RambamYomi] st[${i}] keyword="${keyword.slice(0,30)}" text="${text.slice(0,80)}"`);
+      return { keyword, text, raw };
     }).filter(Boolean);
 
     console.log('[RambamYomi] stEntries count:', stEntries.length);
-    stEntries.forEach((e,i) => console.log(`[RambamYomi] st[${i}]:`, e.slice(0,100)));
+
+    // Strip nikud for comparison
+    const stripN = s => s.replace(/[\u0591-\u05C7]/g,'').replace(/\s+/g,' ').trim();
+    const rambamStripped = _rambamFlat.map(v => stripN(v.replace(/<[^>]+>/g,'')));
+
+    // For each Steinsaltz entry, find which Rambam halacha contains its keyword
+    // Build map: halacha_index → [steinsaltz entries]
+    const halachaToSt = {};
+    stEntries.forEach(st => {
+      const kw = stripN(st.keyword);
+      if (!kw) return;
+      // Find the halacha containing this keyword
+      let bestIdx = -1;
+      for (let i = 0; i < rambamStripped.length; i++) {
+        if (rambamStripped[i].includes(kw)) { bestIdx = i; break; }
+      }
+      // Fallback: partial match on first 5 chars
+      if (bestIdx < 0 && kw.length >= 3) {
+        const partial = kw.slice(0,5);
+        for (let i = 0; i < rambamStripped.length; i++) {
+          if (rambamStripped[i].includes(partial)) { bestIdx = i; break; }
+        }
+      }
+      console.log(`[RambamYomi] keyword="${kw.slice(0,20)}" → halacha[${bestIdx}]`);
+      if (bestIdx >= 0) {
+        if (!halachaToSt[bestIdx]) halachaToSt[bestIdx] = [];
+        halachaToSt[bestIdx].push(st.text);
+      }
+    });
 
     el.className = 'content-text';
 
     if (view === 'steinsaltz_only') {
-      // ── Standalone: show ALL Steinsaltz entries sequentially ──
+      // Standalone: show ALL Steinsaltz entries sequentially
       el.innerHTML = `
         <div style="font-size:11px;color:var(--muted);margin-bottom:12px;padding:8px;
           background:rgba(126,214,160,.05);border-radius:8px;border-right:3px solid var(--addition)">
-          📚 פירוש שטיינזלץ – ${he.length} פירושים על ${data?.heRef || _rambamRef}
+          📚 פירוש שטיינזלץ – ${stEntries.length} פירושים על ${data?.heRef || _rambamRef}
         </div>` +
         stEntries.map((st, i) => {
-          const formatted = st.replace(/\*\*([^*]+)\*\*/g,
+          const formatted = st.text.replace(/\*\*([^*]+)\*\*/g,
             '<strong style="color:var(--cream);font-style:normal;font-size:1.05em">$1</strong> —');
           return `<div style="margin-bottom:14px;padding:8px 12px;
             background:rgba(126,214,160,.06);
@@ -1383,39 +1465,28 @@ async function switchRambamView(view) {
         }).join('');
 
     } else {
-      // ── Inline: try to align Steinsaltz to Rambam halachot ──
-      // Since Steinsaltz may have different count than halachot, we show best-effort:
-      // If counts match → 1:1. If not → append all remaining Steinsaltz after last halacha.
+      // Inline: show Rambam + matched Steinsaltz under each halacha
       el.innerHTML = _rambamFlat.map((v, i) => {
-        const stRaw = stEntries[i] || '';
-        const stText = stRaw.replace(/\*\*([^*]+)\*\*/g,
-          '<strong style="color:var(--cream);font-style:normal">$1</strong> —');
-        const stHtml = stText
+        const matched = halachaToSt[i] || [];
+        const stHtml = matched.length
           ? `<div style="margin-top:6px;padding:6px 10px;
               background:rgba(126,214,160,.07);
               border-right:2px solid var(--addition);border-radius:0 5px 5px 0;
               color:var(--addition);font-size:calc(var(--font-size)*0.84);
               font-style:italic;line-height:1.85">
               <span style="font-size:9px;font-weight:700;display:block;margin-bottom:2px;opacity:.8">📚 שטיינזלץ</span>
-              ${stText}</div>`
+              ${matched.map(t => t.replace(/\*\*([^*]+)\*\*/g,
+                '<strong style="color:var(--cream);font-style:normal">$1</strong> —')).join('<br>')}
+            </div>`
           : '';
         return `<div style="margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.05)">
           <div><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}</div>
           ${stHtml}
         </div>`;
-      }).join('') +
-      // If more Steinsaltz entries than rambam entries, show the rest
-      (stEntries.length > _rambamFlat.length
-        ? `<div style="margin-top:12px;padding:8px 12px;background:rgba(126,214,160,.05);border-radius:8px;border-right:3px solid var(--addition)">
-            <div style="font-size:10px;color:var(--muted);margin-bottom:8px">📚 פירושים נוספים מהשטיינזלץ</div>` +
-          stEntries.slice(_rambamFlat.length).map((st, i) => {
-            const formatted = st.replace(/\*\*([^*]+)\*\*/g,'<strong style="color:var(--cream);font-style:normal">$1</strong> —');
-            return `<div style="margin-bottom:10px;color:var(--addition);font-style:italic;font-size:calc(var(--font-size)*0.84);line-height:1.85">${formatted}</div>`;
-          }).join('') + `</div>`
-        : '');
+      }).join('');
     }
 
-    console.log('[RambamYomi] rendered view=', view, '| st=', stEntries.length, 'rambam=', _rambamFlat.length);
+    console.log('[RambamYomi] rendered view=', view, '| matched halachot:', Object.keys(halachaToSt).length, 'of', _rambamFlat.length);
   } catch(e) {
     console.warn('[RambamYomi] commentary error:', e.message);
     el.innerHTML = `<div style="color:var(--muted);text-align:center;padding:20px">⚠️ ${e.message}</div>`;
