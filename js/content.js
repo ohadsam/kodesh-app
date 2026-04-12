@@ -462,12 +462,18 @@ async function loadParasha() {
       const first  = parts[0].trim();
       const second = parts[1]?.trim();
 
-      // Fuzzy match: find parasha whose name starts with first 3 chars
-      const fuzzyFind = name => name && (
-        ALL_PARASHIOT.find(p => p.he === name) ||
-        ALL_PARASHIOT.find(p => name.length >= 3 && p.he.startsWith(name.slice(0,3))) ||
-        ALL_PARASHIOT.find(p => name.length >= 3 && p.he.includes(name.slice(0,3)))
-      );
+      // Strip medial vav/yod (matres lectionis) for consonant-based fuzzy match
+      // e.g. "מצרע" matches "מצורע", "בחקתי" matches "בחוקותי"
+      const stripVowelLetters = s => s ? s.replace(/(?<=[א-ת])[וי](?=[א-ת])/g, '') : '';
+
+      const fuzzyFind = name => {
+        if (!name) return null;
+        const nc = stripVowelLetters(name);
+        return ALL_PARASHIOT.find(p => p.he === name) ||
+               ALL_PARASHIOT.find(p => stripVowelLetters(p.he) === nc) ||
+               ALL_PARASHIOT.find(p => name.length >= 3 && p.he.startsWith(name.slice(0,3))) ||
+               ALL_PARASHIOT.find(p => nc.length >= 3 && stripVowelLetters(p.he).startsWith(nc.slice(0,3)));
+      };
 
       matchP = fuzzyFind(first);
       combinedSecond = fuzzyFind(second);

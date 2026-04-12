@@ -296,7 +296,12 @@ function checkRemindersOnOpen() {
     <label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer">
       <input type="checkbox" id="rem-chk-${item.key}" onchange="toggleReminderDone('${item.key}', this.checked)"
         style="width:20px;height:20px;accent-color:var(--gold);flex-shrink:0">
-      <span style="font-family:'Frank Ruhl Libre',serif;font-size:15px">${item.name}</span>
+      <span style="font-family:'Frank Ruhl Libre',serif;font-size:15px;flex:1">${item.name}</span>
+      ${item.key === 'omer' ? `<button onclick="closeReminderModal();showOmerNow()"
+        style="background:var(--gold);color:#000;border:none;border-radius:8px;padding:5px 10px;
+        font-size:11px;font-weight:700;cursor:pointer;font-family:'Heebo',sans-serif;white-space:nowrap">
+        ספור עכשיו ▶
+      </button>` : ''}
     </label>
   `).join('') + `
     <div style="margin-top:10px;font-size:11px;color:var(--muted);text-align:center">
