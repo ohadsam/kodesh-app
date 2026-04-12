@@ -32,18 +32,8 @@ function _redBlock(label, innerHtml) {
 // Each def: label, starts (regex on first para), ends (optional regex on last para),
 // multiPara (true = collect all consecutive paras until ends match or no more paras)
 const SEASONAL_DEFS = [
-  { label: 'מוריד הטל (קיץ)',
-    starts: /^מוריד הטל$/,
-    show: () => !_isWinterSeason() },
-  { label: 'משיב הרוח ומוריד הגשם (חורף)',
-    starts: /משיב הרוח/,
-    show: () => _isWinterSeason() },
-  { label: 'ותן ברכה (קיץ)',
-    starts: /^ותן ברכה$/,
-    show: () => !_isWinterSeason() },
-  { label: 'ותן טל ומטר לברכה (חורף)',
-    starts: /ותן טל ומטר/,
-    show: () => _isWinterSeason() },
+  // NOTE: מוריד הטל/משיב הרוח and ותן ברכה/טל ומטר are handled by _fixAmidaSeasonalWords
+  // (which has better context-awareness). Only keeping entries that DON'T conflict:
   // יעלה ויבוא – multi-paragraph block
   { label: 'יעלה ויבוא',
     starts: /יעלה ויבוא/,

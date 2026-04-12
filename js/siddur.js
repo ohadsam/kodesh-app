@@ -8,6 +8,8 @@ let siddurNusach  = 'sfard';
 let siddurPrayer  = 'shacharit';
 let siddurSections = [];   // currently loaded sections
 let siddurLoading  = false;
+let _siddurPendingReload = false; // set when a reload is requested during loading
+let _siddurLoadId = 0;            // incremented on each load; sections check if they're stale
 
 const NUSACH_NAMES = { ashkenaz: 'נוסח אשכנז', sfard: 'נוסח ספרד', mizrach: 'עדות המזרח' };
 const PRAYER_NAMES = { shacharit: 'שחרית', mincha: 'מנחה', arvit: 'ערבית', birkat: 'ברכת המזון', layla: 'קריאת שמע על המיטה' };
@@ -327,20 +329,31 @@ const SIDDUR_CONDITIONS = {
 
 function setSiddurNusach(n) {
   siddurNusach = n;
-  window._currentNusach = n;  // used by SIDDUR_SECTIONS getter
+  window._currentNusach = n;
   document.querySelectorAll('#nusach-buttons .aliya-tab').forEach(b => b.classList.remove('active'));
   document.getElementById('sn-'+n)?.classList.add('active');
   appState.siddurNusach = n; saveState();
-  console.log('[Siddur] nusach changed to', n, '– reloading');
-  siddurLoading = false;
-  loadSiddur();
+  console.log('[Siddur] nusach changed to', n);
+  // If currently loading → mark pending (will reload after current load finishes)
+  // If not loading → reload immediately (reset loading flag first since nusach change invalidates cache)
+  if (!siddurLoading) {
+    siddurLoading = false; // ensure clean state
+    loadSiddur();
+  } else {
+    _siddurPendingReload = true;
+  }
 }
 
 function setSiddurPrayer(p) {
   siddurPrayer = p;
   document.querySelectorAll('#tefila-type-buttons .aliya-tab').forEach(b => b.classList.remove('active'));
   document.getElementById('sp-'+p)?.classList.add('active');
-  loadSiddur();
+  console.log('[Siddur] prayer changed to', p);
+  if (!siddurLoading) {
+    loadSiddur();
+  } else {
+    _siddurPendingReload = true;
+  }
 }
 
 function shouldShowSection(s) {
@@ -352,13 +365,15 @@ function shouldShowSection(s) {
   return s.conditionType === 'skip' ? !result : !!result;
 }
 
-function _updatePrayerStatusBanner(allSections, visibleSections) {
+function _updatePrayerStatusBanner(allSections, visibleSections, prayer) {
   const banner = document.getElementById('siddur-status-banner');
   if (!banner) return;
   
   const cal = window._siddurCal || {};
   const isWinter = typeof _isWinterSeason === 'function' ? _isWinterSeason() : false;
   const hd = (typeof appState !== 'undefined') ? appState?._lastHebrewDate : null;
+  const isArvit = prayer === 'arvit';
+  const hasAmida = !isArvit || true; // ערבית has Amida but no tachanun
   
   const sayItems = [];
   const skipItems = [];
@@ -372,7 +387,8 @@ function _updatePrayerStatusBanner(allSections, visibleSections) {
     else skipItems.push(name);
   }
   
-  // Inline Amida inserts (always in text)
+  // Inline Amida inserts — only relevant when Amida has these sections
+  // (all prayers with Amida have מוריד הטל / ותן ברכה)
   if (isWinter) {
     sayItems.push('משיב הרוח ומוריד הגשם');
     sayItems.push('ותן טל ומטר לברכה');
@@ -393,7 +409,7 @@ function _updatePrayerStatusBanner(allSections, visibleSections) {
     skipItems.push('תוספות עשרת ימי תשובה');
   }
   
-  // יעלה ויבוא — inline in Amida, not a separate section
+  // יעלה ויבוא — inline in Amida
   const sayYaaleh = cal.isRoshChodesh || cal.isCholHamoed || cal.isYomTov;
   if (sayYaaleh) {
     const occasion = cal.isRoshChodesh ? 'ר"ח' : cal.isCholHamoed ? 'חול המועד' : 'יו"ט';
@@ -407,32 +423,35 @@ function _updatePrayerStatusBanner(allSections, visibleSections) {
   else if (cal.isPurim) sayItems.push('על הנסים – פורים');
   else skipItems.push('על הנסים');
 
-  // ── תחנון ──────────────────────────────────
-  // Build a human-readable reason why tachanun is/isn't said
-  const tachanunReasons = [];
-  if (cal.skipTachanun) {
-    if (cal.isShabbat)      tachanunReasons.push('שבת');
-    if (cal.isYomTov)       tachanunReasons.push('יום טוב');
-    if (cal.isRoshChodesh)  tachanunReasons.push('ראש חודש');
-    if (cal.isCholHamoed)   tachanunReasons.push('חול המועד');
-    if (cal.isChanuka)      tachanunReasons.push('חנוכה');
-    if (cal.isPurim)        tachanunReasons.push('פורים');
-    if (cal.isSunday)       tachanunReasons.push('ראשון (אין תחנון בשחרית בלבד)');
-    if (hd) {
-      const m = hd.hm, d = hd.hd;
-      if (m === 'Nisan')            tachanunReasons.push('ניסן');
-      if (m === 'Iyar' && d === 18) tachanunReasons.push('ל"ג בעומר');
-      if (m === 'Iyar' && d === 5)  tachanunReasons.push('יום העצמאות');
-      if (m === 'Iyar' && d === 28) tachanunReasons.push('יום ירושלים');
-      if (m === 'Shevat' && d === 15) tachanunReasons.push('ט"ו בשבט');
-      if (m === 'Av' && d === 15)   tachanunReasons.push('ט"ו באב');
-      if (m === 'Adar' && d === 15) tachanunReasons.push('שושן פורים');
+  // ── תחנון — אין בערבית! ──────────────────────────────────────────
+  if (!isArvit) {
+    const tachanunReasons = [];
+    if (cal.skipTachanun) {
+      if (cal.isShabbat)      tachanunReasons.push('שבת');
+      if (cal.isYomTov)       tachanunReasons.push('יום טוב');
+      if (cal.isRoshChodesh)  tachanunReasons.push('ראש חודש');
+      if (cal.isCholHamoed)   tachanunReasons.push('חול המועד');
+      if (cal.isChanuka)      tachanunReasons.push('חנוכה');
+      if (cal.isPurim)        tachanunReasons.push('פורים');
+      if (cal.isSunday)       tachanunReasons.push('ראשון (אין תחנון בשחרית בלבד)');
+      if (hd) {
+        const m = hd.hm, d = hd.hd;
+        if (m === 'Nisan')            tachanunReasons.push('ניסן');
+        if (m === 'Iyar' && d === 18) tachanunReasons.push('ל"ג בעומר');
+        if (m === 'Iyar' && d === 5)  tachanunReasons.push('יום העצמאות');
+        if (m === 'Iyar' && d === 28) tachanunReasons.push('יום ירושלים');
+        if (m === 'Shevat' && d === 15) tachanunReasons.push('ט"ו בשבט');
+        if (m === 'Av' && d === 15)   tachanunReasons.push('ט"ו באב');
+        if (m === 'Adar' && d === 15) tachanunReasons.push('שושן פורים');
+      }
+      if (!tachanunReasons.length) tachanunReasons.push('יום מיוחד');
+      skipItems.push(`תחנון (${tachanunReasons.join(', ')})`);
+    } else {
+      sayItems.push('תחנון');
     }
-    if (!tachanunReasons.length) tachanunReasons.push('יום מיוחד');
-    skipItems.push(`תחנון (${tachanunReasons.join(', ')})`);
-  } else {
-    sayItems.push('תחנון');
   }
+  // ערבית: note that tachanun is never said
+  // (no entry added — it's obvious, no need to clutter the display)
 
   const sayEl = document.getElementById('siddur-status-say-list');
   const skipEl = document.getElementById('siddur-status-skip-list');
@@ -949,7 +968,15 @@ async function loadSiddur() {
   const dbg2 = document.getElementById('siddur-debug');
   if (dbg2) dbg2.textContent = '⏳ loadSiddur נקרא... ' + new Date().toLocaleTimeString();
   console.log('[Siddur] loadSiddur called, siddurLoading=', siddurLoading, 'prayer=', siddurPrayer, 'nusach=', siddurNusach);
-  if (siddurLoading) { console.log('[Siddur] already loading, skip'); if(dbg2) dbg2.textContent += ' (כבר טוען)'; return; }
+  if (siddurLoading) {
+    console.log('[Siddur] already loading — marking pending reload');
+    _siddurPendingReload = true;
+    _siddurLoadId++; // invalidate current load
+    if(dbg2) dbg2.textContent += ' (ממתין לסיום)';
+    return;
+  }
+  _siddurLoadId++;
+  const myLoadId = _siddurLoadId;
   siddurLoading = true;
 
   // Log SW cache status so we can diagnose caching issues
@@ -976,7 +1003,7 @@ async function loadSiddur() {
   console.log('[Siddur] visible sections=', total, sections.map(s=>s.label));
 
   // ── Prayer status banner ──────────────────────
-  _updatePrayerStatusBanner(allSections, sections);
+  _updatePrayerStatusBanner(allSections, sections, siddurPrayer);
 
   // ── Progress bar ──────────────────────────
   const progressWrap = document.getElementById('siddur-progress-wrap');
@@ -1060,6 +1087,12 @@ async function loadSiddur() {
   startPrefetch(1);
 
   for (let i = 0; i < sections.length; i++) {
+    // Check if a newer load was requested — abort this one
+    if (myLoadId !== _siddurLoadId) {
+      console.log('[Siddur] load aborted (stale loadId), exiting section loop');
+      return; // finally block will handle pending reload
+    }
+
     const s       = sections[i];
     const id      = s.label.replace(/\s/g,'_');
     const contentEl = document.getElementById('sc-' + id);
@@ -1077,7 +1110,6 @@ async function loadSiddur() {
         html = await _fetchSectionHtml(s, null, yaalehOccasion);
       }
       contentEl.innerHTML = html || '<span style="color:var(--muted)">(אין טקסט)</span>';
-      // Apply static seasonal inserts (labels + green blocks) based on calendar
     } catch(e) {
       contentEl.innerHTML = `<span style="color:var(--muted)">⚠️ ${e.message}</span>`;
       console.warn('[Siddur] failed:', s.label, e.message);
@@ -1102,6 +1134,12 @@ async function loadSiddur() {
   } finally {
     siddurLoading = false;
     console.log('[Siddur] done:', siddurPrayer, '| cache:', Object.keys(_siddurCache).length);
+    // If prayer/nusach changed during loading, reload now with the new values
+    if (_siddurPendingReload) {
+      _siddurPendingReload = false;
+      console.log('[Siddur] executing pending reload for prayer=', siddurPrayer, 'nusach=', siddurNusach);
+      setTimeout(loadSiddur, 50); // slight delay to let UI settle
+    }
   }
 }
 

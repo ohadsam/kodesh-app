@@ -449,11 +449,37 @@ async function loadParasha() {
     nameEl.textContent = heName + (isFutureParasha ? ' (שבוע הבא)' : '');
 
     // Match to our ALL_PARASHIOT list
+    // Handle combined parshiot like "תזריע-מצורע" or "ויקהל-פקודי"
     const clean = heName.replace(/פרשת\s*/,'').trim();
-    const matchP = ALL_PARASHIOT.find(p => clean === p.he)
+    let matchP = ALL_PARASHIOT.find(p => clean === p.he)
       || ALL_PARASHIOT.find(p => heName === p.he || heName === 'פרשת ' + p.he)
       || ALL_PARASHIOT.find(p => clean.length >= 3 && p.he.startsWith(clean) && p.he.length <= clean.length + 2);
+
+    // Combined parsha fallback: "תזריע-מצרע" → match first parasha
+    let combinedSecond = null;
+    if (!matchP && clean.includes('-')) {
+      const parts = clean.split('-');
+      const first = parts[0].trim();
+      const second = parts[1]?.trim();
+      matchP = ALL_PARASHIOT.find(p => p.he === first)
+        || ALL_PARASHIOT.find(p => first.length >= 3 && p.he.startsWith(first));
+      // Also find the second parasha for combined ref
+      combinedSecond = ALL_PARASHIOT.find(p => p.he === second)
+        || ALL_PARASHIOT.find(p => second && second.length >= 3 && p.he.startsWith(second));
+      if (matchP) {
+        console.log('[Parasha] Combined: matched', matchP.he, '+', combinedSecond?.he);
+      }
+    }
+
     if (!matchP) throw new Error('לא נמצאה התאמה לפרשה: ' + heName);
+
+    // For combined parshiot: build combined ref spanning both parshiot
+    if (combinedSecond && matchP) {
+      const startRef = matchP.ref.split('-')[0]; // e.g. "Leviticus 12:1"
+      const endRef = combinedSecond.ref.split('-')[1]; // e.g. "15:33"
+      matchP = { ...matchP, ref: `${startRef}-${endRef}`, he: clean };
+      console.log('[Parasha] Combined ref:', matchP.ref);
+    }
 
     document.getElementById('parasha-select').value = matchP.ref;
 
