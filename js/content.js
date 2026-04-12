@@ -449,26 +449,29 @@ async function loadParasha() {
     nameEl.textContent = heName + (isFutureParasha ? ' (שבוע הבא)' : '');
 
     // Match to our ALL_PARASHIOT list
-    // Handle combined parshiot like "תזריע-מצורע" or "ויקהל-פקודי"
+    // Handle combined parshiot like "תזריע-מצורע" / "תזריע-מצרע" (Hebcal spelling varies)
     const clean = heName.replace(/פרשת\s*/,'').trim();
     let matchP = ALL_PARASHIOT.find(p => clean === p.he)
       || ALL_PARASHIOT.find(p => heName === p.he || heName === 'פרשת ' + p.he)
       || ALL_PARASHIOT.find(p => clean.length >= 3 && p.he.startsWith(clean) && p.he.length <= clean.length + 2);
 
-    // Combined parsha fallback: "תזריע-מצרע" → match first parasha
+    // Combined parsha fallback: "תזריע-מצרע" → match each part with fuzzy matching
     let combinedSecond = null;
     if (!matchP && clean.includes('-')) {
       const parts = clean.split('-');
-      const first = parts[0].trim();
+      const first  = parts[0].trim();
       const second = parts[1]?.trim();
-      matchP = ALL_PARASHIOT.find(p => p.he === first)
-        || ALL_PARASHIOT.find(p => first.length >= 3 && p.he.startsWith(first));
-      // Also find the second parasha for combined ref
-      combinedSecond = ALL_PARASHIOT.find(p => p.he === second)
-        || ALL_PARASHIOT.find(p => second && second.length >= 3 && p.he.startsWith(second));
-      if (matchP) {
-        console.log('[Parasha] Combined: matched', matchP.he, '+', combinedSecond?.he);
-      }
+
+      // Fuzzy match: find parasha whose name starts with first 3 chars
+      const fuzzyFind = name => name && (
+        ALL_PARASHIOT.find(p => p.he === name) ||
+        ALL_PARASHIOT.find(p => name.length >= 3 && p.he.startsWith(name.slice(0,3))) ||
+        ALL_PARASHIOT.find(p => name.length >= 3 && p.he.includes(name.slice(0,3)))
+      );
+
+      matchP = fuzzyFind(first);
+      combinedSecond = fuzzyFind(second);
+      console.log('[Parasha] Combined: matched', matchP?.he, '+', combinedSecond?.he);
     }
 
     if (!matchP) throw new Error('לא נמצאה התאמה לפרשה: ' + heName);
@@ -476,12 +479,21 @@ async function loadParasha() {
     // For combined parshiot: build combined ref spanning both parshiot
     if (combinedSecond && matchP) {
       const startRef = matchP.ref.split('-')[0]; // e.g. "Leviticus 12:1"
-      const endRef = combinedSecond.ref.split('-')[1]; // e.g. "15:33"
+      const endRef   = combinedSecond.ref.split('-')[1]; // e.g. "15:33"
       matchP = { ...matchP, ref: `${startRef}-${endRef}`, he: clean };
       console.log('[Parasha] Combined ref:', matchP.ref);
     }
 
     document.getElementById('parasha-select').value = matchP.ref;
+    // If combined parasha ref isn't in dropdown, add it
+    const sel = document.getElementById('parasha-select');
+    if (sel && combinedSecond && !Array.from(sel.options).find(o => o.value === matchP.ref)) {
+      const opt = document.createElement('option');
+      opt.value = matchP.ref;
+      opt.textContent = clean; // "תזריע-מצורע"
+      opt.selected = true;
+      sel.insertBefore(opt, sel.firstChild);
+    }
 
     // Detect combined parshiot (e.g. "Parashat Vayakhel-Pekudei")
     // Hebcal title: "Parashat Vayakhel-Pekudei" / Hebrew: "פרשת ויקהל-פקודי"
