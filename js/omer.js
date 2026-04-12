@@ -21,17 +21,27 @@ function _omerDayHe(n) {
   return ones ? `${_OMER_ONES[ones]} וְ${_OMER_TENS[tens]}` : _OMER_TENS[tens];
 }
 
-// Build the full day string: "שִׁבְעָה וְעֶשְׂרִים יוֹם שֶׁהֵם שְׁלֹשָׁה שָׁבוּעוֹת וְשִׁשָּׁה יָמִים לָעֹמֶר"
+// Build the full day string per halacha:
+// Days 1-6: "יוֹם אֶחָד", "שְׁנֵי יָמִים" ... "שִׁשָּׁה יָמִים"
+// Days 7,14,21...: "שִׁבְעָה יָמִים שֶׁהֵם שָׁבוּעַ אֶחָד"
+// Days 8+: "אַחַד עָשָׂר יוֹם שֶׁהֵם שָׁבוּעַ אֶחָד וְאַרְבָּעָה יָמִים"
 function _omerCountStr(day) {
   const total = _omerDayHe(day);
   const weeks = Math.floor(day / 7);
   const rem   = day % 7;
-  // יום for 1, ימים for 2+
-  const dayWord = day === 1 ? 'יוֹם אֶחָד' : `${total} יָמִים`;
-  if (weeks === 0) return `${dayWord} לָעֹמֶר`;
+
+  // Special construct: "שְׁנֵי יָמִים" (not שְׁנַיִם יָמִים) for day 2
+  const totalForPlural = day === 2 ? 'שְׁנֵי' : total;
+
+  // days without weeks: "יוֹם אֶחָד" / "שְׁנֵי יָמִים" / "X יָמִים"
+  const dayWordPlural = day === 1 ? 'יוֹם אֶחָד' : `${totalForPlural} יָמִים`;
+  // days with weeks + remainder: "X יוֹם" (singular, per halacha)
+  const dayWordSingular = `${total} יוֹם`;
+
+  if (weeks === 0) return `${dayWordPlural} לָעֹמֶר`;
   const weekStr = _OMER_WEEKS[weeks];
-  if (rem === 0)  return `${dayWord} שֶׁהֵם ${weekStr} לָעֹמֶר`;
-  return `${dayWord} שֶׁהֵם ${weekStr} וְ${_OMER_DAYS_IN_WEEK[rem]} לָעֹמֶר`;
+  if (rem === 0)  return `${dayWordPlural} שֶׁהֵם ${weekStr} לָעֹמֶר`;
+  return `${dayWordSingular} שֶׁהֵם ${weekStr} וְ${_OMER_DAYS_IN_WEEK[rem]} לָעֹמֶר`;
 }
 
 // Kabbalistic attribute for each week/day (for יהי רצון)
