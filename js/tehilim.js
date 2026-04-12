@@ -287,8 +287,8 @@ async function loadTehilim(chapterOrRange) {
       console.log(`[Tehilim] sliced to verses ${verseFrom}-${verseTo}: ${flat.length} verses`);
     }
 
-    // Build smart navigation buttons
-    const nav = getTehilimNavInfo(chapter);
+    // Build smart navigation buttons — pass full range string so CHAPTER_TO_DAY lookup works
+    const nav = getTehilimNavInfo(isRange ? chapterOrRange : chapter);
     const btnStyle    = `background:var(--surface);border:1px solid var(--border);color:var(--gold);padding:6px 12px;border-radius:20px;font-size:12px;cursor:pointer;font-family:'Heebo',sans-serif;max-width:48%`;
     const dayBtnStyle = `background:rgba(201,165,74,.12);border:1px solid var(--gold-dim);color:var(--gold);padding:6px 12px;border-radius:20px;font-size:12px;cursor:pointer;font-family:'Heebo',sans-serif;max-width:48%`;
 

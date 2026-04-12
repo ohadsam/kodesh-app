@@ -860,27 +860,36 @@ function _fixAmidaSeasonalWords(html) {
       }
     }
 
-    // ── ברכת השנים: ותן ברכה / ותן טל ומטר ────────────────────────────
-    // Sefaria may send BOTH "ותן ברכה" and "ותן טל ומטר לברכה" as consecutive
-    // verses that get joined into one paragraph by buildParagraphs.
+    // ── ברכת השנים: ותן ברכה / טל ומטר לברכה ───────────────────────────
+    // Sefaria verse: "ותן ברכה, טל ומטר לברכה" — ותן only precedes ברכה, not טל ומטר
     const hasBracha = plain.includes('ותן ברכה');
-    const hasMatar  = plain.includes('ותן טל ומטר');
+    const hasMatar  = plain.includes('טל ומטר');  // no ותן prefix needed
     if (hasBracha || hasMatar) {
       const N = '[\u0591-\u05C7]*';
-      const matarRE  = new RegExp('ו'+N+'ת'+N+'ן'+N+'\\s+ט'+N+'ל'+N+'\\s+ו'+N+'מ'+N+'ט'+N+'ר'+N+'\\s+ל'+N+'ב'+N+'ר'+N+'כ'+N+'ה'+N, 'g');
+      // Match "טל ומטר לברכה" with or without preceding "ותן"
+      const matarRE = new RegExp(
+        '(?:ו'+N+'ת'+N+'ן'+N+'\\s+)?'+  // optional ותן
+        'ט'+N+'ל'+N+'\\s+'+
+        'ו'+N+'מ'+N+'ט'+N+'ר'+N+'\\s+'+
+        'ל'+N+'ב'+N+'ר'+N+'כ'+N+'ה'+N,
+        'g');
       const brachaRE = new RegExp('ו'+N+'ת'+N+'ן'+N+'\\s+ב'+N+'ר'+N+'כ'+N+'ה'+N, 'g');
 
       if (hasBracha && hasMatar) {
-        // Both present — remove the wrong one entirely
+        // Both present — keep only the seasonally-correct one
         if (winter) {
-          const newInner = inner.replace(brachaRE, '').replace(/\s{2,}/g,' ').trim();
-          console.log('[SSF] WINTER: both present, removed ותן ברכה, kept ותן טל ומטר');
-          return pOpen + sayInline('ותן טל ומטר לברכה', 'אומרים בחורף') + ' ' +
-                 newInner.replace(matarRE, '') + pClose;
+          // Winter: keep טל ומטר לברכה, remove ותן ברכה
+          // Replace "ותן ברכה" with green inline "ותן טל ומטר לברכה", remove standalone "טל ומטר לברכה"
+          const step1 = inner.replace(brachaRE, sayInline('וְתֵן טַל וּמָטָר לִבְרָכָה', 'אומרים בחורף'));
+          const step2 = step1.replace(matarRE, '').replace(/,?\s{2,}/g, ' ').trim();
+          console.log('[SSF] WINTER: both → ✅ ותן טל ומטר');
+          return pOpen + step2 + pClose;
         } else {
-          const newInner = inner.replace(matarRE, '').replace(/\s{2,}/g,' ').trim();
-          console.log('[SSF] SUMMER: both present, removed ותן טל ומטר, kept ותן ברכה');
-          return pOpen + newInner.replace(brachaRE, m => sayInline(m, 'אומרים בקיץ')) + pClose;
+          // Summer: keep ותן ברכה, remove טל ומטר לברכה
+          const step1 = inner.replace(matarRE, '').replace(/,?\s{2,}/g, ' ').trim();
+          const step2 = step1.replace(brachaRE, m => sayInline(m, 'אומרים בקיץ'));
+          console.log('[SSF] SUMMER: both → ✅ ותן ברכה, removed טל ומטר');
+          return pOpen + step2 + pClose;
         }
       } else if (hasMatar) {
         // Only ותן טל ומטר present
