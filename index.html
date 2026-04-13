@@ -20,54 +20,11 @@
        NOTE: this is the ONLY version check. utils.js must NOT have another one. -->
   <script>
     (function() {
-      var V = '5.54';
-      // Show version in splash immediately
+      var V = '5.56';
       var sv = document.getElementById('splash-version');
       if (sv) sv.textContent = 'גרסה ' + V;
-
-      var stored = localStorage.getItem('app_version');
-      if (stored === V) return; // already up to date – do nothing
-
-      // Guard: if URL already has ?v= we already reloaded once — don't loop
-      // This handles the case where SW serves old cached page after reload
-      if (location.search.indexOf('?v=') >= 0 || location.search.indexOf('v=') >= 0) {
-        localStorage.setItem('app_version', V);
-        return; // reloaded page — just accept and continue
-      }
-
-      // Version mismatch on fresh load: clear SW + caches, then reload once
-      if (sv) sv.textContent = 'גרסה ' + V + ' – מנקה...';
-
-      // Set the version FIRST so reload doesn't loop
+      // Just record version — no reload logic (SW handles cache updates)
       localStorage.setItem('app_version', V);
-      // Also mark in sessionStorage as a secondary guard
-      try { sessionStorage.setItem('reloaded_for', V); } catch(e) {}
-
-      var doReload = function() {
-        var url = location.href.split('?')[0] + '?v=' + V + '&t=' + Date.now();
-        location.replace(url);
-      };
-
-      var p1 = ('serviceWorker' in navigator)
-        ? navigator.serviceWorker.getRegistrations().then(function(regs) {
-            return Promise.all(regs.map(function(r){ return r.unregister(); }));
-          })
-        : Promise.resolve();
-
-      var p2 = ('caches' in window)
-        ? caches.keys().then(function(keys) {
-            return Promise.all(keys.map(function(k){ return caches.delete(k); }));
-          })
-        : Promise.resolve();
-
-      // Safety timeout: reload even if promises hang
-      var reloaded = false;
-      var safeReload = function() {
-        if (!reloaded) { reloaded = true; doReload(); }
-      };
-      setTimeout(safeReload, 3000);
-
-      Promise.all([p1, p2]).then(safeReload).catch(safeReload);
     })();
   </script>
 </head>
@@ -115,7 +72,18 @@
   <div style="font-family:'Frank Ruhl Libre',serif;font-size:26px;color:var(--cream);font-weight:700">לימוד יומי</div>
   <p>מכין את הלמידה של היום...</p>
   <div class="spinner"></div>
-  <p id="splash-version" style="font-size:11px;color:var(--muted);margin-top:4px">גרסה 5.54</p>
+  <p id="splash-version" style="font-size:11px;color:var(--muted);margin-top:4px">גרסה 5.56</p>
+  <!-- Failsafe retry button — appears after 10s if app is stuck -->
+  <div id="splash-retry" style="display:none;margin-top:24px">
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">הטעינה אורכת זמן רב...</p>
+    <button onclick="localStorage.clear();sessionStorage.clear();location.reload(true)"
+      style="background:var(--gold);color:#000;border:none;border-radius:10px;
+             padding:10px 24px;font-size:14px;font-weight:700;cursor:pointer;
+             font-family:'Heebo',sans-serif">
+      🔄 איפוס וטעינה מחדש
+    </button>
+  </div>
+  <script>setTimeout(function(){ var r=document.getElementById('splash-retry'); if(r&&document.getElementById('splash'))r.style.display='block'; }, 10000);</script>
 </div>
 
 <!-- SETTINGS PANEL -->
@@ -240,7 +208,7 @@
     <!-- Version & Copyright -->
     <div style="text-align:center;padding:18px 0 8px;border-top:1px solid var(--border);margin-top:8px">
       <div style="font-size:13px;font-weight:600;color:var(--gold-dim);margin-bottom:4px">📖 לימוד יומי</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">גרסה 5.54</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">גרסה 5.56</div>
       <button onclick="showWhatsNew()" style="background:var(--card);border:1px solid var(--gold-dim);color:var(--gold);padding:6px 16px;border-radius:8px;font-size:11px;cursor:pointer;font-family:'Heebo',sans-serif;margin-bottom:6px">🆕 מה חדש?</button>
       <div style="font-size:11px;color:var(--muted)">© כל הזכויות שמורות לאוהד סמט</div>
     </div>
@@ -252,7 +220,7 @@
 <div id="whats-new-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
   width:88%;max-width:400px;max-height:80vh;overflow-y:auto;
   background:var(--surface);border:1px solid var(--gold-dim);border-radius:16px;z-index:10001;padding:20px;direction:rtl">
-  <div style="font-size:16px;font-weight:700;color:var(--gold);margin-bottom:12px;text-align:center">🆕 מה חדש בגרסה 5.54</div>
+  <div style="font-size:16px;font-weight:700;color:var(--gold);margin-bottom:12px;text-align:center">🆕 מה חדש בגרסה 5.56</div>
   <div style="font-size:13px;color:var(--cream);line-height:1.7" id="whats-new-content">
     <div style="margin-bottom:10px"><b>🧪 מערך טסטים חדש</b></div>
     <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• 87 טסטים: לוגיקה, API, UI, סידור, עומר, תהילים, מצפן</div>
