@@ -7,7 +7,7 @@ setTimeout(() => {
   const splash = document.getElementById('splash');
   if (splash && splash.parentNode) {
     splash.classList.add('hide');
-    setTimeout(() => { if (splash.parentNode) splash.remove(); }, 600);
+    setTimeout(() => { if (splash && splash.parentNode) splash.remove(); }, 600);
   }
 }, 6000);
 
@@ -27,31 +27,41 @@ async function init() {
     // Initialize tab scroll sync
     if (typeof initTabScrollSync === 'function') initTabScrollSync();
 
-    // Hide splash early — before SW registration (which can be slow)
+    // Remove splash
     setTimeout(() => {
       const splash = document.getElementById('splash');
       if (splash) splash.classList.add('hide');
       setTimeout(() => { const s = document.getElementById('splash'); if(s) s.remove(); }, 600);
-      // Check reminders first (will chain to what's new after closing)
       setTimeout(() => {
         const hadReminders = typeof checkRemindersOnOpen === 'function' ? checkRemindersOnOpen() : false;
         if (!hadReminders && typeof checkWhatsNew === 'function') checkWhatsNew();
       }, 500);
     }, 1500);
 
-    // Register service worker (non-blocking — errors here don't affect app)
+    // Register service worker with updateViaCache:'none' so browser always
+    // fetches fresh sw.js from network (bypasses HTTP cache for SW file)
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js').then(() => {
-        console.log('[init] service worker registered');
-      }).catch(e => {
-        console.warn('[init] service worker failed:', e.message);
+      navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+        .then(reg => {
+          console.log('[SW] registered, state:', reg.active?.state);
+          // Force check for updates immediately
+          reg.update().catch(() => {});
+        })
+        .catch(e => console.warn('[SW] register failed:', e.message));
+
+      // Listen for SW postMessage — new SW activated, reload to get fresh files
+      navigator.serviceWorker.addEventListener('message', e => {
+        if (e.data?.type === 'SW_UPDATED') {
+          console.log('[SW] new version active:', e.data.version, '— reloading');
+          // Small delay so current render completes
+          setTimeout(() => location.reload(), 300);
+        }
       });
     }
 
     console.log('✅ [init] DONE');
   } catch(e) {
     console.error('❌ [init] FATAL ERROR:', e);
-    // Show error but STILL remove splash after delay
     const splash = document.getElementById('splash');
     if (splash) {
       splash.innerHTML = `
@@ -59,24 +69,16 @@ async function init() {
           <div style="font-size:40px;margin-bottom:16px">⚠️</div>
           <div style="font-size:15px;font-weight:700;margin-bottom:8px">שגיאה בהפעלה</div>
           <div style="font-size:12px;color:#888;margin-bottom:20px">${e.message}</div>
-          <button onclick="location.reload()" 
+          <button onclick="location.reload()"
             style="background:#c9a54a;color:#000;border:none;border-radius:10px;
                    padding:10px 24px;font-size:14px;font-weight:700;cursor:pointer">
             נסה שוב
           </button>
         </div>`;
-      // Remove splash after 8 seconds even on error (allow app to partially load)
-      setTimeout(() => {
-        if (splash.parentNode) {
-          splash.classList.add('hide');
-          setTimeout(() => { if (splash.parentNode) splash.remove(); }, 600);
-        }
-      }, 8000);
     }
   }
 }
 
-// Log any uncaught errors
 window.addEventListener('error', e => {
   console.error('🔴 [uncaught error]', e.message, 'at', e.filename, 'line', e.lineno);
 });
