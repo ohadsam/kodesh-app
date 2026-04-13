@@ -76,6 +76,7 @@ function openSettings() {
   document.getElementById('settings-panel').classList.add('open');
   loadSettingsState();
   renderTabVisibilityRows();
+  setTimeout(_updateNotifBadge, 100);
 }
 function closeSettings() {
   document.getElementById('settings-panel').classList.remove('open');
@@ -130,6 +131,8 @@ function toggleReminder(key, enabled) {
   if (!appState.reminders[key]) appState.reminders[key] = {};
   appState.reminders[key].enabled = enabled; saveState();
   if (enabled) scheduleReminder(key);
+  // Update bell badge immediately
+  setTimeout(_updateNotifBadge, 50);
 }
 function scheduleReminder(key) {
   if (!('Notification' in window)) return;
@@ -283,14 +286,25 @@ const REMINDER_ITEMS = [
 
 // Update topbar notification bell
 function _updateNotifBadge() {
-  const pending = _getPendingReminders();
+  // Show bell for ALL enabled+applicable reminders regardless of scheduled time
   const btn   = document.getElementById('notif-btn');
   const badge = document.getElementById('notif-badge');
   if (!btn) return;
-  if (pending.length > 0) {
+
+  const today = formatDate(new Date());
+  const todayDone = (appState._remindersDone || {})[today] || {};
+  let count = 0;
+  for (const item of REMINDER_ITEMS) {
+    const r = appState?.reminders?.[item.key];
+    if (!r?.enabled) continue;
+    if (item.checkFn && !item.checkFn()) continue;
+    if (!todayDone[item.key]) count++;
+  }
+
+  if (count > 0) {
     btn.style.display = 'block';
     badge.style.display = 'block';
-    badge.textContent = pending.length > 9 ? '9+' : String(pending.length);
+    badge.textContent = count > 9 ? '9+' : String(count);
   } else {
     btn.style.display = 'none';
     badge.style.display = 'none';
