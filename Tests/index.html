@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>קודש App – Test Suite</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Heebo', sans-serif; background: #1a1108; color: #e8d5a3; padding: 16px; direction: rtl; }
+    h1 { color: #c9a54a; font-size: 20px; margin-bottom: 16px; }
+    h2 { color: #c9a54a; font-size: 15px; margin: 12px 0 6px; border-bottom: 1px solid #3a2a0a; padding-bottom: 4px; }
+    .suite { background: #2a1f0a; border-radius: 10px; padding: 12px; margin-bottom: 12px; }
+    .test { display: flex; align-items: flex-start; gap: 8px; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,.05); font-size: 13px; }
+    .test:last-child { border-bottom: none; }
+    .status { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+    .test-name { flex: 1; }
+    .test-detail { font-size: 11px; color: #888; margin-top: 2px; }
+    .pass .test-name { color: #7ed6a0; }
+    .fail .test-name { color: #e07060; }
+    .skip .test-name { color: #888; }
+    .pending .test-name { color: #c9a54a; }
+    .summary { background: #2a1f0a; border-radius: 10px; padding: 14px; margin-bottom: 16px; display: flex; gap: 16px; flex-wrap: wrap; }
+    .summary-item { text-align: center; }
+    .summary-num { font-size: 24px; font-weight: 700; }
+    .summary-label { font-size: 11px; color: #888; }
+    .pass-num { color: #7ed6a0; }
+    .fail-num { color: #e07060; }
+    .skip-num { color: #888; }
+    .pending-num { color: #c9a54a; }
+    button { background: #c9a54a; color: #000; border: none; border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; }
+    button:disabled { opacity: .5; cursor: default; }
+    .controls { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+    .filter-btn { background: #2a1f0a; color: #c9a54a; border: 1px solid #c9a54a; }
+    .filter-btn.active { background: #c9a54a; color: #000; }
+    #progress { height: 4px; background: #3a2a0a; border-radius: 2px; margin-bottom: 12px; }
+    #progress-bar { height: 100%; background: #7ed6a0; border-radius: 2px; transition: width .3s; width: 0; }
+    .tag { font-size: 9px; background: rgba(201,165,74,.2); color: #c9a54a; border-radius: 4px; padding: 1px 5px; margin-right: 4px; }
+    .api-tag { background: rgba(122,184,214,.2); color: #7ab8d6; }
+    .logic-tag { background: rgba(126,214,160,.2); color: #7ed6a0; }
+    .ui-tag { background: rgba(214,180,122,.2); color: #d6b47a; }
+  </style>
+</head>
+<body>
+  <h1>🧪 קודש App – Test Suite</h1>
+  <div class="controls">
+    <button onclick="runAll()">▶ הרץ הכל</button>
+    <button onclick="runCategory('api')" class="filter-btn">🌐 API</button>
+    <button onclick="runCategory('logic')" class="filter-btn">🧠 לוגיקה</button>
+    <button onclick="runCategory('ui')" class="filter-btn">🎨 UI</button>
+    <button onclick="runCategory('siddur')" class="filter-btn">📕 סידור</button>
+    <button onclick="runCategory('omer')" class="filter-btn">🌾 עומר</button>
+    <button onclick="runCategory('calendar')" class="filter-btn">📅 לוח</button>
+    <button onclick="runCategory('tehilim')" class="filter-btn">📖 תהילים</button>
+    <button onclick="runCategory('compass')" class="filter-btn">🧭 מצפן</button>
+  </div>
+  <div id="progress"><div id="progress-bar"></div></div>
+  <div class="summary" id="summary">
+    <div class="summary-item"><div class="summary-num pass-num" id="s-pass">0</div><div class="summary-label">עברו</div></div>
+    <div class="summary-item"><div class="summary-num fail-num" id="s-fail">0</div><div class="summary-label">נכשלו</div></div>
+    <div class="summary-item"><div class="summary-num skip-num" id="s-skip">0</div><div class="summary-label">דולגו</div></div>
+    <div class="summary-item"><div class="summary-num pending-num" id="s-pending">0</div><div class="summary-label">ממתינים</div></div>
+    <div class="summary-item"><div class="summary-num" id="s-total">0</div><div class="summary-label">סה"כ</div></div>
+    <div class="summary-item"><div class="summary-num" id="s-time">—</div><div class="summary-label">שניות</div></div>
+  </div>
+  <div id="results"></div>
+
+  <script src="test-utils.js"></script>
+  <script src="tests-logic.js"></script>
+  <script src="tests-api.js"></script>
+  <script src="tests-ui.js"></script>
+  <script src="tests-siddur.js"></script>
+  <script src="tests-omer.js"></script>
+  <script src="tests-tehilim.js"></script>
+  <script src="tests-compass.js"></script>
+  <script src="runner.js"></script>
+</body>
+</html>
