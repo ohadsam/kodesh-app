@@ -21,10 +21,44 @@
   <script>
     (function() {
       var V = '5.60';
+      // Show version in splash immediately
       var sv = document.getElementById('splash-version');
       if (sv) sv.textContent = 'גרסה ' + V;
-      // Just record version — no reload logic (SW handles cache updates)
+
+      var stored = localStorage.getItem('app_version');
+      if (stored === V) return; // already up to date – do nothing
+
+      // Version mismatch: clear SW + caches, then reload once
+      if (sv) sv.textContent = 'גרסה ' + V + ' – מנקה...';
+
+      // Set the version FIRST so reload doesn't loop
       localStorage.setItem('app_version', V);
+
+      var doReload = function() {
+        var url = location.href.split('?')[0] + '?v=' + V + '&t=' + Date.now();
+        location.replace(url);
+      };
+
+      var p1 = ('serviceWorker' in navigator)
+        ? navigator.serviceWorker.getRegistrations().then(function(regs) {
+            return Promise.all(regs.map(function(r){ return r.unregister(); }));
+          })
+        : Promise.resolve();
+
+      var p2 = ('caches' in window)
+        ? caches.keys().then(function(keys) {
+            return Promise.all(keys.map(function(k){ return caches.delete(k); }));
+          })
+        : Promise.resolve();
+
+      // Safety timeout: reload even if promises hang (e.g. SW unregister takes too long)
+      var reloaded = false;
+      var safeReload = function() {
+        if (!reloaded) { reloaded = true; doReload(); }
+      };
+      setTimeout(safeReload, 3000);
+
+      Promise.all([p1, p2]).then(safeReload).catch(safeReload);
     })();
   </script>
 </head>
@@ -71,13 +105,11 @@
   <div class="logo-big">✡</div>
   <div style="font-family:'Frank Ruhl Libre',serif;font-size:26px;color:var(--cream);font-weight:700">לימוד יומי</div>
   <div class="spinner"></div>
-  <p id="splash-status" style="font-size:12px;color:var(--gold);margin-top:4px;min-height:18px">טוען...</p>
+  <p id="splash-status" style="font-size:12px;color:var(--gold);margin:4px 0 0;min-height:18px">טוען...</p>
   <p id="splash-version" style="font-size:11px;color:var(--muted);margin-top:2px">גרסה 5.60</p>
   <div id="splash-retry" style="display:none;margin-top:20px">
     <button onclick="localStorage.clear();sessionStorage.clear();location.reload(true)"
-      style="background:var(--gold);color:#000;border:none;border-radius:10px;
-             padding:10px 24px;font-size:14px;font-weight:700;cursor:pointer;
-             font-family:'Heebo',sans-serif">🔄 איפוס וטעינה מחדש</button>
+      style="background:var(--gold);color:#000;border:none;border-radius:10px;padding:10px 24px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Heebo',sans-serif">🔄 איפוס וטעינה מחדש</button>
   </div>
   <script>setTimeout(function(){ var r=document.getElementById('splash-retry'); if(r&&document.getElementById('splash'))r.style.display='block'; }, 10000);</script>
 </div>
@@ -228,20 +260,926 @@
   <button onclick="closeWhatsNew()" style="display:block;width:100%;margin-top:14px;background:var(--gold);color:#000;border:none;border-radius:10px;padding:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Heebo',sans-serif">👍 הבנתי</button>
 </div>
 
-  <!-- App scripts — order matters: utils first, init last -->
-  <script src="js/utils.js"></script>
-  <script src="js/network-log.js"></script>
-  <script src="js/siddur-inserts.js"></script>
-  <script src="js/calendar.js"></script>
-  <script src="js/content.js"></script>
-  <script src="js/siddur.js"></script>
-  <script src="js/tehilim.js"></script>
-  <script src="js/omer.js"></script>
-  <script src="js/brachot.js"></script>
-  <script src="js/tefilot.js"></script>
-  <script src="js/misc.js"></script>
-  <script src="js/settings.js"></script>
-  <script src="js/app.js"></script>
-  <script src="js/init.js"></script>
+<!-- TOP BAR -->
+<div id="topbar">
+  <div class="brand">✡ לימוד יומי</div>
+  <div class="date-chip" id="topbar-date" onclick="toggleDateNav()" style="cursor:pointer">
+    <div id="topbar-greg">טוען...</div>
+    <div id="topbar-heb" style="font-size:10px;color:var(--muted)"></div>
+    <div id="topbar-offset-badge" style="display:none;position:absolute;top:-4px;left:-4px;background:var(--gold);color:#000;font-size:8px;font-weight:700;border-radius:50%;width:16px;height:16px;line-height:16px;text-align:center"></div>
+  </div>
+  <button class="settings-btn" onclick="openSettings()">⚙</button>
+</div>
+
+<!-- Expandable date navigation drawer -->
+<div id="date-nav-drawer" style="display:none;background:var(--surface);border-bottom:1px solid var(--border);padding:6px 12px;direction:rtl;text-align:center;z-index:99">
+  <div style="display:flex;align-items:center;justify-content:center;gap:10px">
+    <button onclick="changeDay(-1)" style="background:none;border:1px solid var(--border);border-radius:8px;padding:4px 12px;color:var(--cream);font-size:16px;cursor:pointer">→</button>
+    <div style="min-width:120px">
+      <div id="drawer-greg" style="font-size:13px;color:var(--cream);font-weight:600"></div>
+      <div id="drawer-heb" style="font-size:11px;color:var(--muted)"></div>
+    </div>
+    <button onclick="changeDay(1)" style="background:none;border:1px solid var(--border);border-radius:8px;padding:4px 12px;color:var(--cream);font-size:16px;cursor:pointer">←</button>
+  </div>
+  <button onclick="goToToday();toggleDateNav()" id="drawer-today-btn" class="hidden"
+    style="margin-top:4px;background:var(--gold);color:#000;border:none;border-radius:6px;padding:3px 14px;font-size:11px;font-weight:600;cursor:pointer;font-family:'Heebo',sans-serif">
+    📅 חזרה להיום
+  </button>
+</div>
+
+<!-- TABS -->
+<div id="tabs">
+  <button class="tab active" onclick="showTab('calendar')" id="t-calendar"><span class="icon">📅</span>לוח</button>
+  <button class="tab" onclick="showTab('siddur')" id="t-siddur"><span class="icon">📕</span>סידור</button>
+  <button class="tab" onclick="showTab('halacha')" id="t-halacha"><span class="icon">📖</span>הלכה</button>
+  <button class="tab" onclick="showTab('lashon')" id="t-lashon"><span class="icon">🗣</span>לשה"ר</button>
+  <button class="tab" onclick="showTab('tehilim')" id="t-tehilim"><span class="icon">🙏</span>תהילים</button>
+  <button class="tab" onclick="showTab('daf')" id="t-daf"><span class="icon">📚</span>דף יומי</button>
+  <button class="tab" onclick="showTab('mishna')" id="t-mishna"><span class="icon">📜</span>משנה</button>
+  <button class="tab" onclick="showTab('929')" id="t-929"><span class="icon">✡️</span>929</button>
+  <button class="tab" onclick="showTab('rambam')" id="t-rambam"><span class="icon">📗</span>רמב"ם</button>
+  <button class="tab" onclick="showTab('parasha')" id="t-parasha"><span class="icon">📜</span>פרשה</button>
+  <button class="tab" onclick="showTab('igeret')" id="t-igeret"><span class="icon">✉️</span>אגרת</button>
+  <button class="tab" onclick="showTab('tefilot')" id="t-tefilot"><span class="icon">🤲</span>תפילות</button>
+  <button class="tab" onclick="showTab('brachot')" id="t-brachot"><span class="icon">✨</span>ברכות</button>
+  <button class="tab" onclick="showTab('qibla')" id="t-qibla"><span class="icon">🧭</span>מצפן</button>
+  <button class="tab" onclick="showTab('logs')" id="t-logs"><span class="icon">🐛</span>לוגים</button>
+  <button class="tab" onclick="showTab('network')" id="t-network"><span class="icon">🌐</span>רשת</button>
+</div>
+
+<!-- ─── PAGE: CALENDAR ─────────────────────── -->
+<div class="page active" id="page-calendar">
+  <div class="date-nav">
+    <button onclick="changeDay(-1)">→</button>
+    <div class="date-label">
+      <div class="greg" id="cal-greg">טוען...</div>
+      <div class="heb" id="cal-heb"></div>
+    </div>
+    <button class="date-nav-today hidden" id="today-btn-cal" onclick="goToToday()">📅 היום</button>
+    <button onclick="changeDay(1)">←</button>
+  </div>
+  <div id="today-btn-wrapper" style="display:none"></div>
+
+  <div id="special-event-banner"></div>
+
+  <!-- Zmanim -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title"><span class="emoji">⏰</span>זמני היום</div>
+        <div class="card-subtitle" id="zmanim-location">פתח תקווה</div>
+      </div>
+    </div>
+    <!-- Location selector -->
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <select id="city-select" onchange="setCity(this.value)" style="flex:1;background:var(--surface);border:1px solid var(--border);color:var(--cream);padding:7px 10px;border-radius:10px;font-size:13px;font-family:'Heebo',sans-serif;direction:rtl;min-width:0">
+        <option value="petah_tikva">פתח תקווה</option>
+        <option value="jerusalem">ירושלים</option>
+        <option value="tel_aviv">תל אביב</option>
+        <option value="haifa">חיפה</option>
+        <option value="beersheba">באר שבע</option>
+        <option value="bnei_brak">בני ברק</option>
+        <option value="rehovot">רחובות</option>
+        <option value="ashdod">אשדוד</option>
+        <option value="netanya">נתניה</option>
+        <option value="modiin">מודיעין</option>
+        <option value="raanana">רעננה</option>
+        <option value="herzliya">הרצליה</option>
+        <option value="kfar_saba">כפר סבא</option>
+        <option value="safed">צפת</option>
+        <option value="tiberias">טבריה</option>
+        <option value="gps">📍 GPS אוטומטי</option>
+      </select>
+    </div>
+    <!-- Date display for zmanim -->
+    <div id="zmanim-date-display" style="font-size:12px;color:var(--muted);margin-bottom:12px;padding:7px 10px;background:var(--surface);border-radius:8px;border:1px solid var(--border)">
+      טוען תאריך...
+    </div>
+    <div class="zmanim-grid" id="zmanim-grid">
+      <div class="zman-item"><div class="label">עולה השחר</div><div class="time" id="z-alot">--:--</div></div>
+      <div class="zman-item"><div class="label">משיכיר</div><div class="time" id="z-misheyakir">--:--</div></div>
+      <div class="zman-item"><div class="label">הנץ החמה</div><div class="time" id="z-sunrise">--:--</div></div>
+      <div class="zman-item zman-highlight"><div class="label">סוף ק"ש גר"א</div><div class="time" id="z-shema-gra">--:--</div></div>
+      <div class="zman-item zman-highlight"><div class="label">סוף ק"ש מג"א</div><div class="time" id="z-shema-mga">--:--</div></div>
+      <div class="zman-item zman-highlight"><div class="label">סוף תפילה גר"א</div><div class="time" id="z-tefila-gra">--:--</div></div>
+      <div class="zman-item zman-highlight"><div class="label">סוף תפילה מג"א</div><div class="time" id="z-tefila-mga">--:--</div></div>
+      <div class="zman-item"><div class="label">חצות היום</div><div class="time" id="z-noon">--:--</div></div>
+      <div class="zman-item"><div class="label">מנחה גדולה</div><div class="time" id="z-mincha">--:--</div></div>
+      <div class="zman-item"><div class="label">מנחה קטנה</div><div class="time" id="z-mincha-ketana">--:--</div></div>
+      <div class="zman-item"><div class="label">פלג המנחה</div><div class="time" id="z-plag">--:--</div></div>
+      <div class="zman-item"><div class="label">שקיעה</div><div class="time" id="z-sunset">--:--</div></div>
+      <div class="zman-item"><div class="label">צאת הכוכבים</div><div class="time" id="z-tzeit">--:--</div></div>
+      <div class="zman-item"><div class="label">הדלקת נרות</div><div class="time" id="z-candles">--:--</div></div>
+      <div class="zman-item" id="z-havdalah-row" style="display:none"><div class="label">צאת שבת / יו"ט</div><div class="time" id="z-havdalah">--:--</div></div>
+      <!-- Special day zmanim (fasts, erev pesach etc) – shown only when relevant -->
+      <div id="z-special-rows"></div>
+    </div>
+    <div class="source-link">
+      מקור: <a href="https://www.hebcal.com/zmanim" target="_blank">Hebcal Zmanim API</a>
+    </div>
+  </div>
+
+  <!-- Events of the day -->
+  <div class="card">
+    <div class="card-title"><span class="emoji">📅</span>אירועים ביום זה</div>
+    <div style="margin-top:12px" id="events-list">
+      <div style="color:var(--muted);font-size:13px">טוען...</div>
+    </div>
+    <div class="source-link">
+      מקור: <a href="https://www.hebcal.com" target="_blank">Hebcal Jewish Calendar</a>
+    </div>
+  </div>
+</div>
+
+<!-- ─── PAGE: SIDDUR ──────────────────────── -->
+<div class="page" id="page-siddur">
+  <!-- Floating back-to-top button -->
+  <button id="siddur-float-btn" onclick="document.getElementById('siddur-top').scrollIntoView({behavior:'smooth'})"
+    style="position:fixed;bottom:76px;left:12px;z-index:9999;
+    width:40px;height:40px;border-radius:50%;border:1px solid var(--gold-dim);
+    background:rgba(20,20,40,0.95);color:var(--gold);font-size:18px;cursor:pointer;
+    box-shadow:0 2px 10px rgba(0,0,0,.6);backdrop-filter:blur(4px);
+    display:flex;align-items:center;justify-content:center;
+    opacity:0;transition:opacity 0.25s;pointer-events:none" title="חזור לניווט">
+    ☰
+  </button>
+
+  <!-- Floating sections quick-nav button -->
+  <button id="siddur-sec-btn" onclick="openSiddurSectionsPopup()"
+    style="position:fixed;bottom:122px;left:12px;z-index:9999;
+    width:40px;height:40px;border-radius:50%;border:1px solid var(--addition-border);
+    background:rgba(20,30,25,0.93);color:var(--addition);font-size:17px;cursor:pointer;
+    box-shadow:0 2px 10px rgba(0,0,0,.6);backdrop-filter:blur(4px);
+    display:flex;align-items:center;justify-content:center;
+    opacity:0;transition:opacity 0.25s;pointer-events:none" title="קפוץ לקטע">
+    ≡
+  </button>
+
+  <!-- Floating prayer status button -->
+  <button id="siddur-status-btn" onclick="openSiddurStatusPopup()"
+    style="position:fixed;bottom:168px;left:12px;z-index:9999;
+    width:40px;height:40px;border-radius:50%;border:1px solid rgba(201,165,74,.4);
+    background:rgba(25,20,10,0.93);color:var(--gold);font-size:16px;cursor:pointer;
+    box-shadow:0 2px 10px rgba(0,0,0,.6);backdrop-filter:blur(4px);
+    display:flex;align-items:center;justify-content:center;
+    opacity:0;transition:opacity 0.25s;pointer-events:none" title="מה אומרים היום">
+    📋
+  </button>
+
+  <!-- Status popup overlay -->
+  <div id="siddur-status-popup-overlay" onclick="closeSiddurStatusPopup()"
+    style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.45)">
+  </div>
+  <!-- Status popup panel -->
+  <div id="siddur-status-popup"
+    style="display:none;position:fixed;bottom:76px;left:8px;z-index:10001;
+    width:240px;max-height:70vh;
+    background:rgba(18,12,6,0.97);border:1px solid var(--border);
+    border-radius:16px;backdrop-filter:blur(16px);
+    box-shadow:0 8px 32px rgba(0,0,0,.7);
+    overflow-y:auto;padding:0 0 8px">
+    <div style="padding:8px 14px 8px;font-size:11px;color:var(--gold);font-weight:700;
+      border-bottom:1px solid var(--border);letter-spacing:.3px;position:sticky;top:0;
+      background:rgba(18,12,6,0.97)">
+      📋 מה אומרים היום
+      <button onclick="closeSiddurStatusPopup()" style="float:left;background:none;border:none;
+        color:var(--muted);font-size:16px;cursor:pointer;line-height:1;padding:0">✕</button>
+    </div>
+    <div style="padding:8px 12px 4px">
+      <div style="font-size:10px;font-weight:700;color:#5cb87a;margin-bottom:4px">✅ אומרים:</div>
+      <div id="siddur-status-popup-say" style="font-size:12px;color:#5cb87a;line-height:1.8"></div>
+    </div>
+    <div style="padding:4px 12px 4px;border-top:1px solid rgba(255,255,255,.06);margin-top:4px">
+      <div style="font-size:10px;font-weight:700;color:#c87060;margin-bottom:4px">❌ לא אומרים:</div>
+      <div id="siddur-status-popup-skip" style="font-size:12px;color:#c87060;line-height:1.8"></div>
+    </div>
+  </div>
+
+  <!-- Sections popup overlay -->
+  <div id="siddur-sec-popup-overlay" onclick="closeSiddurSectionsPopup()"
+    style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.45)">
+  </div>
+  <!-- Sections popup panel -->
+  <div id="siddur-sec-popup"
+    style="display:none;position:fixed;bottom:76px;left:8px;z-index:10001;
+    width:220px;max-height:65vh;
+    background:rgba(18,12,6,0.97);border:1px solid var(--border);
+    border-radius:16px;backdrop-filter:blur(16px);
+    box-shadow:0 8px 32px rgba(0,0,0,.7);
+    overflow-y:auto;overflow-x:hidden;
+    padding:8px 0 8px;">
+    <div style="padding:6px 14px 8px;font-size:11px;color:var(--gold);font-weight:700;
+      border-bottom:1px solid var(--border);letter-spacing:.3px;">
+      📜 קטעי התפילה
+      <button onclick="closeSiddurSectionsPopup()" style="float:left;background:none;border:none;
+        color:var(--muted);font-size:16px;cursor:pointer;line-height:1;padding:0">✕</button>
+    </div>
+    <div id="siddur-sec-popup-list" style="padding:4px 0"></div>
+  </div>
+
+  <!-- Nusach selector -->
+  <div class="card" style="padding:12px 14px;margin-bottom:10px">
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600">נוסח</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap" id="nusach-buttons">
+      <button class="aliya-tab" onclick="setSiddurNusach('ashkenaz')" id="sn-ashkenaz">אשכנז</button>
+      <button class="aliya-tab active" onclick="setSiddurNusach('sfard')" id="sn-sfard">ספרד</button>
+      <button class="aliya-tab" onclick="setSiddurNusach('mizrach')" id="sn-mizrach">עדות המזרח</button>
+    </div>
+  </div>
+
+  <!-- Prayer selector -->
+  <div class="card" style="padding:12px 14px;margin-bottom:10px">
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600">תפילה</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap" id="tefila-type-buttons">
+      <button class="aliya-tab active" onclick="setSiddurPrayer('shacharit')" id="sp-shacharit">שחרית</button>
+      <button class="aliya-tab" onclick="setSiddurPrayer('mincha')" id="sp-mincha">מנחה</button>
+      <button class="aliya-tab" onclick="setSiddurPrayer('arvit')" id="sp-arvit">ערבית</button>
+      <button class="aliya-tab" onclick="setSiddurPrayer('layla')" id="sp-layla">ק"ש על המיטה</button>
+    </div>
+  </div>
+
+  <!-- Prayer status: what to say and what not to say today -->
+  <div id="siddur-status-banner" style="display:none;margin-bottom:10px">
+    <div id="siddur-status-say" style="padding:8px 12px;background:rgba(61,140,90,.15);border:1px solid rgba(61,140,90,.4);border-radius:10px 10px 0 0;font-size:12px;color:#5cb87a;direction:rtl">
+      <div style="font-weight:700;margin-bottom:4px">✅ אומרים היום:</div>
+      <div id="siddur-status-say-list"></div>
+    </div>
+    <div id="siddur-status-skip" style="padding:8px 12px;background:rgba(180,80,60,.12);border:1px solid rgba(180,80,60,.3);border-top:none;border-radius:0 0 10px 10px;font-size:12px;color:#c87060;direction:rtl">
+      <div style="font-weight:700;margin-bottom:4px">❌ לא אומרים היום:</div>
+      <div id="siddur-status-skip-list"></div>
+    </div>
+  </div>
+
+  <!-- Prayer content with section nav -->
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div>
+        <div class="card-title"><span class="emoji">📕</span><span id="siddur-title">שחרית</span></div>
+        <div class="card-subtitle" id="siddur-subtitle">נוסח ספרד</div>
+      </div>
+      <div id="done-siddur"></div>
+    </div>
+    <div id="siddur-debug" style="font-size:10px;color:var(--muted);margin-bottom:6px"></div>
+
+    <!-- Progress bar -->
+    <div id="siddur-progress-wrap" style="display:none;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:4px">
+        <span>טוען סידור מספריא...</span>
+        <span id="siddur-progress-lbl"></span>
+      </div>
+      <div style="background:var(--border);border-radius:4px;height:4px;overflow:hidden">
+        <div id="siddur-progress-bar" style="height:100%;width:0%;background:var(--gold);border-radius:4px;transition:width .3s ease"></div>
+      </div>
+    </div>
+
+    <!-- Section jump buttons -->
+    <div id="siddur-top"></div>
+    <div id="siddur-sections" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border)"></div>
+
+    <!-- Prayer text -->
+    <div id="siddur-content" class="content-text" style="min-height:200px">
+      טוען...
+    </div>
+  </div>
+</div>
+
+<!-- ─── PAGE: HALACHA ─────────────────────── -->
+<div class="page" id="page-halacha">
+  <div class="date-nav">
+    <button onclick="changeDay(-1)">→</button>
+    <div class="date-label">
+      <div class="greg" id="hal-date">היום</div>
+      <div class="heb" id="hal-heb"></div>
+    </div>
+    <button class="date-nav-today hidden" id="today-btn-hal" onclick="goToToday()">📅 היום</button>
+    <button onclick="changeDay(1)">←</button>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title"><span class="emoji">📖</span>הלכה יומית – קיצור שולחן ערוך</div>
+        <div class="card-subtitle">הרב שלמה גנצפריד • ספריא</div>
+      </div>
+      <div id="done-halacha"></div>
+    </div>
+    <div id="halacha-content" class="content-text loading">טוען הלכה יומית...</div>
+    <div class="divider"></div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:6px">מקור</div>
+    <div id="halacha-ref" style="font-size:13px;color:var(--gold)"></div>
+    <div class="source-link">
+      מקור: <a href="https://www.sefaria.org/Kitzur_Shulchan_Arukh" target="_blank">קיצור שולחן ערוך – ספריא</a>
+    </div>
+  </div>
+
+  <div class="card" style="background:rgba(201,165,74,.04)">
+    <div class="card-title" style="margin-bottom:10px"><span class="emoji">🔗</span>לימוד הלכה נוסף</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <a href="https://ph.yhb.org.il/pninayomit/" target="_blank" style="color:var(--gold-dim);font-size:13px;text-decoration:none">🌐 פניני הלכה יומי – הרב אליעזר מלמד</a>
+      <a href="https://www.sefaria.org/Kitzur_Shulchan_Arukh" target="_blank" style="color:var(--gold-dim);font-size:13px;text-decoration:none">🌐 קיצור שולחן ערוך – ספריא</a>
+      <a href="https://www.yeshiva.org.il/ask" target="_blank" style="color:var(--gold-dim);font-size:13px;text-decoration:none">🌐 שאל שאלת הלכה – ישיבה.אורג</a>
+    </div>
+  </div>
+</div>
+
+<!-- ─── PAGE: TEHILIM ─────────────────────── -->
+<div class="page" id="page-tehilim">
+  <div class="card" style="background:rgba(201,165,74,.04)">
+    <div class="card-title" style="margin-bottom:10px"><span class="emoji">🙏</span>תהילים לפי תאריך עברי</div>
+    <div id="tehilim-day-info" style="font-size:13px;color:var(--muted);margin-bottom:12px">מחשב...</div>
+    <!-- Day-of-month selector -->
+    <div style="margin-bottom:10px">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">בחר יום בחודש העברי:</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap" id="tehilim-day-btns"></div>
+    </div>
+    <!-- Chapter selector -->
+    <div class="tehilim-nav">
+      <select id="tehilim-select" onchange="loadTehilim(this.value)">
+        <option value="">-- בחר פרק ספציפי --</option>
+      </select>
+    </div>
+    <!-- Chapter search with gematria support -->
+    <div style="margin-top:10px">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">חיפוש פרק (מספר או אותיות, למשל: 130 / קל / פרק קמא):</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="tehilim-search-input" type="text" placeholder="למשל: 23 או כג או פרק כג"
+          style="flex:1;padding:8px 12px;border-radius:10px;border:1px solid var(--border);
+          background:var(--surface);color:var(--cream);font-family:'Heebo',sans-serif;
+          font-size:14px;direction:rtl;outline:none"
+          onkeydown="if(event.key==='Enter') searchTehilimChapter()">
+        <button onclick="searchTehilimChapter()"
+          style="padding:8px 14px;border-radius:10px;border:1px solid var(--gold);
+          background:rgba(201,165,74,.12);color:var(--gold);cursor:pointer;
+          font-family:'Heebo',sans-serif;font-size:13px;white-space:nowrap">חפש</button>
+      </div>
+      <div id="tehilim-search-error" style="font-size:11px;color:#c87060;margin-top:4px"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title"><span class="emoji">📖</span>תהילים <span id="tehilim-num-title"></span></div>
+        <div class="card-subtitle" id="tehilim-subtitle"></div>
+      </div>
+      <div id="done-tehilim"></div>
+    </div>
+    <div id="tehilim-tts-wrap" style="margin-bottom:8px"></div>
+    <div id="tehilim-content" class="content-text loading">בחר יום לקריאת תהילים</div>
+    <div class="source-link">
+      מקור: <a href="https://www.sefaria.org/Psalms" target="_blank">Sefaria – ספר תהילים</a>
+    </div>
+  </div>
+</div>
+
+<!-- ─── PAGE: PARASHA ─────────────────────── -->
+<div class="page" id="page-parasha">
+  <!-- Parasha selector -->
+  <div class="card" style="padding:12px 14px;margin-bottom:12px">
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600">בחר פרשה</div>
+    <div style="display:flex;gap:8px">
+      <select id="parasha-select" onchange="loadSpecificParasha(this.value)" style="flex:1;background:var(--surface);border:1px solid var(--border);color:var(--cream);padding:7px 10px;border-radius:10px;font-size:13px;font-family:'Heebo',sans-serif;direction:rtl">
+        <option value="">טוען רשימת פרשיות...</option>
+      </select>
+      <button onclick="loadParasha()" style="background:var(--card);border:1px solid var(--gold-dim);color:var(--gold);padding:7px 12px;border-radius:10px;font-size:12px;cursor:pointer;font-family:'Heebo',sans-serif;white-space:nowrap">הפרשה הנוכחית</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title"><span class="emoji">📜</span>פרשת השבוע</div>
+        <div class="card-subtitle" id="parasha-name">טוען...</div>
+      </div>
+      <div id="done-parasha"></div>
+    </div>
+    <!-- Aliya tabs -->
+    <div class="aliya-tabs" id="aliya-tabs">
+      <div class="aliya-tab active" onclick="showAliya('all', this)">הכל</div>
+    </div>
+    <!-- View mode toggle -->
+    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+      <button id="view-text-btn" class="aliya-tab active" onclick="setParashaView('text')">📖 פסוקים בלבד</button>
+      <button id="view-rashi-btn" class="aliya-tab" onclick="setParashaView('rashi')">🖊 עם רש"י</button>
+      <button id="view-onkelos-btn" class="aliya-tab" onclick="setParashaView('onkelos')">🔤 עם אונקלוס</button>
+      <button id="view-haftara-btn" class="aliya-tab" onclick="setParashaView('haftara')">📜 הפטרה</button>
+      <button id="view-sacks-btn" class="aliya-tab" onclick="setParashaView('sacks')">📝 הרב זקס</button>
+    </div>
+    <!-- Aliya prev/next navigation -->
+    <div id="aliya-nav" style="display:flex;justify-content:space-between;gap:8px;margin-bottom:10px"></div>
+    <!-- Rashi progress bar -->
+    <div id="rashi-progress-wrap">
+      <span class="rp-icon">🖊</span>
+      <div class="rp-bar-wrap"><div id="rashi-progress-bar"></div></div>
+      <span id="rashi-progress-lbl">טוען רש"י...</span>
+    </div>
+    <div id="parasha-loading" style="color:var(--muted);font-size:13px;font-style:italic">טוען פרשת השבוע...</div>
+    <div id="parasha-notice" style="display:none;background:rgba(201,165,74,.1);border:1px solid var(--gold-dim);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--gold);margin-bottom:10px;line-height:1.6"></div>
+    <div id="parasha-content"></div>
+    <!-- Bottom aliya navigation -->
+    <div id="aliya-nav-bottom" style="display:flex;justify-content:space-between;gap:8px;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)"></div>
+    <div class="source-link">
+      מקור: <a href="https://www.sefaria.org" target="_blank">Sefaria</a> |
+      <a href="https://www.sefaria.org/Rashi_on_Torah" target="_blank">רש"י על התורה</a>
+    </div>
+  </div>
+</div>
+
+<!-- ─── PAGE: LASHON HARA ──────────────────── -->
+<div class="page" id="page-lashon">
+  <div class="date-nav">
+    <button onclick="changeDay(-1)">→</button>
+    <div class="date-label">
+      <div class="greg" id="lash-date">היום</div>
+      <div class="heb" id="lash-heb"></div>
+    </div>
+    <button class="date-nav-today hidden" id="today-btn-lash" onclick="goToToday()">📅 היום</button>
+    <button onclick="changeDay(1)">←</button>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title"><span class="emoji">🗣</span>הלכות לשון הרע היומי</div>
+        <div class="card-subtitle">ספר חפץ חיים – חלקים יומיים</div>
+      </div>
+      <div id="done-lashon"></div>
+    </div>
+    <div id="lashon-content" class="content-text loading">טוען...</div>
+    <div id="lashon-section" style="margin-top:12px;font-size:12px;color:var(--gold)"></div>
+    <div class="source-link">
+      מקור: <a href="https://www.sefaria.org/Chafetz_Chaim" target="_blank">חפץ חיים – ספריא</a>
+    </div>
+  </div>
+
+  <div class="card" style="background:rgba(201,165,74,.04)">
+    <div class="card-title" style="margin-bottom:10px"><span class="emoji">💡</span>על ספר חפץ חיים</div>
+    <div style="font-size:13px;color:var(--muted);line-height:1.7">
+      ספר חפץ חיים חובר על ידי הרב ישראל מאיר הכהן (החפץ חיים) ועוסק בהלכות שמירת הלשון. הספר מחולק לחלקים יומיים המאפשרים לסיים את לימוד ההלכות במשך שנה אחת.
+    </div>
+  </div>
+</div>
+
+<!-- ─── PAGE: DAF YOMI ────────────────────── -->
+<div class="page" id="page-daf">
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title"><span class="emoji">📚</span>דף יומי</div>
+        <div class="card-subtitle" id="daf-subtitle">טוען...</div>
+      </div>
+      <div id="done-daf"></div>
+    </div>
+    <div id="daf-view-buttons" class="aliya-tabs" style="margin-bottom:8px;gap:6px;flex-wrap:wrap"></div>
+    <div id="daf-content" class="content-text loading">טוען דף יומי...</div>
+    <div class="source-link">
+      מקור: <a href="https://www.sefaria.org/texts/Talmud" target="_blank">תלמוד בבלי – ספריא</a>
+    </div>
+  </div>
+</div>
+
+<!-- ─── PAGE: MISHNA YOMI ─────────────────── -->
+<div class="page" id="page-mishna">
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title"><span class="emoji">📜</span>משנה יומי</div>
+        <div class="card-subtitle" id="mishna-subtitle">טוען...</div>
+      </div>
+      <div id="done-mishna"></div>
+    </div>
+    <div id="mishna-view-buttons" class="aliya-tabs" style="margin-bottom:8px;gap:6px;flex-wrap:wrap"></div>
+    <div id="mishna-content" class="content-text loading">טוען משנה יומי...</div>
+    <div class="source-link">
+      מקור: <a href="https://www.sefaria.org/texts/Mishnah" target="_blank">משנה – ספריא</a>
+    </div>
+  </div>
+</div>
+
+<!-- ─── PAGE: 929 ──────────────────────────── -->
+<div class="page" id="page-929">
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title"><span class="emoji">✡️</span>929 – תנ"ך יומי</div>
+        <div class="card-subtitle" id="tanach-subtitle">טוען...</div>
+      </div>
+      <div id="done-929"></div>
+    </div>
+    <div id="tanach-content" class="content-text loading">טוען פרק תנ"ך...</div>
+    <div class="source-link">
+      מקור: <a href="https://www.sefaria.org" target="_blank">ספריא</a> | <a href="https://929.org.il" target="_blank">929.org.il</a>
+    </div>
+  </div>
+</div>
+
+<!-- ─── PAGE: RAMBAM YOMI ────────────────── -->
+<div class="page" id="page-rambam">
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title"><span class="emoji">📗</span>רמב"ם יומי</div>
+        <div class="card-subtitle" id="rambam-subtitle">טוען...</div>
+      </div>
+      <div id="done-rambam"></div>
+    </div>
+    <div id="rambam-view-buttons" class="aliya-tabs" style="margin-bottom:8px;gap:6px;flex-wrap:wrap"></div>
+    <div id="rambam-content" class="content-text loading">טוען רמב"ם יומי...</div>
+    <div class="source-link">
+      מקור: <a href="https://www.sefaria.org/texts/Halakhah/Mishneh%20Torah" target="_blank">משנה תורה – ספריא</a>
+    </div>
+  </div>
+</div>
+
+<!-- ─── PAGE: IGERET RAMBAN ───────────────── -->
+<div class="page" id="page-igeret">
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title"><span class="emoji">✉️</span>אגרת הרמב"ן</div>
+        <div class="card-subtitle">מכתב הרמב"ן לבנו</div>
+      </div>
+      <div id="done-igeret"></div>
+    </div>
+    <div id="igeret-content" class="content-text loading">טוען אגרת הרמב"ן...</div>
+    <div class="source-link">
+      מקור: <a href="https://www.sefaria.org/Iggeret_HaRamban" target="_blank">אגרת הרמב"ן – ספריא</a>
+    </div>
+  </div>
+</div>
+
+<!-- ─── PAGE: TEFILOT ────────────────────── -->
+<div class="page" id="page-tefilot">
+  <!-- Prayer selector -->
+  <div class="card" style="padding:12px 14px;margin-bottom:12px">
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;font-weight:600">בחר תפילה</div>
+    <div style="display:flex;flex-direction:column;gap:8px" id="tefila-buttons">
+      <button class="aliya-tab active" onclick="showTefila('motzash')" id="tf-motzash">
+        תפילה למוצאי שבת – ר' לוי יצחק מברדיטשוב
+      </button>
+      <button class="aliya-tab" onclick="showTefila('simcha')" id="tf-simcha">
+        תפילה לשמחה – ר' נתן מברסלב
+      </button>
+      <button class="aliya-tab" onclick="showTefila('shla')" id="tf-shla">
+        תפילת השל"ה הקדוש
+      </button>
+      <button class="aliya-tab" onclick="showTefila('man')" id="tf-man">
+        פרשת המן עם תרגום אונקלוס
+      </button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title"><span class="emoji">🤲</span><span id="tefila-title">תפילה</span></div>
+        <div class="card-subtitle" id="tefila-source"></div>
+      </div>
+      <div id="done-tefilot"></div>
+    </div>
+    <div id="tefila-content" class="content-text igeret-text" style="min-height:200px">
+      לחץ על תפילה מהרשימה למעלה
+    </div>
+  </div>
+</div>
+
+<!-- ─── PAGE: BRACHOT ──────────────────── -->
+<div class="page" id="page-brachot">
+  <!-- Nusach selector -->
+  <div class="card" style="padding:10px 14px;margin-bottom:12px">
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-weight:600">נוסח</div>
+    <div style="display:flex;gap:8px" id="brachot-nusach-buttons">
+      <button id="bn2-sfard"    class="aliya-tab active"  onclick="setBrachotNusach('sfard');appState.brachaNusach='sfard';saveState()">ספרד</button>
+      <button id="bn2-ashkenaz" class="aliya-tab"         onclick="setBrachotNusach('ashkenaz');appState.brachaNusach='ashkenaz';saveState()">אשכנז</button>
+      <button id="bn2-mizrach"  class="aliya-tab"         onclick="setBrachotNusach('mizrach');appState.brachaNusach='mizrach';saveState()">עדות המזרח</button>
+    </div>
+  </div>
+
+  <!-- Bracha selector -->
+  <div class="card" style="padding:12px 14px;margin-bottom:12px">
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;font-weight:600">בחר ברכה</div>
+    <div style="display:flex;flex-direction:column;gap:6px" id="bracha-buttons">
+      <!-- ברכות אחרי אכילה -->
+      <div style="font-size:10px;color:var(--gold-dim);font-weight:700;margin-top:4px">ברכות אחרי אכילה</div>
+      <button id="bb-birkat_hamazon" class="aliya-tab bracha-btn" onclick="showBracha('birkat_hamazon')">📖 ברכת המזון</button>
+      <button id="bb-mezonot"        class="aliya-tab bracha-btn" onclick="showBracha('mezonot')">על המחיה (מזונות)</button>
+      <button id="bb-borei_nefashot" class="aliya-tab bracha-btn" onclick="showBracha('borei_nefashot')">בורא נפשות</button>
+      <!-- ברכות לפני אכילה -->
+      <div style="font-size:10px;color:var(--gold-dim);font-weight:700;margin-top:8px">ברכות לפני שתייה / אכילה</div>
+      <button id="bb-shehakol"       class="aliya-tab bracha-btn" onclick="showBracha('shehakol')">שהכל נהיה בדברו</button>
+      <!-- ברכות תורה והפטרה -->
+      <div style="font-size:10px;color:var(--gold-dim);font-weight:700;margin-top:8px">ברכות תורה</div>
+      <button id="bb-birkot_torah"           class="aliya-tab bracha-btn" onclick="showBracha('birkot_torah')">📚 ברכות התורה</button>
+      <button id="bb-birkot_haftara_lifnei"  class="aliya-tab bracha-btn" onclick="showBracha('birkot_haftara_lifnei')">📖 ברכת ההפטרה (לפני)</button>
+      <button id="bb-birkot_haftara_acharei" class="aliya-tab bracha-btn" onclick="showBracha('birkot_haftara_acharei')">📖 ברכת ההפטרה (אחרי)</button>
+      <button id="bb-gomel"          class="aliya-tab bracha-btn" onclick="showBracha('gomel')">🙏 ברכת הגומל</button>
+      <!-- ברכות מיוחדות -->
+      <div style="font-size:10px;color:var(--gold-dim);font-weight:700;margin-top:8px">ברכות מיוחדות</div>
+      <button id="bb-tefila_haderech" class="aliya-tab bracha-btn" onclick="showBracha('tefila_haderech')">✈️ תפילת הדרך</button>
+      <button id="bb-kiddush_levana" class="aliya-tab bracha-btn" onclick="showBracha('kiddush_levana')">🌙 ברכת הלבנה</button>
+      <button id="bb-birkat_ilanot"  class="aliya-tab bracha-btn" onclick="showBracha('birkat_ilanot')">🌸 ברכת האילנות</button>
+      <button id="bb-havdala"        class="aliya-tab bracha-btn" onclick="showBracha('havdala')">🕯️ הבדלה</button>
+      <!-- ברכות תופעות טבע -->
+      <div style="font-size:10px;color:var(--gold-dim);font-weight:700;margin-top:8px">ברכות על תופעות טבע</div>
+      <button id="bb-raam"           class="aliya-tab bracha-btn" onclick="showBracha('raam')">⛈️ ברכה על רעם</button>
+      <button id="bb-barak"          class="aliya-tab bracha-btn" onclick="showBracha('barak')">⚡ ברכה על ברק</button>
+      <button id="bb-keshet"         class="aliya-tab bracha-btn" onclick="showBracha('keshet')">🌈 ברכה על קשת</button>
+      <button id="bb-nof"            class="aliya-tab bracha-btn" onclick="showBracha('nof')">🏔️ ברכה על נופים מיוחדים</button>
+      <button id="bb-yam_gadol"      class="aliya-tab bracha-btn" onclick="showBracha('yam_gadol')">🌊 ברכה על הים הגדול</button>
+      <!-- ברכות על אנשים -->
+      <div style="font-size:10px;color:var(--gold-dim);font-weight:700;margin-top:8px">ברכות על אנשים</div>
+      <button id="bb-chacham"        class="aliya-tab bracha-btn" onclick="showBracha('chacham')">📚 חכמי ישראל</button>
+      <button id="bb-chacham_umot"   class="aliya-tab bracha-btn" onclick="showBracha('chacham_umot')">🔬 חכמי אומות העולם</button>
+      <button id="bb-melachim"       class="aliya-tab bracha-btn" onclick="showBracha('melachim')">👑 מלכים / ראשי מדינה</button>
+      <!-- תפילות לאומיות -->
+      <div style="font-size:10px;color:var(--gold-dim);font-weight:700;margin-top:8px">תפילות לאומיות</div>
+      <button id="bb-tzahal"         class="aliya-tab bracha-btn" onclick="showBracha('tzahal')">🎖️ שלום חיילי צה"ל</button>
+      <button id="bb-medinat_israel" class="aliya-tab bracha-btn" onclick="showBracha('medinat_israel')">🇮🇱 שלום המדינה</button>
+    </div>
+  </div>
+
+  <!-- Bracha display -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title"><span class="emoji">✨</span><span id="bracha-title">ברכה</span></div>
+        <div class="card-subtitle" id="bracha-source"></div>
+      </div>
+      <div id="done-brachot"></div>
+    </div>
+    <div id="bracha-tts-wrap" style="margin-bottom:10px"></div>
+    <div id="bracha-content" class="content-text igeret-text" style="min-height:120px">
+      בחר ברכה מהרשימה למעלה
+    </div>
+  </div>
+
+  <!-- Floating buttons for brachot -->
+  <button id="brachot-float-top" onclick="document.getElementById('bracha-buttons')?.scrollIntoView({behavior:'smooth'})"
+    style="position:fixed;bottom:70px;right:16px;width:44px;height:44px;border-radius:50%;
+    background:var(--gold);color:#000;border:none;cursor:pointer;font-size:18px;z-index:50;
+    box-shadow:0 2px 8px rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .2s">⬆</button>
+  <button id="brachot-float-nav" onclick="openBrachotNavPopup()"
+    style="position:fixed;bottom:120px;right:16px;width:44px;height:44px;border-radius:50%;
+    background:var(--surface);color:var(--gold);border:1px solid var(--gold);cursor:pointer;font-size:18px;z-index:50;
+    box-shadow:0 2px 8px rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .2s">☰</button>
+
+  <!-- Brachot nav popup -->
+  <div id="brachot-nav-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200" onclick="closeBrachotNavPopup()"></div>
+  <div id="brachot-nav-popup" style="display:none;position:fixed;bottom:60px;right:16px;left:16px;max-height:60vh;overflow-y:auto;
+    background:var(--card);border:1px solid var(--border);border-radius:14px;z-index:201;padding:10px 0">
+    <div id="brachot-nav-list"></div>
+  </div>
+</div>
+
+<div class="page" id="page-qibla">
+  <!-- Status bar -->
+  <div id="qibla-status" style="
+    text-align:center; font-size:13px; color:var(--muted);
+    margin-bottom:16px; min-height:20px;
+  ">מאתר מיקום...</div>
+
+  <!-- Main compass card -->
+  <div class="card" style="padding:24px 16px; text-align:center; background:var(--card)">
+
+    <!-- Compass ring -->
+    <div style="position:relative; width:280px; height:280px; margin:0 auto 20px;">
+
+      <!-- Outer decorative ring -->
+      <div id="compass-outer" style="
+        position:absolute; inset:0;
+        border-radius:50%;
+        background: conic-gradient(
+          from 0deg,
+          rgba(201,165,74,.08) 0deg, rgba(201,165,74,.18) 45deg,
+          rgba(201,165,74,.06) 90deg, rgba(201,165,74,.16) 135deg,
+          rgba(201,165,74,.08) 180deg, rgba(201,165,74,.14) 225deg,
+          rgba(201,165,74,.06) 270deg, rgba(201,165,74,.16) 315deg,
+          rgba(201,165,74,.08) 360deg
+        );
+        border: 2px solid rgba(201,165,74,.3);
+        transition: transform .1s linear;
+      ">
+        <!-- Cardinal directions – fixed to compass ring so they rotate -->
+        <div style="position:absolute;top:6px;left:50%;transform:translateX(-50%);font-size:14px;font-weight:700;color:var(--gold);font-family:'Heebo',sans-serif">צ</div>
+        <div style="position:absolute;bottom:6px;left:50%;transform:translateX(-50%);font-size:14px;font-weight:700;color:var(--muted);font-family:'Heebo',sans-serif">ד</div>
+        <div style="position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:14px;font-weight:700;color:var(--muted);font-family:'Heebo',sans-serif">מ</div>
+        <div style="position:absolute;left:6px;top:50%;transform:translateY(-50%);font-size:14px;font-weight:700;color:var(--muted);font-family:'Heebo',sans-serif">ע</div>
+
+        <!-- Tick marks every 30° -->
+        <svg style="position:absolute;inset:0;width:100%;height:100%;" viewBox="0 0 280 280">
+          <g id="tick-marks">
+            <!-- Generated by JS -->
+          </g>
+        </svg>
+      </div>
+
+      <!-- Inner disc -->
+      <div style="
+        position:absolute; inset:20px;
+        border-radius:50%;
+        background: radial-gradient(circle at 40% 35%, rgba(37,26,12,.9), rgba(14,9,5,1));
+        border: 1px solid rgba(201,165,74,.2);
+        box-shadow: inset 0 0 30px rgba(0,0,0,.5), 0 0 20px rgba(0,0,0,.3);
+      "></div>
+
+      <!-- SVG compass arrows – all in one element for clean rotation -->
+      <svg id="compass-arrows" style="
+        position:absolute; inset:0; width:100%; height:100%;
+        transition: transform .12s ease-out;
+        z-index:10;
+      " viewBox="0 0 280 280">
+        <!-- Gold arrow pointing TO Jerusalem (upward by default) -->
+        <g id="jerusalem-arrow-g">
+          <!-- shaft -->
+          <rect x="137" y="78" width="6" height="74" rx="2" fill="url(#goldGrad)"/>
+          <!-- arrowhead -->
+          <polygon points="140,52 128,82 152,82" fill="#ffe066"
+                   filter="url(#goldGlow)"/>
+          <!-- tail wedge -->
+          <polygon points="140,152 133,168 147,168" fill="rgba(201,165,74,.4)"/>
+          <!-- "כותל" label on tip -->
+          <rect x="121" y="38" width="38" height="14" rx="7" fill="rgba(201,165,74,.9)"/>
+          <text x="140" y="49" text-anchor="middle"
+                font-family="'Heebo',sans-serif" font-size="9" font-weight="800"
+                fill="#0e0905">כותל</text>
+        </g>
+        <!-- Red north indicator (always points up = north, rotates with compass ring via compass-outer) -->
+        <defs>
+          <linearGradient id="goldGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#ffe066"/>
+            <stop offset="100%" stop-color="#9a7830"/>
+          </linearGradient>
+          <filter id="goldGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+      </svg>
+
+      <!-- Red North dot on the compass ring (rotates with ring) -->
+      <!-- (North is already marked by the bright tick on compass-outer) -->
+
+      <!-- Center jewel -->
+      <div style="
+        position:absolute; top:50%; left:50%;
+        width:16px; height:16px; border-radius:50%;
+        transform:translate(-50%,-50%);
+        background: radial-gradient(circle at 35% 35%, #ffe066, var(--gold) 50%, #7a6128);
+        border:2px solid rgba(255,255,255,.25);
+        box-shadow: 0 0 10px rgba(201,165,74,.9);
+        z-index:20;
+      "></div>
+
+    </div>
+
+    <!-- Bearing display -->
+    <div style="margin-bottom:6px">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:4px">כיוון הכותל המערבי</div>
+      <div style="display:flex;align-items:baseline;justify-content:center;gap:6px">
+        <span id="qibla-bearing" style="font-family:'Frank Ruhl Libre',serif;font-size:52px;font-weight:700;color:var(--gold);line-height:1">--</span>
+        <span style="font-size:18px;color:var(--muted)">°</span>
+      </div>
+      <div id="qibla-direction-label" style="font-size:13px;color:var(--cream);margin-top:4px">--</div>
+    </div>
+
+    <!-- Device heading + tilt info -->
+    <div style="
+      display:inline-flex;align-items:center;gap:8px;
+      background:var(--surface);border:1px solid var(--border);
+      border-radius:20px;padding:6px 14px;margin-top:8px;
+    ">
+      <span style="font-size:13px;color:var(--muted)">כיוון המכשיר:</span>
+      <span id="device-heading" style="font-size:15px;font-weight:600;color:var(--cream)">--°</span>
+    </div>
+    <div id="tilt-warning" style="
+      margin-top:8px;font-size:11px;color:var(--muted);display:none;
+    ">⚠️ הנח את הטלפון שטוח (מאוזן) לדיוק מירבי</div>
+
+    <!-- Calibration warning – shown when sensor is stuck -->
+    <div id="qibla-calibration" style="
+      display:none;margin-top:10px;padding:10px 14px;
+      background:rgba(180,80,60,.1);border:1px solid rgba(180,80,60,.3);
+      border-radius:10px;text-align:right;
+    "></div>
+
+    <!-- Raw sensor debug -->
+    <div id="qibla-raw-alpha" style="
+      margin-top:6px;font-size:10px;color:var(--muted);opacity:.6;text-align:center;
+    "></div>
+
+    <!-- Alignment indicator -->
+    <div id="alignment-indicator" style="
+      margin-top:14px; padding:8px 16px;
+      border-radius:20px; font-size:13px; font-weight:600;
+      display:inline-block;
+      background:rgba(100,70,20,.2); color:var(--muted);
+      border:1px solid var(--border);
+      transition: all .3s;
+    ">כוון את המכשיר</div>
+  </div>
+
+  <!-- Info card -->
+  <div class="card" style="margin-top:12px">
+    <div class="card-title" style="margin-bottom:10px"><span class="emoji">📍</span>פרטי חישוב</div>
+    <div id="qibla-location-info" style="font-size:13px;color:var(--muted);line-height:1.7">טוען...</div>
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+      <button onclick="qiblaInitDone=false; loaded['qibla']=false; initQibla()" style="
+        background:var(--surface);border:1px solid var(--border);
+        color:var(--gold);padding:7px 16px;border-radius:20px;
+        font-size:12px;cursor:pointer;font-family:'Heebo',sans-serif;
+      ">🔄 חשב מחדש</button>
+      <button onclick="requestCompassPermission()" id="compass-permission-btn" style="
+        background:rgba(201,165,74,.12);border:1px solid var(--gold-dim);
+        color:var(--gold);padding:7px 16px;border-radius:20px;
+        font-size:12px;cursor:pointer;font-family:'Heebo',sans-serif;
+      ">🧭 הפעל חיישן כיוון</button>
+    </div>
+    <div style="margin-top:10px;font-size:11px;color:var(--muted);line-height:1.6">
+      ⓘ <strong>איך להשתמש:</strong> לחץ "הפעל חיישן כיוון" ואז סובב את הטלפון עד שהחץ הזהב מצביע ישר למעלה – אז אתה פונה לכיוון הכותל.<br>
+      📱 <strong>iOS בלבד:</strong> נדרשת אישור הרשאה בחלון שייפתח.
+    </div>
+  </div>
+
+  <!-- Calibration hint -->
+  <div style="
+    text-align:center;margin-top:12px;
+    font-size:11px;color:var(--muted);
+    padding:10px;border-radius:10px;
+    background:rgba(255,255,255,.03);
+  ">
+    💡 לכיול המצפן: הזז את הטלפון בתנועת ∞ (שמונה שוכב) מספר פעמים
+  </div>
+  <div style="text-align:center;color:var(--muted);font-size:11px;padding:12px 0 4px">
+    גרסה 5.60 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
+  </div>
+</div>
+
+<!-- ─── PAGE: LOGS ────────────────────────── -->
+<div class="page" id="page-logs">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <div style="font-family:'Frank Ruhl Libre',serif;font-size:15px;color:var(--gold);font-weight:700">🐛 לוגי מערכת</div>
+    <div style="display:flex;gap:8px">
+      <button onclick="clearLogs()" style="background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:5px 12px;border-radius:8px;font-size:11px;cursor:pointer;font-family:'Heebo',sans-serif">נקה</button>
+      <button onclick="copyLogs()" style="background:var(--surface);border:1px solid var(--gold-dim);color:var(--gold);padding:5px 12px;border-radius:8px;font-size:11px;cursor:pointer;font-family:'Heebo',sans-serif">📋 העתק</button>
+    </div>
+  </div>
+  <div id="log-stats" style="font-size:11px;color:var(--muted);margin-bottom:10px"></div>
+  <div id="log-container" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;max-height:70vh;overflow-y:auto;direction:ltr">
+    <div style="color:var(--muted);font-size:12px;text-align:center;padding:20px">אין לוגים עדיין</div>
+  </div>
+</div>
+
+<!-- ─── PAGE: NETWORK LOG ──────────────────── -->
+<div class="page" id="page-network">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <div style="font-family:'Frank Ruhl Libre',serif;font-size:15px;color:var(--gold);font-weight:700">🌐 קריאות רשת</div>
+    <div style="display:flex;gap:8px">
+      <button onclick="clearNetworkLog()" style="background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:5px 12px;border-radius:8px;font-size:11px;cursor:pointer;font-family:'Heebo',sans-serif">נקה</button>
+      <button onclick="copyNetworkLog()" style="background:var(--surface);border:1px solid var(--gold-dim);color:var(--gold);padding:5px 12px;border-radius:8px;font-size:11px;cursor:pointer;font-family:'Heebo',sans-serif">📋 העתק</button>
+    </div>
+  </div>
+  <div id="network-stats" style="font-size:11px;color:var(--muted);margin-bottom:10px"></div>
+  <div id="network-container" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;max-height:70vh;overflow-y:auto;direction:ltr">
+    <div style="color:var(--muted);font-size:12px;text-align:center;padding:20px">אין קריאות רשת עדיין</div>
+  </div>
+</div>
+
+<!-- BOTTOM NAV -->
+<div id="bottom-nav">
+  <button class="bnav-btn active" onclick="showTab('calendar')" id="bn-calendar"><span class="bicon">📅</span>לוח</button>
+  <button class="bnav-btn" onclick="showTab('siddur')" id="bn-siddur"><span class="bicon">📕</span>סידור</button>
+  <button class="bnav-btn" onclick="showTab('halacha')" id="bn-halacha"><span class="bicon">📖</span>הלכה</button>
+  <button class="bnav-btn" onclick="showTab('lashon')" id="bn-lashon"><span class="bicon">🗣</span>לשה"ר</button>
+  <button class="bnav-btn" onclick="showTab('tehilim')" id="bn-tehilim"><span class="bicon">🙏</span>תהילים</button>
+  <button class="bnav-btn" onclick="showTab('daf')" id="bn-daf"><span class="bicon">📚</span>דף</button>
+  <button class="bnav-btn" onclick="showTab('mishna')" id="bn-mishna"><span class="bicon">📜</span>משנה</button>
+  <button class="bnav-btn" onclick="showTab('929')" id="bn-929"><span class="bicon">✡️</span>929</button>
+  <button class="bnav-btn" onclick="showTab('rambam')" id="bn-rambam"><span class="bicon">📗</span>רמב"ם</button>
+  <button class="bnav-btn" onclick="showTab('parasha')" id="bn-parasha"><span class="bicon">📜</span>פרשה</button>
+  <button class="bnav-btn" onclick="showTab('igeret')" id="bn-igeret"><span class="bicon">✉️</span>אגרת</button>
+  <button class="bnav-btn" onclick="showTab('tefilot')" id="bn-tefilot"><span class="bicon">🤲</span>תפילות</button>
+  <button class="bnav-btn" onclick="showTab('brachot')" id="bn-brachot"><span class="bicon">✨</span>ברכות</button>
+  <button class="bnav-btn" onclick="showTab('qibla')" id="bn-qibla"><span class="bicon">🧭</span>מצפן</button>
+  <button class="bnav-btn" onclick="showTab('logs')" id="bn-logs"><span class="bicon">🐛</span>לוגים</button>
+  <button class="bnav-btn" onclick="showTab('network')" id="bn-network"><span class="bicon">🌐</span>רשת</button>
+</div>
+
+<!-- ═══════════════════════════════════════
+     JavaScript modules (load order matters)
+     v4.3 – querystring busts browser/SW cache
+     ═══════════════════════════════════════ -->
+<script src="js/network-log.js?v=5.60"></script>
+<script src="js/utils.js?v=5.60"></script>
+<script src="js/settings.js?v=5.60"></script>
+<script src="js/app.js?v=5.60"></script>
+<script src="js/tehilim.js?v=5.60"></script>
+<script src="js/calendar.js?v=5.60"></script>
+<script src="js/content.js?v=5.60"></script>
+<script src="js/tefilot.js?v=5.60"></script>
+<script src="js/siddur-inserts.js?v=5.60"></script>
+<script src="js/siddur.js?v=5.60"></script>
+<script src="js/omer.js?v=5.60"></script>
+<script src="js/brachot.js?v=5.60"></script>
+<script src="js/misc.js?v=5.60"></script>
+<script src="js/init.js?v=5.60"></script>
 </body>
 </html>
