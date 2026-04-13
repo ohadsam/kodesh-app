@@ -247,6 +247,24 @@ function checkWhatsNew() {
 // ═══════════════════════════════════════════
 // REMINDER CHECK ON APP OPEN
 // ═══════════════════════════════════════════
+// Map reminder key → action to navigate to the relevant tab/section
+const REMINDER_NAV = {
+  omer:    { label: 'ספור עכשיו ▶',  action: () => { closeReminderModal(); showOmerNow(); } },
+  halacha: { label: 'פתח עכשיו ▶',   action: () => { closeReminderModal(); showTab('halacha'); } },
+  tehilim: { label: 'פתח עכשיו ▶',   action: () => { closeReminderModal(); showTab('tehilim'); } },
+  lashon:  { label: 'פתח עכשיו ▶',   action: () => { closeReminderModal(); showTab('lashon'); } },
+  daf:     { label: 'פתח עכשיו ▶',   action: () => { closeReminderModal(); showTab('daf'); } },
+  mishna:  { label: 'פתח עכשיו ▶',   action: () => { closeReminderModal(); showTab('mishna'); } },
+  rambam:  { label: 'פתח עכשיו ▶',   action: () => { closeReminderModal(); showTab('rambam'); } },
+  parasha: { label: 'פתח עכשיו ▶',   action: () => { closeReminderModal(); showTab('parasha'); } },
+};
+
+// Expose nav actions globally so onclick strings can call them
+function _reminderNav(key) {
+  const nav = REMINDER_NAV[key];
+  if (nav) nav.action();
+}
+
 const REMINDER_ITEMS = [
   { key: 'omer', name: '🌾 ספירת העומר', checkFn: () => {
     const hd = appState?._lastHebrewDate;
@@ -263,62 +281,111 @@ const REMINDER_ITEMS = [
   { key: 'parasha',  name: '📜 פרשת השבוע',      weekly: true },
 ];
 
+// Update topbar notification bell
+function _updateNotifBadge() {
+  const pending = _getPendingReminders();
+  const btn   = document.getElementById('notif-btn');
+  const badge = document.getElementById('notif-badge');
+  if (!btn) return;
+  if (pending.length > 0) {
+    btn.style.display = 'block';
+    badge.style.display = 'block';
+    badge.textContent = pending.length > 9 ? '9+' : String(pending.length);
+  } else {
+    btn.style.display = 'none';
+    badge.style.display = 'none';
+  }
+}
+
+function _getPendingReminders() {
+  const today = formatDate(new Date());
+  const todayDone = (appState._remindersDone || {})[today] || {};
+  const pending = [];
+  for (const item of REMINDER_ITEMS) {
+    const r = appState?.reminders?.[item.key];
+    if (!r?.enabled) continue;
+    if (item.checkFn && !item.checkFn()) continue;
+    if (todayDone[item.key]) continue;
+    const [h, m] = (r.time || '08:00').split(':').map(Number);
+    const now = new Date();
+    if (now.getHours() < h || (now.getHours() === h && now.getMinutes() < m)) continue;
+    pending.push(item);
+  }
+  return pending;
+}
+
+function _buildReminderList(pending) {
+  const listEl = document.getElementById('reminder-list');
+  if (!listEl) return;
+  const today = formatDate(new Date());
+  const todayDone = (appState._remindersDone || {})[today] || {};
+
+  listEl.innerHTML = pending.map(item => {
+    const isDone = !!todayDone[item.key];
+    const navBtn = REMINDER_NAV[item.key]
+      ? `<button onclick="_reminderNav('${item.key}')"
+           style="background:var(--gold);color:#000;border:none;border-radius:8px;
+                  padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;
+                  font-family:'Heebo',sans-serif;white-space:nowrap;flex-shrink:0">
+           ${REMINDER_NAV[item.key].label}
+         </button>`
+      : '';
+    return `
+      <label style="display:flex;align-items:center;gap:10px;padding:8px 0;
+                    border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer">
+        <input type="checkbox" id="rem-chk-${item.key}"
+          ${isDone ? 'checked' : ''}
+          onchange="toggleReminderDone('${item.key}', this.checked)"
+          style="width:20px;height:20px;accent-color:var(--gold);flex-shrink:0">
+        <span style="font-family:'Frank Ruhl Libre',serif;font-size:15px;flex:1;
+                     ${isDone ? 'text-decoration:line-through;color:var(--muted)' : ''}">${item.name}</span>
+        ${navBtn}
+      </label>`;
+  }).join('') +
+  `<div style="margin-top:10px;font-size:11px;color:var(--muted);text-align:center">
+     סמן את מה שכבר ביצעת היום
+   </div>`;
+
+  window._pendingReminders = pending;
+}
+
+// Open reminder modal manually (from bell button)
+function openReminderModal() {
+  const pending = _getPendingReminders();
+  // Show ALL enabled reminders (not just pending) when opened manually
+  const today = formatDate(new Date());
+  const todayDone = (appState._remindersDone || {})[today] || {};
+  const allEnabled = REMINDER_ITEMS.filter(item => {
+    const r = appState?.reminders?.[item.key];
+    if (!r?.enabled) return false;
+    if (item.checkFn && !item.checkFn()) return false;
+    return true;
+  });
+  if (!allEnabled.length) return;
+  _buildReminderList(allEnabled);
+  const modal = document.getElementById('reminder-modal');
+  if (modal) modal.style.display = 'flex';
+}
+
 function checkRemindersOnOpen() {
   const today = formatDate(new Date());
   const doneMap = appState._remindersDone || {};
-  
+
   // Clean old dates (keep only today)
   for (const k of Object.keys(doneMap)) {
     if (k !== today) delete doneMap[k];
   }
   appState._remindersDone = doneMap;
   saveState();
-  
-  const todayDone = doneMap[today] || {};
-  const pending = [];
-  
-  for (const item of REMINDER_ITEMS) {
-    // Check if reminder is enabled
-    const r = appState?.reminders?.[item.key];
-    if (!r?.enabled) continue;
-    
-    // Check if applicable today (special check for omer)
-    if (item.checkFn && !item.checkFn()) continue;
-    
-    // Check if already done today
-    if (todayDone[item.key]) continue;
-    
-    // Check scheduled time – only show if scheduled time has passed
-    const [h, m] = (r.time || '08:00').split(':').map(Number);
-    const now = new Date();
-    if (now.getHours() < h || (now.getHours() === h && now.getMinutes() < m)) continue;
-    
-    pending.push(item);
-  }
-  
+
+  const pending = _getPendingReminders();
+
+  // Update badge regardless
+  setTimeout(_updateNotifBadge, 100);
+
   if (!pending.length) return false;
-  
-  // Build the reminder list
-  const listEl = document.getElementById('reminder-list');
-  if (!listEl) return false;
-  
-  listEl.innerHTML = pending.map(item => `
-    <label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer">
-      <input type="checkbox" id="rem-chk-${item.key}" onchange="toggleReminderDone('${item.key}', this.checked)"
-        style="width:20px;height:20px;accent-color:var(--gold);flex-shrink:0">
-      <span style="font-family:'Frank Ruhl Libre',serif;font-size:15px;flex:1">${item.name}</span>
-      ${item.key === 'omer' ? `<button onclick="closeReminderModal();showOmerNow()"
-        style="background:var(--gold);color:#000;border:none;border-radius:8px;padding:5px 10px;
-        font-size:11px;font-weight:700;cursor:pointer;font-family:'Heebo',sans-serif;white-space:nowrap">
-        ספור עכשיו ▶
-      </button>` : ''}
-    </label>
-  `).join('') + `
-    <div style="margin-top:10px;font-size:11px;color:var(--muted);text-align:center">
-      סמן את מה שכבר ביצעת היום
-    </div>`;
-  
-  window._pendingReminders = pending;
+
+  _buildReminderList(pending);
   const modal = document.getElementById('reminder-modal');
   if (modal) modal.style.display = 'flex';
   return true;
@@ -330,24 +397,27 @@ function toggleReminderDone(key, done) {
   if (!appState._remindersDone[today]) appState._remindersDone[today] = {};
   appState._remindersDone[today][key] = done;
   saveState();
+  _updateNotifBadge();
 }
 
 function markAllRemindersDone() {
   const today = formatDate(new Date());
   if (!appState._remindersDone) appState._remindersDone = {};
   if (!appState._remindersDone[today]) appState._remindersDone[today] = {};
-  for (const item of (window._pendingReminders || [])) {
+  for (const item of (window._pendingReminders || REMINDER_ITEMS)) {
     appState._remindersDone[today][item.key] = true;
     const chk = document.getElementById('rem-chk-' + item.key);
     if (chk) chk.checked = true;
   }
   saveState();
+  _updateNotifBadge();
   setTimeout(() => closeReminderModal(), 500);
 }
 
 function closeReminderModal() {
   const modal = document.getElementById('reminder-modal');
   if (modal) modal.style.display = 'none';
-  // After reminders, check what's new
+  _updateNotifBadge();
+  // After reminders opened on-launch, check what's new
   if (typeof checkWhatsNew === 'function') checkWhatsNew();
 }
