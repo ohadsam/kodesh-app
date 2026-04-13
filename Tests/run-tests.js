@@ -106,6 +106,21 @@ suite('🎨 מבנה HTML', () => {
     assertContains(modal, 'closeWhatsNew', 'closeWhatsNew in modal');
   });
 
+  test('index.html – כל קבצי JS נטענים', () => {
+    const html = readFile('index.html');
+    const required = ['utils.js','app.js','init.js','calendar.js','siddur.js',
+                      'content.js','omer.js','tehilim.js','settings.js'];
+    for (const f of required) {
+      // Accept both with and without cache-busting ?v= param
+      assert(html.includes(`src="js/${f}"`) || html.includes(`src="js/${f}?`),
+        `Missing script: ${f}`);
+    }
+    // init.js must come AFTER utils.js
+    const utilsPos = html.search(/src="js\/utils\.js/);
+    const initPos  = html.search(/src="js\/init\.js/);
+    assert(utilsPos < initPos, 'utils.js must load before init.js');
+  });
+
   test('whats-new – overlay קיים', () => {
     const html = readFile('index.html');
     assertContains(html, 'id="whats-new-overlay"', 'whats-new overlay');
