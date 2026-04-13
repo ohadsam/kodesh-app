@@ -42,7 +42,7 @@ body {
   gap: 20px;
   transition: opacity .5s ease;
 }
-#splash.hide { opacity: 0; pointer-events: none; }
+#splash.hide { opacity: 0; pointer-events: none; display: none; }
 #splash .logo-big {
   font-family: 'Frank Ruhl Libre', serif;
   font-size: 56px; font-weight: 900;
