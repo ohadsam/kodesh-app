@@ -20,7 +20,7 @@
        NOTE: this is the ONLY version check. utils.js must NOT have another one. -->
   <script>
     (function() {
-      var V = '5.59';
+      var V = '5.60';
       var sv = document.getElementById('splash-version');
       if (sv) sv.textContent = 'גרסה ' + V;
       // Just record version — no reload logic (SW handles cache updates)
@@ -72,7 +72,7 @@
   <div style="font-family:'Frank Ruhl Libre',serif;font-size:26px;color:var(--cream);font-weight:700">לימוד יומי</div>
   <div class="spinner"></div>
   <p id="splash-status" style="font-size:12px;color:var(--gold);margin-top:4px;min-height:18px">טוען...</p>
-  <p id="splash-version" style="font-size:11px;color:var(--muted);margin-top:2px">גרסה 5.59</p>
+  <p id="splash-version" style="font-size:11px;color:var(--muted);margin-top:2px">גרסה 5.60</p>
   <div id="splash-retry" style="display:none;margin-top:20px">
     <button onclick="localStorage.clear();sessionStorage.clear();location.reload(true)"
       style="background:var(--gold);color:#000;border:none;border-radius:10px;
@@ -204,7 +204,7 @@
     <!-- Version & Copyright -->
     <div style="text-align:center;padding:18px 0 8px;border-top:1px solid var(--border);margin-top:8px">
       <div style="font-size:13px;font-weight:600;color:var(--gold-dim);margin-bottom:4px">📖 לימוד יומי</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">גרסה 5.59</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">גרסה 5.60</div>
       <button onclick="showWhatsNew()" style="background:var(--card);border:1px solid var(--gold-dim);color:var(--gold);padding:6px 16px;border-radius:8px;font-size:11px;cursor:pointer;font-family:'Heebo',sans-serif;margin-bottom:6px">🆕 מה חדש?</button>
       <div style="font-size:11px;color:var(--muted)">© כל הזכויות שמורות לאוהד סמט</div>
     </div>
@@ -216,7 +216,7 @@
 <div id="whats-new-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
   width:88%;max-width:400px;max-height:80vh;overflow-y:auto;
   background:var(--surface);border:1px solid var(--gold-dim);border-radius:16px;z-index:10001;padding:20px;direction:rtl">
-  <div style="font-size:16px;font-weight:700;color:var(--gold);margin-bottom:12px;text-align:center">🆕 מה חדש בגרסה 5.59</div>
+  <div style="font-size:16px;font-weight:700;color:var(--gold);margin-bottom:12px;text-align:center">🆕 מה חדש בגרסה 5.60</div>
   <div style="font-size:13px;color:var(--cream);line-height:1.7" id="whats-new-content">
     <div style="margin-bottom:10px"><b>🧪 מערך טסטים חדש</b></div>
     <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• 87 טסטים: לוגיקה, API, UI, סידור, עומר, תהילים, מצפן</div>
@@ -227,3 +227,21 @@
   </div>
   <button onclick="closeWhatsNew()" style="display:block;width:100%;margin-top:14px;background:var(--gold);color:#000;border:none;border-radius:10px;padding:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Heebo',sans-serif">👍 הבנתי</button>
 </div>
+
+  <!-- App scripts — order matters: utils first, init last -->
+  <script src="js/utils.js"></script>
+  <script src="js/network-log.js"></script>
+  <script src="js/siddur-inserts.js"></script>
+  <script src="js/calendar.js"></script>
+  <script src="js/content.js"></script>
+  <script src="js/siddur.js"></script>
+  <script src="js/tehilim.js"></script>
+  <script src="js/omer.js"></script>
+  <script src="js/brachot.js"></script>
+  <script src="js/tefilot.js"></script>
+  <script src="js/misc.js"></script>
+  <script src="js/settings.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/init.js"></script>
+</body>
+</html>
