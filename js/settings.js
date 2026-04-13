@@ -90,20 +90,30 @@ function setFont(size) {
 function loadSettingsState() {
   if (appState.fontSize) setFont(appState.fontSize);
   const reminders = appState.reminders || {};
-  ['halacha','tehilim','lashon','parasha','igeret'].forEach(k => {
+
+  // Restore standard reminder toggles (halacha, tehilim, lashon, parasha, igeret, omer)
+  ['halacha','tehilim','lashon','parasha','igeret','omer'].forEach(k => {
     const r = reminders[k] || {};
     const timeEl = document.getElementById('rem-'+k);
     const togEl  = document.getElementById('tog-'+k);
     if (timeEl && r.time) timeEl.value = r.time;
     if (togEl) togEl.checked = !!r.enabled;
   });
+
   // Restore igeret day
-  const igeretDay = (appState.reminders?.igeret?.day ?? 5).toString(); // default Friday
+  const igeretDay = (appState.reminders?.igeret?.day ?? 5).toString();
   const dayEl = document.getElementById('rem-igeret-day');
   if (dayEl) dayEl.value = igeretDay;
 
-  // Restore omer reminder settings
+  // Restore omer time (handled above, but also call restoreOmerSettings for any extra UI)
   if (typeof restoreOmerSettings === 'function') restoreOmerSettings();
+
+  // Restore zmanim reminder toggles
+  const zmRem = appState.zmanimReminders || {};
+  ['shema','tefila','noon','sunset','tzeit'].forEach(k => {
+    const togEl = document.getElementById(`tog-${k}-auto`);
+    if (togEl) togEl.checked = !!zmRem[k];
+  });
 }
 function saveReminder(key, time) {
   if (!appState.reminders) appState.reminders = {};
