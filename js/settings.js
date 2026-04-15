@@ -15,6 +15,14 @@ const ALL_TABS = [
   { id: 'tefilot',  label: '🤲 תפילות נוספות'                  },
   { id: 'brachot',  label: '✨ ברכות'                           },
   { id: 'qibla',    label: '🧭 מצפן תפילה'                    },
+  { id: 'selichot', label: '🕊 סליחות',  defaultHidden: true,
+    autoShowFn: () => {
+      const hd = appState?._lastHebrewDate;
+      if (!hd) return false;
+      return typeof isSelichotAutoWindow === 'function'
+        ? isSelichotAutoWindow(hd.hm, hd.hd) : false;
+    }
+  },
   { id: 'logs',     label: '🐛 לוגי מערכת',   defaultHidden: true },
   { id: 'network',  label: '🌐 קריאות רשת',   defaultHidden: true },
 ];
@@ -27,6 +35,8 @@ function getTabVisibility() {
 function isTabVisible(id) {
   const tab = ALL_TABS.find(t => t.id === id);
   if (tab?.fixed) return true;
+  // autoShowFn: if returns true, ALWAYS show regardless of user setting
+  if (tab?.autoShowFn && tab.autoShowFn()) return true;
   const vis = getTabVisibility();
   if (id in vis) return vis[id];          // user set explicitly
   return !tab?.defaultHidden;             // use default (false = hidden by default)
@@ -58,11 +68,16 @@ function renderTabVisibilityRows() {
   if (!container) return;
   const vis = getTabVisibility();
   container.innerHTML = ALL_TABS.map(tab => {
-    const checked = tab.fixed || (tab.id in vis ? vis[tab.id] : !tab.defaultHidden);
-    const disabled = tab.fixed ? 'disabled' : '';
+    const isAutoNow = tab.autoShowFn && tab.autoShowFn();
+    const checked = tab.fixed || isAutoNow || (tab.id in vis ? vis[tab.id] : !tab.defaultHidden);
+    const disabled = (tab.fixed || isAutoNow) ? 'disabled' : '';
+    const autoNote = isAutoNow
+      ? ` <span style="font-size:10px;color:var(--gold)">★ אוטומטי</span>` : '';
     return `<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0">
-      <label style="font-size:13px;color:${tab.fixed ? 'var(--muted)' : 'var(--cream)'}">${tab.label}</label>
-      <label class="toggle" style="opacity:${tab.fixed ? 0.4 : 1}">
+      <label style="font-size:13px;color:${(tab.fixed||isAutoNow) ? 'var(--muted)' : 'var(--cream)'}">
+        ${tab.label}${autoNote}
+      </label>
+      <label class="toggle" style="opacity:${(tab.fixed||isAutoNow) ? 0.4 : 1}">
         <input type="checkbox" ${checked ? 'checked' : ''} ${disabled}
           onchange="setTabVisible('${tab.id}', this.checked)" />
         <span class="toggle-slider"></span>
