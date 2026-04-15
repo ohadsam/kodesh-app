@@ -56,7 +56,6 @@ function loadTab(name) {
   if (name === 'mishna')    loadMishnaYomi();
   if (name === '929')       loadTanach929();
   if (name === 'rambam')    loadRambamYomi();
-  if (name === 'selichot')  initSelichot();
   if (name === 'logs')      renderLogs();
   if (name === 'qibla')     initQibla();
 }
@@ -181,8 +180,6 @@ async function loadHebrewDate() {
     // Cache for omer calculation
     appState._lastHebrewDate = { hm: data.hm, hd: data.hd, hy: data.hy };
     saveState();
-    // Re-apply tab visibility — selichot tab auto-shows in Elul/Aseret Yemei Teshuva
-    if (typeof applyTabVisibility === 'function') applyTabVisibility();
     // Schedule omer reminder if enabled
     if (typeof scheduleOmerReminder === 'function') scheduleOmerReminder();
     const tehilimEl = document.getElementById('tehilim-day-info');

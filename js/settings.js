@@ -15,14 +15,6 @@ const ALL_TABS = [
   { id: 'tefilot',  label: '🤲 תפילות נוספות'                  },
   { id: 'brachot',  label: '✨ ברכות'                           },
   { id: 'qibla',    label: '🧭 מצפן תפילה'                    },
-  { id: 'selichot', label: '🕊 סליחות',  defaultHidden: true,
-    autoShowFn: () => {
-      const hd = appState?._lastHebrewDate;
-      if (!hd) return false;
-      return typeof isSelichotAutoWindow === 'function'
-        ? isSelichotAutoWindow(hd.hm, hd.hd) : false;
-    }
-  },
   { id: 'logs',     label: '🐛 לוגי מערכת',   defaultHidden: true },
   { id: 'network',  label: '🌐 קריאות רשת',   defaultHidden: true },
 ];
