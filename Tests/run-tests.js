@@ -384,6 +384,43 @@ suite('📕 סידור – race condition ותזכורות', () => {
 
 // ═══════════════════════════════════════════════════════════════════════
 // SUMMARY
+suite('📅 נרמול חודשים עבריים מ-Hebcal', () => {
+  // Mirror normalizeMonth from app.js
+  function normalizeMonth(m) {
+    if (m === 'Iyyar')   return 'Iyar';
+    if (m === 'Tammuz')  return 'Tamuz';
+    if (m === 'Adar I' || m === 'Adar 1') return 'Adar';
+    return m;
+  }
+  function getOmerDay(month, day) {
+    const m = normalizeMonth(month);
+    if (m === 'Nisan' && day >= 16) return day - 15;
+    if (m === 'Iyar')  return day + 15;
+    if (m === 'Sivan' && day <= 5) return day + 44;
+    return null;
+  }
+
+  test('Iyyar (Hebcal) → Iyar', () => assertEqual(normalizeMonth('Iyyar'), 'Iyar'));
+  test('Tammuz (Hebcal) → Tamuz', () => assertEqual(normalizeMonth('Tammuz'), 'Tamuz'));
+  test('Adar I → Adar', () => assertEqual(normalizeMonth('Adar I'), 'Adar'));
+  test('Adar II → Adar II (unchanged)', () => assertEqual(normalizeMonth('Adar II'), 'Adar II'));
+  test('Nisan → Nisan (unchanged)', () => assertEqual(normalizeMonth('Nisan'), 'Nisan'));
+
+  test('Iyyar 5 = יום 20 לעומר', () => assertEqual(getOmerDay('Iyyar', 5), 20));
+  test('Iyyar 18 = יום 33 (לג בעומר)', () => assertEqual(getOmerDay('Iyyar', 18), 33));
+  test('Nisan 16 = יום 1', () => assertEqual(getOmerDay('Nisan', 16), 1));
+  test('Sivan 5 = יום 49', () => assertEqual(getOmerDay('Sivan', 5), 49));
+  test('Sivan 6 = null (שבועות)', () => assert(getOmerDay('Sivan', 6) === null));
+
+  // Verify app.js has normalization
+  test('app.js מכיל normalizeMonth', () => {
+    const src = readFile('js/app.js');
+    assertContains(src, '_normalizeMonth');
+    assertContains(src, "Iyyar");
+    assertContains(src, "Tammuz");
+  });
+});
+
 // ═══════════════════════════════════════════════════════════════════════
 console.log('\n' + '═'.repeat(50));
 console.log(`✅ עברו: ${pass}   ❌ נכשלו: ${fail}   ⏭  דולגו: ${skip}`);
