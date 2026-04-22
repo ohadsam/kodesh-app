@@ -178,7 +178,14 @@ async function loadHebrewDate() {
     const drawerHeb = document.getElementById('drawer-heb');
     if (drawerHeb) drawerHeb.textContent = hd;
     // Cache for omer calculation
-    appState._lastHebrewDate = { hm: data.hm, hd: data.hd, hy: data.hy };
+    // Normalize Hebcal month names (Hebcal uses "Iyyar", code uses "Iyar" etc.)
+    const _normalizeMonth = m => {
+      if (m === 'Iyyar')   return 'Iyar';
+      if (m === 'Tammuz')  return 'Tamuz';
+      if (m === 'Adar I' || m === 'Adar 1') return 'Adar';
+      return m; // Adar II, Tishrei, Nisan etc. unchanged
+    };
+    appState._lastHebrewDate = { hm: _normalizeMonth(data.hm), hd: data.hd, hy: data.hy };
     saveState();
     // Re-check reminders now that Hebrew date is available (omer checkFn needs it)
     if (typeof _updateNotifBadge === 'function') _updateNotifBadge();
