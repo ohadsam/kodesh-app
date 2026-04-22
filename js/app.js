@@ -180,6 +180,8 @@ async function loadHebrewDate() {
     // Cache for omer calculation
     appState._lastHebrewDate = { hm: data.hm, hd: data.hd, hy: data.hy };
     saveState();
+    // Re-check reminders now that Hebrew date is available (omer checkFn needs it)
+    if (typeof _updateNotifBadge === 'function') _updateNotifBadge();
     // Schedule omer reminder if enabled
     if (typeof scheduleOmerReminder === 'function') scheduleOmerReminder();
     const tehilimEl = document.getElementById('tehilim-day-info');

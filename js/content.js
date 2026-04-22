@@ -806,11 +806,13 @@ async function loadRashiForRef(torahRef) {
           
           chapterLengths[ch] = Array.isArray(heArr) ? heArr.length : 0;
           const chapLen = chapterLengths[ch];
-          console.log('[Rashi] ch', ch, 'heArr structure: length=', chapLen, 'sample type:', typeof heArr[0], Array.isArray(heArr[0]) ? 'array('+heArr[0].length+')' : '');
+          // Check if structure is per-verse (each element should be array of strings, not a single string)
+          const firstElem = heArr[0];
+          const isPerVerse = chapLen >= 2 && (Array.isArray(firstElem) || typeof firstElem !== 'string');
+          console.log('[Rashi] ch', ch, 'heArr structure: length=', chapLen, 'sample type:', typeof firstElem, Array.isArray(firstElem) ? 'array('+firstElem.length+')' : '');
           
-          // If chapLen is suspiciously low (< 5 for a Torah chapter), the structure might be wrong
-          // Fall through to commentary=1 strategy
-          if (chapLen < 5) {
+          // If structure is not per-verse (too short or single string), fall to strategy 2
+          if (!isPerVerse) {
             console.warn('[Rashi] ch', ch, 'chapLen too low (', chapLen, '), trying commentary=1 fallback');
             // Don't set success - fall through to strategy 2
           } else {
@@ -839,12 +841,55 @@ async function loadRashiForRef(torahRef) {
           }
         }
 
-        // Strategy 2 fallback: commentary=1 with timeout
-        const ctrl2 = new AbortController();
-        const timer2 = setTimeout(() => ctrl2.abort(), 25000);
+        // Strategy 2: "Rashi on Book Chapter:1-N" range ref — returns per-verse structure
+        // Use a chapter length estimate (Torah chapters rarely exceed 60 verses)
+        const chEnd = ch === endCh ? endV : 60;
+        const chStart = ch === startCh ? startV : 1;
+        const rangeRef = `Rashi on ${book} ${ch}:${chStart}-${ch}:${chEnd}`;
+        try {
+          const ctrl2 = new AbortController();
+          const timer2 = setTimeout(() => ctrl2.abort(), 20000);
+          const url2 = `https://www.sefaria.org/api/texts/${encodeURI(rangeRef)}?lang=he&commentary=0&context=0`;
+          console.log('[Rashi] trying range ref:', rangeRef);
+          const resp2 = await fetch(url2, { signal: ctrl2.signal });
+          clearTimeout(timer2);
+          if (resp2.ok) {
+            const data2 = await resp2.json();
+            let heArr2 = data2.he;
+            if (heArr2 && Array.isArray(heArr2) && heArr2.length >= 2) {
+              // Range ref returns array indexed from chStart
+              heArr2.forEach((verseRashi, idx) => {
+                const vNum = chStart + idx;
+                if (vNum > chEnd) return;
+                if (ch === endCh && vNum > endV) return;
+                const key = `${ch}:${vNum}`;
+                const rawTexts = Array.isArray(verseRashi)
+                  ? verseRashi.flat(Infinity).filter(Boolean)
+                  : (verseRashi ? [verseRashi] : []);
+                const cleaned = rawTexts.map(t =>
+                  typeof t === 'string' ? t.replace(/<(?!\/?(?:b|i|strong)\b)[^>]+>/gi,'').trim() : ''
+                ).filter(Boolean);
+                if (cleaned.length) {
+                  if (!verseMap.has(key)) verseMap.set(key, []);
+                  verseMap.get(key).push(cleaned.join('<br><br>'));
+                }
+              });
+              const chEntries = [...verseMap.keys()].filter(k => k.startsWith(ch+':')).length;
+              console.log('[Rashi] range ref OK, ch', ch, '| entries:', chEntries);
+              success = true;
+            }
+          }
+        } catch(e2) {
+          console.warn('[Rashi] range ref failed for ch', ch, ':', e2.message);
+        }
+        if (success) continue;
+
+        // Strategy 3 fallback: commentary=1 (large response, last resort)
+        const ctrl3 = new AbortController();
+        const timer3 = setTimeout(() => ctrl3.abort(), 35000);
         const url = `https://www.sefaria.org/api/texts/${encodeURI(book + ' ' + ch)}?lang=he&commentary=1&context=0`;
-        const resp = await fetch(url, { signal: ctrl2.signal });
-        clearTimeout(timer2);
+        const resp = await fetch(url, { signal: ctrl3.signal });
+        clearTimeout(timer3);
         if (!resp.ok) {
           console.warn('[Rashi] ch', ch, 'attempt', attempt+1, 'HTTP', resp.status);
           continue;
