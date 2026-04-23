@@ -383,6 +383,40 @@ suite('📕 סידור – race condition ותזכורות', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
+suite('📜 פרשות מחוברות – מקף עברי (maqaf)', () => {
+  // Mirror the fix: normalize maqaf U+05BE to hyphen before splitting
+  function normalizeMaqaf(s) { return s ? s.replace(/־/g, '-') : s; }
+  function cleanParasha(heName) {
+    return normalizeMaqaf(heName).replace(/פרשת\s*/, '').trim();
+  }
+
+  test('מקף עברי (U+05BE) מנורמל ל-hyphen', () => {
+    const s = 'אחרי מות־קדשים';
+    assertEqual(normalizeMaqaf(s), 'אחרי מות-קדשים');
+  });
+
+  test('פרשת אחרי מות־קדשים (maqaf) → חלקים נכונים', () => {
+    const clean = cleanParasha('פרשת אחרי מות־קדשים');
+    assertEqual(clean, 'אחרי מות-קדשים');
+    const parts = clean.split('-');
+    assertEqual(parts[0].trim(), 'אחרי מות');
+    assertEqual(parts[1].trim(), 'קדשים');
+  });
+
+  test('פרשת תזריע-מצרע (hyphen רגיל) עדיין עובד', () => {
+    const clean = cleanParasha('פרשת תזריע-מצרע');
+    assertEqual(clean, 'תזריע-מצרע');
+    const parts = clean.split('-');
+    assertEqual(parts[0].trim(), 'תזריע');
+    assertEqual(parts[1].trim(), 'מצרע');
+  });
+
+  test('content.js מכיל נרמול maqaf', () => {
+    const src = readFile('js/content.js');
+    assertContains(src, '\u05be', 'maqaf normalization in content.js');
+  });
+});
+
 // SUMMARY
 suite('📅 נרמול חודשים עבריים מ-Hebcal', () => {
   // Mirror normalizeMonth from app.js
