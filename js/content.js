@@ -450,15 +450,17 @@ async function loadParasha() {
 
     // Match to our ALL_PARASHIOT list
     // Handle combined parshiot like "תזריע-מצורע" / "תזריע-מצרע" (Hebcal spelling varies)
-    const clean = heName.replace(/פרשת\s*/,'').trim();
+    const clean = heName.replace(/־/g, '-').replace(/פרשת\s*/,'').trim();
     let matchP = ALL_PARASHIOT.find(p => clean === p.he)
       || ALL_PARASHIOT.find(p => heName === p.he || heName === 'פרשת ' + p.he)
       || ALL_PARASHIOT.find(p => clean.length >= 3 && p.he.startsWith(clean) && p.he.length <= clean.length + 2);
 
     // Combined parsha fallback: "תזריע-מצרע" → match each part with fuzzy matching
+    // Normalize Hebrew maqaf (U+05BE ־) to regular hyphen before splitting
+    const cleanNorm = clean.replace(/־/g, '-');
     let combinedSecond = null;
-    if (!matchP && clean.includes('-')) {
-      const parts = clean.split('-');
+    if (!matchP && (cleanNorm.includes('-'))) {
+      const parts = cleanNorm.split('-');
       const first  = parts[0].trim();
       const second = parts[1]?.trim();
 
@@ -503,7 +505,7 @@ async function loadParasha() {
 
     // Detect combined parshiot (e.g. "Parashat Vayakhel-Pekudei")
     // Hebcal title: "Parashat Vayakhel-Pekudei" / Hebrew: "פרשת ויקהל-פקודי"
-    const isCombined = (parashaEvent.title || '').includes('-') || (heName || '').includes('-');
+    const isCombined = (parashaEvent.title || '').replace(/־/g,'-').includes('-') || (heName || '').replace(/־/g,'-').includes('-');
     if (isCombined) {
       console.log('[Parasha] Combined parsha detected:', heName);
       // nameEl already has the full combined name from Hebcal
@@ -556,7 +558,7 @@ async function loadParasha() {
     loadingEl.style.display = 'none';
     updateDoneButton('parasha', currentParashaRef);
   } catch(e) {
-    console.error('[Parasha] error:', e);
+    console.error('[Parasha] error:', e?.message || e, e?.stack);
     loadingEl.textContent = 'שגיאה בטעינה: ' + e.message;
   } finally {
     _parashaLoading = false;
