@@ -124,11 +124,12 @@ function renderParasha() {
     }
     el.innerHTML = parashaVerses.map((v,i) => {
       const r = rashiVerses[i];
+      const verseRef = _aliyaVerseNums[i] ? `<span style="color:var(--muted);font-size:10px;margin-right:4px">(${_aliyaVerseNums[i]})</span>` : '';
       return `<div style="margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:10px">
         <div style="margin-bottom:5px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>
         <span style="font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);color:var(--cream);line-height:1.85">${v}</span></div>
         ${r ? `<div style="padding:7px 10px;background:rgba(201,165,74,.06);border-right:2px solid var(--gold-dim);border-radius:0 6px 6px 0">
-          <div style="font-size:10px;color:var(--gold);font-weight:600;margin-bottom:2px">רש"י</div>
+          <div style="font-size:10px;color:var(--gold);font-weight:600;margin-bottom:2px">רש"י ${verseRef}</div>
           <span style="font-family:'Frank Ruhl Libre',serif;font-size:calc(var(--font-size)*.88);color:var(--text);line-height:1.7">${r}</span></div>` : ''}
       </div>`;
     }).join('');
@@ -566,6 +567,7 @@ async function loadParasha() {
 }
 
 let _currentAliyaRef = null;  // tracks which ref Rashi/Onkelos are loading for
+let _aliyaVerseNums  = [];    // absolute verse numbers (e.g. "21:3") for each parashaVerses index
 
 // ── Haftara loading ─────────────────────────────────────────────────────────
 // haftaraRef from Hebcal is like "I Kings 18:46-19:21"
@@ -696,7 +698,7 @@ async function loadAliyaText(ref) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
   const page = document.getElementById('page-parasha');
   if (page) page.scrollTop = 0;
-  parashaVerses = []; rashiVerses = []; onkelosVerses = [];
+  parashaVerses = []; rashiVerses = []; onkelosVerses = []; _aliyaVerseNums = [];
   rashiLoaded = false; onkelosLoaded = false;
   _rashiLoading = false;   // cancel any in-progress Rashi load
   _onkelosLoading = false; // cancel any in-progress Onkelos load
@@ -878,6 +880,10 @@ async function loadRashiForRef(torahRef) {
               });
               const chEntries = [...verseMap.keys()].filter(k => k.startsWith(ch+':')).length;
               console.log('[Rashi] range ref OK, ch', ch, '| entries:', chEntries);
+              // Fix: update chapterLengths so the final mapping loop uses correct lastV
+              // Use the max verse number found, or chEnd (whichever is larger)
+              const maxVerseFound = heArr2.length > 0 ? chStart + heArr2.length - 1 : chEnd;
+              chapterLengths[ch] = Math.max(chapterLengths[ch] || 0, maxVerseFound, chEnd);
               success = true;
             }
           }
@@ -932,7 +938,8 @@ async function loadRashiForRef(torahRef) {
   // Map Rashi to verse indices
   // Don't rely on chapterLengths from Rashi endpoint (can differ from Torah)
   // Instead, iterate exactly the verse range we need
-  rashiVerses = new Array(parashaVerses.length).fill('');
+  rashiVerses      = new Array(parashaVerses.length).fill('');
+  _aliyaVerseNums  = new Array(parashaVerses.length).fill('');
   let idx = 0;
   for (let ch = startCh; ch <= endCh; ch++) {
     const firstV   = (ch === startCh) ? startV : 1;
@@ -940,6 +947,7 @@ async function loadRashiForRef(torahRef) {
     for (let v = firstV; v <= lastV; v++) {
       if (idx >= parashaVerses.length) break;
       const key = `${ch}:${v}`;
+      _aliyaVerseNums[idx] = key;   // store absolute verse ref
       if (verseMap.has(key)) {
         rashiVerses[idx] = verseMap.get(key).join('<br><br>');
       }
