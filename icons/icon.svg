@@ -1,48 +1,116 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
-    <radialGradient id="bg" cx="50%" cy="40%" r="60%">
-      <stop offset="0%" stop-color="#2a1a08"/>
-      <stop offset="100%" stop-color="#0e0905"/>
+    <radialGradient id="bg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#2a1f0a"/>
+      <stop offset="100%" stop-color="#1a1108"/>
     </radialGradient>
-    <linearGradient id="star" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#ffe066"/>
-      <stop offset="60%" stop-color="#c9a54a"/>
-      <stop offset="100%" stop-color="#9a7830"/>
+    <radialGradient id="glow" cx="50%" cy="40%" r="55%">
+      <stop offset="0%" stop-color="#c9a54a" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#c9a54a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="bookGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#e8c06a"/>
+      <stop offset="100%" stop-color="#a07830"/>
     </linearGradient>
-    <linearGradient id="hex" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#b8922a"/>
-      <stop offset="100%" stop-color="#7a6030"/>
+    <linearGradient id="pageGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5e8c8"/>
+      <stop offset="100%" stop-color="#e0c88a"/>
     </linearGradient>
   </defs>
 
-  <!-- Rounded square background -->
-  <rect width="512" height="512" rx="110" ry="110" fill="url(#bg)"/>
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="256" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="256" fill="url(#glow)"/>
 
-  <!-- Gold border ring -->
-  <rect width="512" height="512" rx="110" ry="110"
-        fill="none" stroke="#c9a54a" stroke-width="12" opacity="0.7"/>
+  <!-- Open book base -->
+  <g transform="translate(256,270)">
+    <!-- Left page -->
+    <path d="M-165,-95 Q-165,-105 -155,-108 L-10,-120 Q-2,-121 0,-115 L0,85 Q-2,90 -12,92 L-155,80 Q-165,78 -165,68 Z"
+          fill="url(#pageGrad)" opacity="0.95"/>
+    <!-- Right page -->
+    <path d="M165,-95 Q165,-105 155,-108 L10,-120 Q2,-121 0,-115 L0,85 Q2,90 12,92 L155,80 Q165,78 165,68 Z"
+          fill="url(#pageGrad)" opacity="0.85"/>
+    <!-- Spine -->
+    <path d="M-8,-122 Q0,-126 8,-122 L8,92 Q0,96 -8,92 Z" fill="url(#bookGrad)"/>
+    <!-- Book cover bottom -->
+    <path d="M-165,68 Q-165,85 -150,88 L-12,100 Q-2,102 0,96 L0,85 Q-2,90 -12,92 L-155,80 Q-165,78 -165,68 Z"
+          fill="#8a6420" opacity="0.6"/>
+    <path d="M165,68 Q165,85 150,88 L12,100 Q2,102 0,96 L0,85 Q2,90 12,92 L155,80 Q165,78 165,68 Z"
+          fill="#8a6420" opacity="0.5"/>
 
-  <!-- Star of David (Magen David) -->
-  <!-- Triangle pointing UP -->
-  <polygon points="256,90 84,390 428,390"
-           fill="url(#star)" opacity="0.95"/>
-  <!-- Triangle pointing DOWN -->
-  <polygon points="256,420 84,120 428,120"
-           fill="url(#star)" opacity="0.95"/>
-  <!-- Center hexagon (darker overlap) -->
-  <polygon points="256,175 328,215 328,295 256,335 184,295 184,215"
-           fill="url(#hex)"/>
+    <!-- Text lines on left page -->
+    <line x1="-140" y1="-70" x2="-20" y2="-78" stroke="#c9a54a" stroke-width="3" stroke-linecap="round" opacity="0.7"/>
+    <line x1="-140" y1="-48" x2="-20" y2="-55" stroke="#c9a54a" stroke-width="2.5" stroke-linecap="round" opacity="0.5"/>
+    <line x1="-140" y1="-28" x2="-20" y2="-34" stroke="#c9a54a" stroke-width="2.5" stroke-linecap="round" opacity="0.5"/>
+    <line x1="-140" y1="-8"  x2="-20" y2="-13" stroke="#c9a54a" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
+    <line x1="-140" y1="12"  x2="-20" y2="8"   stroke="#c9a54a" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
+    <line x1="-140" y1="32"  x2="-20" y2="28"  stroke="#c9a54a" stroke-width="2" stroke-linecap="round" opacity="0.3"/>
+    <line x1="-140" y1="52"  x2="-50" y2="48"  stroke="#c9a54a" stroke-width="2" stroke-linecap="round" opacity="0.3"/>
 
-  <!-- Text bar background -->
-  <rect x="50" y="390" width="412" height="72" rx="12" fill="#140c04" opacity="0.9"/>
-  <!-- Gold separator line -->
-  <line x1="50" y1="390" x2="462" y2="390" stroke="#c9a54a" stroke-width="2"/>
+    <!-- Text lines on right page -->
+    <line x1="20" y1="-78" x2="140" y2="-70" stroke="#a07830" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+    <line x1="20" y1="-55" x2="140" y2="-48" stroke="#a07830" stroke-width="2.5" stroke-linecap="round" opacity="0.4"/>
+    <line x1="20" y1="-34" x2="140" y2="-28" stroke="#a07830" stroke-width="2.5" stroke-linecap="round" opacity="0.4"/>
+    <line x1="20" y1="-13" x2="140" y2="-8"  stroke="#a07830" stroke-width="2" stroke-linecap="round" opacity="0.35"/>
+    <line x1="20" y1="8"   x2="140" y2="12"  stroke="#a07830" stroke-width="2" stroke-linecap="round" opacity="0.35"/>
+    <line x1="20" y1="28"  x2="140" y2="32"  stroke="#a07830" stroke-width="2" stroke-linecap="round" opacity="0.25"/>
+  </g>
 
-  <!-- "לימוד יומי" text -->
-  <text x="256" y="438"
-        font-family="'Frank Ruhl Libre', 'Arial Hebrew', serif"
-        font-size="42" font-weight="700"
-        fill="#c9a54a"
-        text-anchor="middle"
-        direction="rtl">לימוד יומי</text>
+  <!-- Menorah / candelabra above book -->
+  <g transform="translate(256,148)" opacity="0.9">
+    <!-- Base -->
+    <rect x="-28" y="72" width="56" height="8" rx="4" fill="url(#bookGrad)"/>
+    <rect x="-18" y="64" width="36" height="10" rx="3" fill="url(#bookGrad)"/>
+    <!-- Stem -->
+    <rect x="-4" y="-8" width="8" height="74" rx="4" fill="url(#bookGrad)"/>
+    <!-- Arms -->
+    <path d="M-60,20 Q-60,0 -40,0 L-4,0" fill="none" stroke="url(#bookGrad)" stroke-width="6" stroke-linecap="round"/>
+    <path d="M-38,20 Q-38,8 -26,8 L-4,8" fill="none" stroke="url(#bookGrad)" stroke-width="5" stroke-linecap="round"/>
+    <path d="M60,20 Q60,0 40,0 L4,0" fill="none" stroke="url(#bookGrad)" stroke-width="6" stroke-linecap="round"/>
+    <path d="M38,20 Q38,8 26,8 L4,8" fill="none" stroke="url(#bookGrad)" stroke-width="5" stroke-linecap="round"/>
+    <!-- Flames - 7 candles -->
+    <g fill="#f0c040">
+      <!-- flame glow -->
+      <ellipse cx="-60" cy="12" rx="7" ry="10" opacity="0.3"/>
+      <ellipse cx="-38" cy="12" rx="6" ry="9" opacity="0.3"/>
+      <ellipse cx="-16" cy="4"  rx="6" ry="9" opacity="0.3"/>
+      <ellipse cx="0"   cy="-16" rx="7" ry="11" opacity="0.4"/>
+      <ellipse cx="16"  cy="4"  rx="6" ry="9" opacity="0.3"/>
+      <ellipse cx="38"  cy="12" rx="6" ry="9" opacity="0.3"/>
+      <ellipse cx="60"  cy="12" rx="7" ry="10" opacity="0.3"/>
+      <!-- flame shapes -->
+      <path d="M-63,10 Q-60,2 -57,10 Q-58,18 -60,18 Q-62,18 -63,10 Z" fill="#ffd060"/>
+      <path d="M-60,5 Q-60,-2 -60,5 Q-57,2 -60,8 Z" fill="#fff" opacity="0.8"/>
+      <path d="M-41,10 Q-38,3 -35,10 Q-36,17 -38,17 Q-40,17 -41,10 Z" fill="#ffd060"/>
+      <path d="M-38,5 Q-38,-1 -38,5 Q-35,2 -38,7 Z" fill="#fff" opacity="0.7"/>
+      <path d="M-19,2 Q-16,-4 -13,2 Q-14,10 -16,10 Q-18,10 -19,2 Z" fill="#ffd060"/>
+      <path d="M-16,-3 Q-16,-8 -16,-3 Q-13,-5 -16,2 Z" fill="#fff" opacity="0.7"/>
+      <path d="M-3,-18 Q0,-28 3,-18 Q2,-8 0,-8 Q-2,-8 -3,-18 Z" fill="#ffe070"/>
+      <path d="M0,-22 Q0,-30 0,-22 Q3,-25 0,-16 Z" fill="#fff" opacity="0.9"/>
+      <path d="M13,2 Q16,-4 19,2 Q18,10 16,10 Q14,10 13,2 Z" fill="#ffd060"/>
+      <path d="M16,-3 Q16,-8 16,-3 Q19,-5 16,2 Z" fill="#fff" opacity="0.7"/>
+      <path d="M35,10 Q38,3 41,10 Q40,17 38,17 Q36,17 35,10 Z" fill="#ffd060"/>
+      <path d="M38,5 Q38,-1 38,5 Q41,2 38,7 Z" fill="#fff" opacity="0.7"/>
+      <path d="M57,10 Q60,2 63,10 Q62,18 60,18 Q58,18 57,10 Z" fill="#ffd060"/>
+      <path d="M60,5 Q60,-2 60,5 Q63,2 60,8 Z" fill="#fff" opacity="0.8"/>
+    </g>
+  </g>
+
+  <!-- Stars of David subtle background -->
+  <g opacity="0.06" fill="#c9a54a">
+    <polygon points="60,60 70,78 50,78" transform="rotate(180,60,69)"/>
+    <polygon points="60,60 70,78 50,78"/>
+    <polygon points="440,80 450,98 430,98" transform="rotate(180,440,89)"/>
+    <polygon points="440,80 450,98 430,98"/>
+    <polygon points="80,440 90,458 70,458" transform="rotate(180,80,449)"/>
+    <polygon points="80,440 90,458 70,458"/>
+    <polygon points="432,420 442,438 422,438" transform="rotate(180,432,429)"/>
+    <polygon points="432,420 442,438 422,438"/>
+  </g>
+
+  <!-- Hebrew word "עיתים" at bottom -->
+  <text x="256" y="470" text-anchor="middle" 
+        font-family="serif" font-size="52" font-weight="bold"
+        fill="url(#bookGrad)" opacity="0.9"
+        letter-spacing="4">עיתים</text>
 </svg>
