@@ -92,7 +92,7 @@ let currentAliya = 'all';
 let rashiLoaded = false;
 let rashiVisible = false;
 
-const APP_VERSION  = '5.73';
+const APP_VERSION  = '5.76';
 const STORAGE_KEY  = 'kodesh_app_v1';
 const SIDDUR_CACHE_KEY = 'siddur_cache_v';
 
@@ -132,6 +132,22 @@ function formatDisplayDate(d) {
 // ═══════════════════════════════════════════
 // API WITH DELAY
 // ═══════════════════════════════════════════
+// ── Gematria (Hebrew numerals) ────────────────────────────────────────
+function toGematria(n) {
+  if (!n || n <= 0 || n >= 1000) return String(n);
+  const hundreds = ['','ק','ר','ש','ת','תק','תר','תש','תת','תתק'];
+  const tens     = ['','י','כ','ל','מ','נ','ס','ע','פ','צ'];
+  const ones     = ['','א','ב','ג','ד','ה','ו','ז','ח','ט'];
+  if (n === 15) return 'ט\u05F4ו';
+  if (n === 16) return 'ט\u05F4ז';
+  const h = Math.floor(n / 100);
+  const t = Math.floor((n % 100) / 10);
+  const o = n % 10;
+  const s = hundreds[h] + tens[t] + ones[o];
+  if (s.length === 1) return s + '\u05F3';
+  return s.slice(0, -1) + '\u05F4' + s.slice(-1);
+}
+
 async function fetchWithDelay(url, delay = 300) {
   await new Promise(r => setTimeout(r, delay));
   console.log(`[fetch] GET ${url.length > 120 ? url.slice(0,120)+'...' : url}`);

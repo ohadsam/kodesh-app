@@ -56,6 +56,7 @@ function loadTab(name) {
   if (name === 'mishna')    loadMishnaYomi();
   if (name === '929')       loadTanach929();
   if (name === 'rambam')    loadRambamYomi();
+  if (name === 'emuna')     loadEmuna();
   if (name === 'logs')      renderLogs();
   if (name === 'qibla')     initQibla();
 }

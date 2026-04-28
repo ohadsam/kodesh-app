@@ -112,9 +112,43 @@ function renderParasha() {
   const el = document.getElementById('parasha-content');
   if (!parashaVerses.length) { el.innerHTML = ''; return; }
 
+  // Helper: parse verse ref from _aliyaVerseNums[i] → {ch, v}
+  const parseRef = (i) => {
+    const key = (_aliyaVerseNums && _aliyaVerseNums[i]) || '';
+    const m = key.match(/^(\d+):(\d+)$/);
+    return m ? { ch: parseInt(m[1]), v: parseInt(m[2]) } : null;
+  };
+  // Verse label as gematria (verse number within chapter)
+  const verseLabel = (i) => {
+    const ref = parseRef(i);
+    return toGematria(ref ? ref.v : i + 1);
+  };
+  // Rashi label: "(פרק X פסוק Y)" in gematria
+  const rashiLabel = (i) => {
+    const ref = parseRef(i);
+    if (!ref) return '';
+    return `(פרק ${toGematria(ref.ch)} פסוק ${toGematria(ref.v)})`;
+  };
+  // Chapter header when chapter changes
+  const chapterHeader = (i) => {
+    const ref = parseRef(i);
+    if (!ref) return '';
+    const prev = parseRef(i - 1);
+    if (i === 0 || (prev && prev.ch !== ref.ch)) {
+      return `<div style="text-align:center;margin:14px 0 8px;font-size:11px;` +
+        `font-family:'Heebo',sans-serif;color:var(--gold-dim);font-weight:600;` +
+        `letter-spacing:1px">— פרק ${toGematria(ref.ch)} —</div>`;
+    }
+    return '';
+  };
+
   if (parashaView === 'text') {
     el.innerHTML = parashaVerses.map((v,i) =>
-      `<div style="margin-bottom:8px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span><span style="font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);line-height:1.85">${v}</span></div>`
+      chapterHeader(i) +
+      `<div style="margin-bottom:8px">` +
+      `<span style="color:var(--gold-dim);font-size:11px">${verseLabel(i)} </span>` +
+      `<span style="font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);line-height:1.85">${v}</span>` +
+      `</div>`
     ).join('');
 
   } else if (parashaView === 'rashi') {
@@ -124,14 +158,18 @@ function renderParasha() {
     }
     el.innerHTML = parashaVerses.map((v,i) => {
       const r = rashiVerses[i];
-      const verseRef = _aliyaVerseNums[i] ? `<span style="color:var(--muted);font-size:10px;margin-right:4px">(${_aliyaVerseNums[i]})</span>` : '';
-      return `<div style="margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:10px">
-        <div style="margin-bottom:5px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>
-        <span style="font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);color:var(--cream);line-height:1.85">${v}</span></div>
-        ${r ? `<div style="padding:7px 10px;background:rgba(201,165,74,.06);border-right:2px solid var(--gold-dim);border-radius:0 6px 6px 0">
-          <div style="font-size:10px;color:var(--gold);font-weight:600;margin-bottom:2px">רש"י ${verseRef}</div>
-          <span style="font-family:'Frank Ruhl Libre',serif;font-size:calc(var(--font-size)*.88);color:var(--text);line-height:1.7">${r}</span></div>` : ''}
-      </div>`;
+      return chapterHeader(i) +
+        `<div style="margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:10px">` +
+        `<div style="margin-bottom:5px">` +
+        `<span style="color:var(--gold-dim);font-size:11px">${verseLabel(i)} </span>` +
+        `<span style="font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);color:var(--cream);line-height:1.85">${v}</span>` +
+        `</div>` +
+        (r ? `<div style="padding:7px 10px;background:rgba(201,165,74,.06);border-right:2px solid var(--gold-dim);border-radius:0 6px 6px 0">` +
+          `<div style="font-size:10px;color:var(--gold);font-weight:600;margin-bottom:2px">רש"י ` +
+          `<span style="color:var(--muted);font-weight:400">${rashiLabel(i)}</span></div>` +
+          `<span style="font-family:'Frank Ruhl Libre',serif;font-size:calc(var(--font-size)*.88);color:var(--text);line-height:1.7">${r}</span>` +
+          `</div>` : '') +
+        `</div>`;
     }).join('');
 
   } else if (parashaView === 'onkelos') {
@@ -141,14 +179,19 @@ function renderParasha() {
     }
     el.innerHTML = parashaVerses.map((v,i) => {
       const o = onkelosVerses[i];
-      return `<div style="margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:10px">
-        <div style="margin-bottom:5px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>
-        <span style="font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);color:var(--cream);line-height:1.85">${v}</span></div>
-        ${o ? `<div style="padding:7px 10px;background:rgba(42,120,140,.08);border-right:2px solid rgba(42,180,200,.4);border-radius:0 6px 6px 0">
-          <div style="font-size:10px;color:rgba(100,200,220,.9);font-weight:600;margin-bottom:2px">אונקלוס</div>
-          <span style="font-family:'Frank Ruhl Libre',serif;font-size:calc(var(--font-size)*.88);color:var(--text);line-height:1.7;font-style:italic">${o}</span></div>` : ''}
-      </div>`;
+      return chapterHeader(i) +
+        `<div style="margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:10px">` +
+        `<div style="margin-bottom:5px">` +
+        `<span style="color:var(--gold-dim);font-size:11px">${verseLabel(i)} </span>` +
+        `<span style="font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);color:var(--cream);line-height:1.85">${v}</span>` +
+        `</div>` +
+        (o ? `<div style="padding:7px 10px;background:rgba(42,120,140,.08);border-right:2px solid rgba(42,180,200,.4);border-radius:0 6px 6px 0">` +
+          `<div style="font-size:10px;color:rgba(100,200,220,.9);font-weight:600;margin-bottom:2px">אונקלוס</div>` +
+          `<span style="font-family:'Frank Ruhl Libre',serif;font-size:calc(var(--font-size)*.88);color:var(--text);line-height:1.7;font-style:italic">${o}</span>` +
+          `</div>` : '') +
+        `</div>`;
     }).join('');
+
   } else if (parashaView === 'haftara') {
     if (!haftaraLoaded) {
       el.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center">⏳ טוען הפטרה...</div>';
@@ -158,11 +201,13 @@ function renderParasha() {
       el.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center">אין נתוני הפטרה</div>';
       return;
     }
-    el.innerHTML = `<div style="font-size:11px;color:var(--gold);margin-bottom:10px;font-family:'Heebo',sans-serif">
-      📜 הפטרה – ${_haftaraRef || ''}</div>` +
+    el.innerHTML = `<div style="font-size:11px;color:var(--gold);margin-bottom:10px;font-family:'Heebo',sans-serif">` +
+      `📜 הפטרה – ${_haftaraRef || ''}</div>` +
       haftaraVerses.map((v,i) =>
-        `<div style="margin-bottom:8px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span><span style="font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);line-height:1.85">${v}</span></div>`
+        `<div style="margin-bottom:8px"><span style="color:var(--gold-dim);font-size:11px">${toGematria(i+1)} </span>` +
+        `<span style="font-family:'Frank Ruhl Libre',serif;font-size:var(--font-size);line-height:1.85">${v}</span></div>`
       ).join('');
+
   } else if (parashaView === 'sacks') {
     if (!_sacksLoaded) {
       el.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center">⏳ טוען מאמר הרב זקס...</div>';
