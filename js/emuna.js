@@ -208,7 +208,13 @@ async function _loadKuzariUnit(idx) {
   try {
     console.log('[Kuzari] loading unit', idx, 'ref:', unit.ref);
     const data = await sefariaText(unit.ref, 300);
-    const flat = heFlat(data).map(cleanSefariaHtml).filter(Boolean);
+    // heFlat may return string or array depending on Kuzari structure
+    let rawItems = heFlat(data);
+    // If only one item and it's a long string, it's a single paragraph
+    if (!Array.isArray(rawItems)) rawItems = rawItems ? [rawItems] : [];
+    const flat = rawItems
+      .map(s => (typeof s === 'string' ? cleanSefariaHtml(s) : (s ? String(s) : '')))
+      .filter(Boolean);
 
     if (!flat.length) throw new Error('no text returned');
 

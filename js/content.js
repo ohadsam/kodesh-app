@@ -734,6 +734,33 @@ async function _kickoffHaftara(haftaraRef) {
   if (parashaView === 'haftara') renderParasha();
 }
 
+
+// Compute absolute verse numbers from a Sefaria ref like "Leviticus 21:1-21:15"
+// Returns array like ["21:1","21:2",...] matching parashaVerses length
+function _computeVerseNums(ref, count) {
+  const nums = new Array(count).fill('');
+  // Match ref like "Book CH:V-CH2:V2" or "Book CH:V"
+  const m = ref.match(/([A-Za-z\s]+)\s+(\d+):(\d+)(?:-(\d+):(\d+))?/);
+  if (!m) return nums;
+  const startCh = parseInt(m[2]), startV = parseInt(m[3]);
+  // For single-chapter refs (no second ch:v): just number from startV
+  if (!m[4]) {
+    for (let i = 0; i < count; i++) nums[i] = `${startCh}:${startV + i}`;
+    return nums;
+  }
+  // Multi-chapter: we don't know exact chapter lengths without API data
+  // Use a best-effort sequential fill starting at startCh:startV
+  // This will be overwritten with accurate data when Rashi loads
+  let ch = startCh, v = startV, idx = 0;
+  while (idx < count) {
+    nums[idx] = `${ch}:${v}`;
+    v++; idx++;
+    // Rough chapter size estimate - will be corrected by Rashi loader
+    // Most Torah chapters: 20-60 verses
+  }
+  return nums;
+}
+
 async function loadAliyaText(ref) {
   const loadingEl = document.getElementById('parasha-loading');
   loadingEl.style.display = 'block';
@@ -756,6 +783,10 @@ async function loadAliyaText(ref) {
     parashaVerses = heFlat(data);
     console.log(`[Parasha] got ${parashaVerses.length} verses`);
     if (!parashaVerses.length) throw new Error('no Hebrew verses returned');
+
+    // Populate _aliyaVerseNums immediately from the ref string
+    // so chapter headers show in text view before Rashi loads
+    _aliyaVerseNums = _computeVerseNums(ref, parashaVerses.length);
 
     // Pre-load Rashi and Onkelos in background (they check _currentAliyaRef)
     loadRashiForRef(ref);
