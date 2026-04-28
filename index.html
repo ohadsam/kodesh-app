@@ -7,8 +7,8 @@
   <meta name="mobile-web-app-capable" content="true" />
   <meta name="apple-mobile-web-app-capable" content="true" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="לימוד יומי" />
-  <title>לימוד יומי</title>
+  <meta name="apple-mobile-web-app-title" content="עיתים" />
+  <title>עיתים – לימוד יומי</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
@@ -20,7 +20,7 @@
        NOTE: this is the ONLY version check. utils.js must NOT have another one. -->
   <script>
     (function() {
-      var V = '5.73';
+      var V = '5.76';
       // Show version in splash immediately
       var sv = document.getElementById('splash-version');
       if (sv) sv.textContent = 'גרסה ' + V;
@@ -103,10 +103,10 @@
 
 <div id="splash">
   <div class="logo-big">✡</div>
-  <div style="font-family:'Frank Ruhl Libre',serif;font-size:26px;color:var(--cream);font-weight:700">לימוד יומי</div>
+  <div style="font-family:'Frank Ruhl Libre',serif;font-size:26px;color:var(--cream);font-weight:700">עיתים</div>
   <div class="spinner"></div>
   <p id="splash-status" style="font-size:12px;color:var(--gold);margin:4px 0 0;min-height:18px">טוען...</p>
-  <p id="splash-version" style="font-size:11px;color:var(--muted);margin-top:2px">גרסה 5.73</p>
+  <p id="splash-version" style="font-size:11px;color:var(--muted);margin-top:2px">גרסה 5.76</p>
   <div id="splash-retry" style="display:none;margin-top:20px">
     <button onclick="localStorage.clear();sessionStorage.clear();location.reload(true)"
       style="background:var(--gold);color:#000;border:none;border-radius:10px;padding:10px 24px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Heebo',sans-serif">🔄 איפוס וטעינה מחדש</button>
@@ -235,8 +235,8 @@
 
     <!-- Version & Copyright -->
     <div style="text-align:center;padding:18px 0 8px;border-top:1px solid var(--border);margin-top:8px">
-      <div style="font-size:13px;font-weight:600;color:var(--gold-dim);margin-bottom:4px">📖 לימוד יומי</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">גרסה 5.73</div>
+      <div style="font-size:13px;font-weight:600;color:var(--gold-dim);margin-bottom:4px">📖 עיתים</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">גרסה 5.76</div>
       <button onclick="showWhatsNew()" style="background:var(--card);border:1px solid var(--gold-dim);color:var(--gold);padding:6px 16px;border-radius:8px;font-size:11px;cursor:pointer;font-family:'Heebo',sans-serif;margin-bottom:6px">🆕 מה חדש?</button>
       <div style="font-size:11px;color:var(--muted)">© כל הזכויות שמורות לאוהד סמט</div>
     </div>
@@ -248,20 +248,21 @@
 <div id="whats-new-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
   width:88%;max-width:400px;max-height:80vh;overflow-y:auto;
   background:var(--surface);border:1px solid var(--gold-dim);border-radius:16px;z-index:10001;padding:20px;direction:rtl">
-  <div style="font-size:16px;font-weight:700;color:var(--gold);margin-bottom:12px;text-align:center">🆕 מה חדש בגרסה 5.73</div>
+  <div style="font-size:16px;font-weight:700;color:var(--gold);margin-bottom:12px;text-align:center">🆕 מה חדש בגרסה 5.76</div>
   <div style="font-size:13px;color:var(--cream);line-height:1.7" id="whats-new-content">
-    <div style="margin-bottom:10px"><b>📖 רש"י – תיקון מיפוי עלייות</b></div>
-    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• תוקן: כשפרשה חוצה פרק (למשל כ"א:טז–כ"ב:טז) הרש"י הוצג על הפסוק הלא נכון</div>
-    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• הסיבה: chapterLengths לא עודכן אחרי range ref – גרם ללולאת מיפוי שגויה</div>
-    <div style="margin-bottom:10px"><b>📖 מספר פסוק ברש"י</b></div>
-    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• נוסף מספר פסוק מוחלט (למשל "כא:ג") בכותרת כל רש"י לאיתור קל</div>
+    <div style="margin-bottom:10px"><b>📜 פרשת השבוע – מספרי פסוקים</b></div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• מספרי פסוקים מוצגים בגמטריה עברית (א׳, ב׳, י״ז...)</div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• כותרת פרק מופיעה אוטומטית בתחילת כל פרק</div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• ברש״י: "(פרק כ״ב פסוק ט״ו)" במקום מספרים רצים</div>
+    <div style="margin-bottom:10px"><b>🕯 כוזרי – סעיף אחד ביחידה</b></div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• עודכן ל-329 יחידות (סעיף אחד, חצי עמוד–עמוד)</div>
   </div>
   <button onclick="closeWhatsNew()" style="display:block;width:100%;margin-top:14px;background:var(--gold);color:#000;border:none;border-radius:10px;padding:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Heebo',sans-serif">👍 הבנתי</button>
 </div>
 
 <!-- TOP BAR -->
 <div id="topbar">
-  <div class="brand">✡ לימוד יומי</div>
+  <div class="brand">✡ עיתים</div>
   <div class="date-chip" id="topbar-date" onclick="toggleDateNav()" style="cursor:pointer">
     <div id="topbar-greg">טוען...</div>
     <div id="topbar-heb" style="font-size:10px;color:var(--muted)"></div>
@@ -312,6 +313,7 @@
   <button class="tab" onclick="showTab('igeret')" id="t-igeret"><span class="icon">✉️</span>אגרת</button>
   <button class="tab" onclick="showTab('tefilot')" id="t-tefilot"><span class="icon">🤲</span>תפילות</button>
   <button class="tab" onclick="showTab('brachot')" id="t-brachot"><span class="icon">✨</span>ברכות</button>
+  <button class="tab" onclick="showTab('emuna')" id="t-emuna"><span class="icon">🕯</span>אמונה</button>
   <button class="tab" onclick="showTab('qibla')" id="t-qibla"><span class="icon">🧭</span>מצפן</button>
   <button class="tab" onclick="showTab('logs')" id="t-logs"><span class="icon">🐛</span>לוגים</button>
   <button class="tab" onclick="showTab('network')" id="t-network"><span class="icon">🌐</span>רשת</button>
@@ -940,6 +942,12 @@
   </div>
 </div>
 
+<div class="page" id="page-emuna">
+  <div id="emuna-content" class="content-text" style="padding:0;min-height:200px">
+    <div style="text-align:center;padding:40px;color:var(--muted)">טוען...</div>
+  </div>
+</div>
+
 <div class="page" id="page-qibla">
   <!-- Status bar -->
   <div id="qibla-status" style="
@@ -1119,7 +1127,7 @@
     💡 לכיול המצפן: הזז את הטלפון בתנועת ∞ (שמונה שוכב) מספר פעמים
   </div>
   <div style="text-align:center;color:var(--muted);font-size:11px;padding:12px 0 4px">
-    גרסה 5.73 · לימוד יומי · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
+    גרסה 5.76 · עיתים · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
   </div>
 </div>
 
@@ -1168,6 +1176,7 @@
   <button class="bnav-btn" onclick="showTab('igeret')" id="bn-igeret"><span class="bicon">✉️</span>אגרת</button>
   <button class="bnav-btn" onclick="showTab('tefilot')" id="bn-tefilot"><span class="bicon">🤲</span>תפילות</button>
   <button class="bnav-btn" onclick="showTab('brachot')" id="bn-brachot"><span class="bicon">✨</span>ברכות</button>
+  <button class="bnav-btn" onclick="showTab('emuna')" id="bn-emuna"><span class="bicon">🕯</span>אמונה</button>
   <button class="bnav-btn" onclick="showTab('qibla')" id="bn-qibla"><span class="bicon">🧭</span>מצפן</button>
   <button class="bnav-btn" onclick="showTab('logs')" id="bn-logs"><span class="bicon">🐛</span>לוגים</button>
   <button class="bnav-btn" onclick="showTab('network')" id="bn-network"><span class="bicon">🌐</span>רשת</button>
@@ -1177,19 +1186,20 @@
      JavaScript modules (load order matters)
      v4.3 – querystring busts browser/SW cache
      ═══════════════════════════════════════ -->
-<script src="js/network-log.js?v=5.73"></script>
-<script src="js/utils.js?v=5.73"></script>
-<script src="js/settings.js?v=5.73"></script>
-<script src="js/app.js?v=5.73"></script>
-<script src="js/tehilim.js?v=5.73"></script>
-<script src="js/calendar.js?v=5.73"></script>
-<script src="js/content.js?v=5.73"></script>
-<script src="js/tefilot.js?v=5.73"></script>
-<script src="js/siddur-inserts.js?v=5.73"></script>
-<script src="js/siddur.js?v=5.73"></script>
-<script src="js/omer.js?v=5.73"></script>
-<script src="js/brachot.js?v=5.73"></script>
-<script src="js/misc.js?v=5.73"></script>
-  <script src="js/init.js?v=5.73"></script>
+<script src="js/network-log.js?v=5.76"></script>
+<script src="js/utils.js?v=5.76"></script>
+<script src="js/settings.js?v=5.76"></script>
+<script src="js/app.js?v=5.76"></script>
+<script src="js/tehilim.js?v=5.76"></script>
+<script src="js/calendar.js?v=5.76"></script>
+<script src="js/content.js?v=5.76"></script>
+<script src="js/tefilot.js?v=5.76"></script>
+<script src="js/siddur-inserts.js?v=5.76"></script>
+<script src="js/siddur.js?v=5.76"></script>
+<script src="js/omer.js?v=5.76"></script>
+<script src="js/brachot.js?v=5.76"></script>
+<script src="js/misc.js?v=5.76"></script>
+  <script src="js/emuna.js?v=5.76"></script>
+  <script src="js/init.js?v=5.76"></script>
 </body>
 </html>

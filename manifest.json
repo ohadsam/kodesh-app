@@ -1,7 +1,7 @@
 {
-  "name": "לימוד יומי",
-  "short_name": "לימוד יומי",
-  "description": "אפליקציית לימוד קודש יומי – הלכה, תהילים, פרשה, לשון הרע ועוד",
+  "name": "עיתים",
+  "short_name": "עיתים",
+  "description": "עיתים – לימוד תורה יומי: סידור, פרשה, תהילים, כוזרי ועוד",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0e0905",
@@ -39,12 +39,22 @@
     {
       "name": "הלכה יומית",
       "url": "./index.html#halacha",
-      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     },
     {
       "name": "תהילים",
       "url": "./index.html#tehilim",
-      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }
