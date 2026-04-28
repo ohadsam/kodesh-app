@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════
-// EMUNA.JS – טאב אמונה
+// EMUNA.JS – טאב אמונה – v5.78
 // ספר הכוזרי – לימוד יומי מספריא
 // 5 פסקאות ביום, שמירת מצב, ניווט קדימה/אחורה
 // ═══════════════════════════════════════════════════════════════════════
@@ -122,7 +122,7 @@ function _renderEmunaMenu() {
         <div style="margin-top:16px;padding:12px;background:var(--card);border-radius:10px;
                     border-right:3px solid var(--gold-dim)">
           <div style="font-size:11px;color:var(--muted);line-height:1.6">
-            📚 ${total} יחידות לימוד · סעיף אחד כל יחידה<br>
+            🔯 ${total} יחידות לימוד · סעיף אחד כל יחידה<br>
             ✍️ נוסח: אבן תיבון (מתוך ספריא)<br>
             📅 כ-${Math.ceil(total/30)} חודשים ללימוד מלא
           </div>
@@ -207,14 +207,46 @@ async function _loadKuzariUnit(idx) {
 
   try {
     console.log('[Kuzari] loading unit', idx, 'ref:', unit.ref);
-    const data = await sefariaText(unit.ref, 300);
-    // heFlat may return string or array depending on Kuzari structure
-    let rawItems = heFlat(data);
-    // If only one item and it's a long string, it's a single paragraph
-    if (!Array.isArray(rawItems)) rawItems = rawItems ? [rawItems] : [];
-    const flat = rawItems
-      .map(s => (typeof s === 'string' ? cleanSefariaHtml(s) : (s ? String(s) : '')))
-      .filter(Boolean);
+    // Use fetch directly - bypass heFlat to avoid any version issues
+    await new Promise(r => setTimeout(r, 300));
+    const kuzariUrl = 'https://www.sefaria.org/api/texts/' +
+      encodeURIComponent(unit.ref) + '?lang=he&commentary=0&context=0';
+    console.log('[Kuzari] fetching:', kuzariUrl);
+    const resp = await fetch(kuzariUrl);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    
+    // Extract Hebrew text - handle ALL possible Sefaria structures
+    const he = data && data.he;
+    console.log('[Kuzari] he type:', typeof he, '| isArray:', Array.isArray(he),
+                '| val:', JSON.stringify(he)?.slice(0, 80));
+    
+    const sections = [];
+    if (typeof he === 'string' && he.trim()) {
+      sections.push(he);
+    } else if (Array.isArray(he)) {
+      const fl = he.flat ? he.flat(10) : he;
+      fl.forEach(function(item) {
+        if (typeof item === 'string' && item.trim()) sections.push(item);
+      });
+    }
+    if (!sections.length && data && data.versions) {
+      // Fallback: try versions array
+      const heVer = data.versions.find(function(v) {
+        return v.actualLanguage === 'he' || v.language === 'he';
+      }) || data.versions[0];
+      const t = heVer && heVer.text;
+      if (typeof t === 'string' && t.trim()) sections.push(t);
+      else if (Array.isArray(t)) t.forEach(function(s) {
+        if (typeof s === 'string' && s.trim()) sections.push(s);
+      });
+    }
+    
+    // Clean HTML - inline to avoid any dependency issues
+    const flat = sections.map(function(s) {
+      return s.replace(/<(?!\/?(b|i|strong)\b)[^>]+>/gi, '').trim();
+    }).filter(Boolean);
+    console.log('[Kuzari] sections ready:', flat.length);
 
     if (!flat.length) throw new Error('no text returned');
 

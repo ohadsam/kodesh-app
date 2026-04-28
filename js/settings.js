@@ -14,7 +14,7 @@ const ALL_TABS = [
   { id: 'igeret',   label: '✉️ אגרת הרמב"ן'                   },
   { id: 'tefilot',  label: '🤲 תפילות נוספות'                  },
   { id: 'brachot',  label: '✨ ברכות'                           },
-  { id: 'emuna',    label: '🕯 אמונה – ספר הכוזרי'             },
+  { id: 'emuna',    label: '🔯 אמונה – ספר הכוזרי'             },
   { id: 'qibla',    label: '🧭 מצפן תפילה'                    },
   { id: 'logs',     label: '🐛 לוגי מערכת',   defaultHidden: true },
   { id: 'network',  label: '🌐 קריאות רשת',   defaultHidden: true },
