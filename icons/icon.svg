@@ -95,19 +95,6 @@
       <path d="M60,5 Q60,-2 60,5 Q63,2 60,8 Z" fill="#fff" opacity="0.8"/>
     </g>
   </g>
-
-  <!-- Stars of David subtle background -->
-  <g opacity="0.06" fill="#c9a54a">
-    <polygon points="60,60 70,78 50,78" transform="rotate(180,60,69)"/>
-    <polygon points="60,60 70,78 50,78"/>
-    <polygon points="440,80 450,98 430,98" transform="rotate(180,440,89)"/>
-    <polygon points="440,80 450,98 430,98"/>
-    <polygon points="80,440 90,458 70,458" transform="rotate(180,80,449)"/>
-    <polygon points="80,440 90,458 70,458"/>
-    <polygon points="432,420 442,438 422,438" transform="rotate(180,432,429)"/>
-    <polygon points="432,420 442,438 422,438"/>
-  </g>
-
   <!-- Hebrew word "עיתים" at bottom -->
   <text x="256" y="470" text-anchor="middle" 
         font-family="serif" font-size="52" font-weight="bold"
