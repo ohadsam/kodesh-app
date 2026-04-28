@@ -417,6 +417,32 @@ suite('📜 פרשות מחוברות – מקף עברי (maqaf)', () => {
   });
 });
 
+suite('🔢 גמטריה – toGematria', () => {
+  // Mirror toGematria from utils.js
+  function toGematria(n) {
+    if (!n || n <= 0 || n >= 1000) return String(n);
+    const hundreds = ['','\u05e7','\u05e8','\u05e9','\u05ea','\u05ea\u05e7','\u05ea\u05e8','\u05ea\u05e9','\u05ea\u05ea','\u05ea\u05ea\u05e7'];
+    const tens     = ['','\u05d9','\u05db','\u05dc','\u05de','\u05e0','\u05e1','\u05e2','\u05e4','\u05e6'];
+    const ones     = ['','\u05d0','\u05d1','\u05d2','\u05d3','\u05d4','\u05d5','\u05d6','\u05d7','\u05d8'];
+    if (n === 15) return '\u05d8\u05f4\u05d5';
+    if (n === 16) return '\u05d8\u05f4\u05d6';
+    const h = Math.floor(n / 100), t = Math.floor((n % 100) / 10), o = n % 10;
+    const s = hundreds[h] + tens[t] + ones[o];
+    if (s.length === 1) return s + '\u05f3';
+    return s.slice(0,-1) + '\u05f4' + s.slice(-1);
+  }
+
+  test('א׳ = 1', () => assert(toGematria(1).includes('א')));
+  test('י׳ = 10', () => assert(toGematria(10).includes('י')));
+  test('ט״ו = 15 (לא יה)', () => assert(toGematria(15).includes('ט') && toGematria(15).includes('ו')));
+  test('ט״ז = 16 (לא יו)', () => assert(toGematria(16).includes('ט') && toGematria(16).includes('ז')));
+  test('כ״ב = 22', () => assert(toGematria(22).includes('כ') && toGematria(22).includes('ב')));
+  test('מ״ט = 49', () => assert(toGematria(49).includes('מ') && toGematria(49).includes('ט')));
+  test('ק׳ = 100', () => assert(toGematria(100).includes('ק')));
+  test('toGematria קיים ב-utils.js', () => assertContains(readFile('js/utils.js'), 'function toGematria'));
+  test('content.js משתמש ב-toGematria', () => assertContains(readFile('js/content.js'), 'toGematria'));
+});
+
 // SUMMARY
 suite('📅 נרמול חודשים עבריים מ-Hebcal', () => {
   // Mirror normalizeMonth from app.js
