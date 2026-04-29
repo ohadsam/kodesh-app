@@ -1478,6 +1478,7 @@ async function switchMishnaView(view) {
 
 function _renderMishnaContent() {
   const el = document.getElementById('mishna-content');
+  console.log('[renderMishna] _mishnaFlat:', typeof _mishnaFlat, Array.isArray(_mishnaFlat), _mishnaFlat?.length);
   el.className = 'content-text';
   el.innerHTML = _mishnaFlat.map((v,i) =>
     `<div style="margin-bottom:8px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}</div>`
@@ -2120,30 +2121,39 @@ async function _loadPickedMishna() {
 
   try {
     _mishnaRef = ref;
+    console.log('[MishnaPick] fetching ref:', ref);
     const data = await sefariaText(ref, 200);
+    console.log('[MishnaPick] he type:', typeof data?.he, '| isArray:', Array.isArray(data?.he));
     const rawFlat = heFlat(data);
+    console.log('[MishnaPick] rawFlat type:', typeof rawFlat, '| isArray:', Array.isArray(rawFlat), '| len:', rawFlat?.length);
     _mishnaFlat = Array.isArray(rawFlat) ? rawFlat : (rawFlat ? [rawFlat] : []);
+    console.log('[MishnaPick] _mishnaFlat len:', _mishnaFlat.length);
     if (!_mishnaFlat.length) throw new Error('אין טקסט');
 
     // Cache mishna count for current chapter if unknown
     if (!_mishnaChapterSizes[tractate]) _mishnaChapterSizes[tractate] = {};
-    // We know current num exists; try to get max from selector
     const mSelOpts = document.getElementById('mishna-mishna-sel');
     if (mSelOpts && mSelOpts.options.length > 1) {
-      _mishnaChapterSizes[tractate][ch] = mSelOpts.options.length - 1; // -1 for placeholder
+      _mishnaChapterSizes[tractate][ch] = mSelOpts.options.length - 1;
     }
 
+    console.log('[MishnaPick] calling _renderMishnaButtons...');
     _renderMishnaButtons();
+    console.log('[MishnaPick] calling _renderMishnaContent...');
     _renderMishnaContent();
+    console.log('[MishnaPick] calling _renderMishnaPickNav...');
     await _renderMishnaPickNav(tractate, ch, num, maxChapter, t);
     updateDoneButton('mishna', ref);
+    console.log('[MishnaPick] done ✅');
   } catch(e) {
+    console.error('[MishnaPick] ERROR:', e.message, e.stack);
     el.className = 'content-text';
     el.textContent = 'שגיאה: ' + e.message;
   }
 }
 
 async function _renderMishnaPickNav(tractate, ch, num, maxChapter, t) {
+  console.log('[renderMishnaNav] start, tractate:', tractate, 'ch:', ch, 'num:', num);
   document.getElementById('mishna-pick-nav')?.remove();
 
   // Get mishna count for current chapter (from cache or selector)
