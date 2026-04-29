@@ -1963,6 +1963,9 @@ function dafPickNext() {
 // MISHNA PICKER – בחר משנה
 // ═══════════════════════════════════════════════════════════════════════
 
+// Helper: get Sefaria ref for Mishnah tractate (always Mishnah_ prefix)
+function mishnaRef(tractate) { return 'Mishnah_' + tractate; }
+
 const MISHNA_TRACTATES = [
   {name:'Berakhot',he:'ברכות',chapters:9},{name:'Peah',he:'פאה',chapters:8},
   {name:'Demai',he:'דמאי',chapters:7},{name:'Kilayim',he:'כלאים',chapters:9},
@@ -2038,7 +2041,7 @@ async function onMishnaChapterChange() {
 
   // Fetch chapter to find mishna count
   try {
-    const ref  = `${tractate}.${chapter}`;
+    const ref  = `${mishnaRef(tractate)}.${chapter}`;
     const data = await sefariaText(ref, 100);
     const he   = data?.he;
     let count  = 5; // fallback
@@ -2089,7 +2092,7 @@ async function _loadPickedMishna() {
   const t   = MISHNA_TRACTATES.find(x => x.name === tractate);
   const maxChapter = t?.chapters || 1;
 
-  const ref = `${tractate}.${ch}.${num}`;
+  const ref = `${mishnaRef(tractate)}.${ch}.${num}`;
   const subtitle = `${t?.he || tractate} פרק ${toGematria(ch)} משנה ${toGematria(num)}`;
 
   const el    = document.getElementById('mishna-content');
@@ -2107,7 +2110,8 @@ async function _loadPickedMishna() {
   try {
     _mishnaRef = ref;
     const data = await sefariaText(ref, 200);
-    _mishnaFlat = heFlat(data);
+    const rawFlat = heFlat(data);
+    _mishnaFlat = Array.isArray(rawFlat) ? rawFlat : (rawFlat ? [rawFlat] : []);
     if (!_mishnaFlat.length) throw new Error('אין טקסט');
 
     // Cache mishna count for current chapter if unknown
@@ -2185,7 +2189,7 @@ async function mishnaPickPrev() {
     } else {
       // Fetch to find count
       try {
-        const ref = `${_pickMishnaTractate}.${_pickMishnaChapter}`;
+        const ref = `${mishnaRef(_pickMishnaTractate)}.${_pickMishnaChapter}`;
         const data = await sefariaText(ref, 100);
         const he = data?.he;
         const count = Array.isArray(he) ? deepFlat(he).filter(Boolean).length : 5;
