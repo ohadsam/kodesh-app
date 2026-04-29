@@ -1964,7 +1964,14 @@ function dafPickNext() {
 // ═══════════════════════════════════════════════════════════════════════
 
 // Helper: get Sefaria ref for Mishnah tractate (always Mishnah_ prefix)
-function mishnaRef(tractate) { return 'Mishnah_' + tractate; }
+function mishnaRef(tractate) {
+  // Special Sefaria ref names (don't use Mishnah_ prefix)
+  const special = {
+    'Avot':       'Pirkei_Avot',
+    'Rosh_Hashanah': 'Mishnah_Rosh_Hashanah',
+  };
+  return special[tractate] || ('Mishnah_' + tractate);
+}
 
 const MISHNA_TRACTATES = [
   {name:'Berakhot',he:'ברכות',chapters:9},{name:'Peah',he:'פאה',chapters:8},
@@ -2044,8 +2051,12 @@ async function onMishnaChapterChange() {
     const ref  = `${mishnaRef(tractate)}.${chapter}`;
     const data = await sefariaText(ref, 100);
     const he   = data?.he;
-    let count  = 5; // fallback
-    if (Array.isArray(he)) count = deepFlat(he).filter(Boolean).length;
+    let count = 5; // fallback
+    if (Array.isArray(he)) {
+      count = Math.max(1, deepFlat(he).filter(Boolean).length);
+    } else if (typeof he === 'string' && he.trim()) {
+      count = 1; // single-mishna chapter
+    }
 
     mSel.innerHTML = '<option value="">משנה...</option>';
     for (let m = 1; m <= count; m++) {
@@ -2192,7 +2203,8 @@ async function mishnaPickPrev() {
         const ref = `${mishnaRef(_pickMishnaTractate)}.${_pickMishnaChapter}`;
         const data = await sefariaText(ref, 100);
         const he = data?.he;
-        const count = Array.isArray(he) ? deepFlat(he).filter(Boolean).length : 5;
+        const count = Array.isArray(he) ? Math.max(1, deepFlat(he).filter(Boolean).length)
+                                            : (typeof he === 'string' && he.trim() ? 1 : 5);
         if (!_mishnaChapterSizes[_pickMishnaTractate]) _mishnaChapterSizes[_pickMishnaTractate] = {};
         _mishnaChapterSizes[_pickMishnaTractate][_pickMishnaChapter] = count;
         _pickMishnaNum = count;
