@@ -1,71 +1,62 @@
 <!DOCTYPE html>
-<html lang="he" dir="rtl">
+<html dir="rtl" lang="he">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>קודש App – איפוס</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>עיתים – איפוס</title>
 <style>
-  body { background:#1a1108; color:#e8d5a3; font-family:'Heebo',sans-serif;
-         display:flex; align-items:center; justify-content:center;
-         min-height:100vh; margin:0; padding:20px; text-align:center; }
-  .card { background:#2a1f0a; border-radius:16px; padding:32px 24px; max-width:340px; }
-  h1 { color:#c9a54a; font-size:20px; margin-bottom:8px; }
-  p { font-size:13px; color:#aaa; margin-bottom:20px; line-height:1.6; }
-  button { background:#c9a54a; color:#000; border:none; border-radius:10px;
-           padding:14px 28px; font-size:15px; font-weight:700; cursor:pointer;
-           width:100%; font-family:inherit; }
-  .status { font-size:12px; color:#7ed6a0; margin-top:16px; min-height:20px; }
-  .spinner { display:none; margin:12px auto; width:28px; height:28px;
-             border:3px solid rgba(201,165,74,.3); border-top-color:#c9a54a;
-             border-radius:50%; animation:spin .8s linear infinite; }
-  @keyframes spin { to { transform:rotate(360deg); } }
+  body { background:#120d04; color:#c9a54a; font-family:'Heebo',sans-serif;
+         display:flex; flex-direction:column; align-items:center;
+         justify-content:center; min-height:100vh; margin:0; padding:20px;
+         text-align:center; }
+  h2 { font-size:22px; margin-bottom:8px; }
+  p  { color:#a09060; font-size:14px; margin:6px 0; }
+  .btn { background:#c9a54a; color:#120d04; border:none; border-radius:12px;
+         padding:14px 32px; font-size:16px; font-weight:700; cursor:pointer;
+         margin-top:20px; width:100%; max-width:300px; }
+  .status { margin-top:16px; font-size:13px; color:#a09060; min-height:40px; }
 </style>
 </head>
 <body>
-<div class="card">
-  <div style="font-size:48px;margin-bottom:12px">🔄</div>
-  <h1>איפוס קודש App</h1>
-  <p>לחץ על הכפתור לניקוי ה-cache של האפליקציה ועדכון לגרסה האחרונה.</p>
-  <button onclick="doReset()" id="btn">נקה Cache והפעל מחדש</button>
-  <div class="spinner" id="spin"></div>
-  <div class="status" id="status"></div>
-</div>
+<h2>🔄 איפוס עיתים</h2>
+<p>מנקה cache ו-Service Worker</p>
+<p style="color:#c06040;font-size:12px">השתמש בזה אם האפליקציה לא מתעדכנת</p>
+<button class="btn" onclick="doReset()">🗑️ נקה הכל וטען מחדש</button>
+<div class="status" id="status">לחץ על הכפתור...</div>
 <script>
 async function doReset() {
-  document.getElementById('btn').disabled = true;
-  document.getElementById('spin').style.display = 'block';
-  const s = document.getElementById('status');
-
-  s.textContent = 'מבטל Service Workers...';
-  if ('serviceWorker' in navigator) {
-    try {
+  const btn = document.querySelector('.btn');
+  const st  = document.getElementById('status');
+  btn.disabled = true;
+  st.textContent = 'מבטל Service Workers...';
+  try {
+    // 1. Unregister all service workers
+    if ('serviceWorker' in navigator) {
       const regs = await navigator.serviceWorker.getRegistrations();
       await Promise.all(regs.map(r => r.unregister()));
-      s.textContent = 'בוטלו ' + regs.length + ' Service Workers';
-    } catch(e) { s.textContent = 'שגיאה ב-SW: ' + e.message; }
-  }
-
-  await new Promise(r => setTimeout(r, 500));
-  s.textContent = 'מנקה caches...';
-  if ('caches' in window) {
-    try {
+      st.textContent = `ביטול ${regs.length} SW... ✓`;
+    }
+    // 2. Clear all caches
+    st.textContent = 'מוחק cache...';
+    if ('caches' in window) {
       const keys = await caches.keys();
       await Promise.all(keys.map(k => caches.delete(k)));
-      s.textContent = 'נוקו ' + keys.length + ' caches';
-    } catch(e) { s.textContent = 'שגיאה ב-cache: ' + e.message; }
+      st.textContent = `נמחקו ${keys.length} caches ✓`;
+    }
+    // 3. Clear localStorage version key so whats-new shows
+    localStorage.removeItem('ittim_last_version');
+    st.textContent = '✅ הכל נוקה! טוען מחדש...';
+    // 4. Hard reload after short delay
+    setTimeout(() => {
+      window.location.replace('/kodesh-app/?nocache=' + Date.now());
+    }, 1200);
+  } catch(e) {
+    st.textContent = 'שגיאה: ' + e.message;
+    btn.disabled = false;
   }
-
-  await new Promise(r => setTimeout(r, 500));
-  s.textContent = 'מנקה localStorage...';
-  try { localStorage.clear(); } catch(e) {}
-
-  await new Promise(r => setTimeout(r, 800));
-  s.textContent = '✅ מעביר לאפליקציה...';
-  setTimeout(() => {
-    // Go to app with cache-bust param
-    window.location.href = '../index.html?reset=' + Date.now();
-  }, 1000);
 }
+// Auto-run on load
+window.addEventListener('load', doReset);
 </script>
 </body>
 </html>
