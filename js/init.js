@@ -1,3 +1,23 @@
+// ── Version guard: if old SW serves old JS, force reload ─────────────
+(function() {
+  // deepFlat was added in v5.86. If it's missing, we have old code.
+  if (typeof deepFlat === 'undefined') {
+    console.warn('[init] OLD CODE DETECTED (no deepFlat) – forcing reload');
+    // Unregister all SWs and reload
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(regs) {
+        var p = regs.map(function(r) { return r.unregister(); });
+        Promise.all(p).then(function() {
+          window.location.reload(true);
+        });
+      });
+    } else {
+      window.location.reload(true);
+    }
+    return; // Don't run rest of init
+  }
+})();
+
 // ═══════════════════════════════════════════
 // INIT - DIAGNOSTIC VERSION
 // ═══════════════════════════════════════════
