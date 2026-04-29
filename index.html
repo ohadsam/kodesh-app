@@ -20,7 +20,7 @@
        NOTE: this is the ONLY version check. utils.js must NOT have another one. -->
   <script>
     (function() {
-      var V = '5.83';
+      var V = '5.85';
       // Show version in splash immediately
       var sv = document.getElementById('splash-version');
       if (sv) sv.textContent = 'גרסה ' + V;
@@ -109,7 +109,7 @@
   <div style="font-family:'Frank Ruhl Libre',serif;font-size:26px;color:var(--cream);font-weight:700">עיתים</div>
   <div class="spinner"></div>
   <p id="splash-status" style="font-size:12px;color:var(--gold);margin:4px 0 0;min-height:18px">טוען...</p>
-  <p id="splash-version" style="font-size:11px;color:var(--muted);margin-top:2px">גרסה 5.83</p>
+  <p id="splash-version" style="font-size:11px;color:var(--muted);margin-top:2px">גרסה 5.85</p>
   <div id="splash-retry" style="display:none;margin-top:20px">
     <button onclick="localStorage.clear();sessionStorage.clear();location.reload(true)"
       style="background:var(--gold);color:#000;border:none;border-radius:10px;padding:10px 24px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Heebo',sans-serif">🔄 איפוס וטעינה מחדש</button>
@@ -239,7 +239,7 @@
     <!-- Version & Copyright -->
     <div style="text-align:center;padding:18px 0 8px;border-top:1px solid var(--border);margin-top:8px">
       <div style="font-size:13px;font-weight:600;color:var(--gold-dim);margin-bottom:4px">📖 עיתים</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">גרסה 5.83</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">גרסה 5.85</div>
       <button onclick="showWhatsNew()" style="background:var(--card);border:1px solid var(--gold-dim);color:var(--gold);padding:6px 16px;border-radius:8px;font-size:11px;cursor:pointer;font-family:'Heebo',sans-serif;margin-bottom:6px">🆕 מה חדש?</button>
       <div style="font-size:11px;color:var(--muted)">© כל הזכויות שמורות לאוהד סמט</div>
     </div>
@@ -251,13 +251,14 @@
 <div id="whats-new-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
   width:88%;max-width:400px;max-height:80vh;overflow-y:auto;
   background:var(--surface);border:1px solid var(--gold-dim);border-radius:16px;z-index:10001;padding:20px;direction:rtl">
-  <div style="font-size:16px;font-weight:700;color:var(--gold);margin-bottom:12px;text-align:center">🆕 מה חדש בגרסה 5.83</div>
+  <div style="font-size:16px;font-weight:700;color:var(--gold);margin-bottom:12px;text-align:center">🆕 מה חדש בגרסה 5.85</div>
   <div style="font-size:13px;color:var(--cream);line-height:1.7" id="whats-new-content">
-    <div style="margin-bottom:10px"><b>🎨 אייקון חדש לאפליקציה</b></div>
-    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• שולחן עץ עם ערימת ספרים, ספר פתוח ועששית מוארת</div>
-    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• מוצג בכל מקום: ספלאש, כותרת עליונה, מניפסט</div>
-    <div style="margin-bottom:10px"><b>📚 ניווט בדף יומי ומשנה יומי</b></div>
-    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• כפתורי קודם/הבא בבחירה חופשית של דף/משנה</div>
+    <div style="margin-bottom:10px"><b>🔧 תיקון: "flat.filter is not a function"</b></div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• נוסף polyfill ל-Array.flat() לדפדפנים ישנים יותר (Android)</div>
+    <div style="margin-bottom:10px"><b>🔍 חיפוש מסכת בגמרא ובמשנה</b></div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• שדה חיפוש מסנן את רשימת המסכתות בזמן אמת</div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• ניתן לחפש בעברית או באנגלית</div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• לחיצה על מסכת בוחרת אותה ומציגה את הפרקים</div>
   </div>
   <button onclick="closeWhatsNew()" style="display:block;width:100%;margin-top:14px;background:var(--gold);color:#000;border:none;border-radius:10px;padding:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Heebo',sans-serif">👍 הבנתי</button>
 </div>
@@ -756,12 +757,22 @@
     </div>
     <!-- Picker (hidden by default) -->
     <div id="daf-picker" style="display:none;margin-bottom:10px">
-      <select id="daf-tractate-sel" onchange="onDafTractateChange()"
-        style="width:100%;padding:8px;background:var(--card);color:var(--cream);
-               border:1px solid var(--border);border-radius:8px;font-size:13px;
-               font-family:'Heebo',sans-serif;direction:rtl;margin-bottom:6px">
-        <option value="">בחר מסכת...</option>
-      </select>
+      <!-- Searchable tractate selector - daf -->
+      <div style="position:relative;margin-bottom:6px" id="daf-tractate-wrap">
+        <input id="daf-tractate-search" type="text" placeholder="🔍 חפש מסכת..."
+          oninput="filterDafTractates(this.value)" onfocus="showDafTractateList()"
+          autocomplete="off"
+          style="width:100%;padding:8px 12px;background:var(--card);color:var(--cream);
+                 border:1px solid var(--border);border-radius:8px;font-size:13px;
+                 font-family:'Heebo',sans-serif;direction:rtl;box-sizing:border-box"/>
+        <div id="daf-tractate-list"
+          style="display:none;position:absolute;top:100%;right:0;left:0;z-index:100;
+                 background:var(--card);border:1px solid var(--gold-dim);border-radius:8px;
+                 max-height:200px;overflow-y:auto;margin-top:2px;
+                 box-shadow:0 4px 16px rgba(0,0,0,.4)">
+        </div>
+      </div>
+      <input type="hidden" id="daf-tractate-sel" value=""/>
       <div style="display:flex;gap:6px">
         <select id="daf-daf-sel" onchange="loadDafByPick()"
           style="flex:1;padding:8px;background:var(--card);color:var(--cream);
@@ -805,12 +816,22 @@
     </div>
     <!-- Picker (hidden by default) -->
     <div id="mishna-picker" style="display:none;margin-bottom:10px">
-      <select id="mishna-tractate-sel" onchange="onMishnaTractateChange()"
-        style="width:100%;padding:8px;background:var(--card);color:var(--cream);
-               border:1px solid var(--border);border-radius:8px;font-size:13px;
-               font-family:'Heebo',sans-serif;direction:rtl;margin-bottom:6px">
-        <option value="">בחר מסכת...</option>
-      </select>
+      <!-- Searchable tractate selector - mishna -->
+      <div style="position:relative;margin-bottom:6px" id="mishna-tractate-wrap">
+        <input id="mishna-tractate-search" type="text" placeholder="🔍 חפש מסכת..."
+          oninput="filterMishnaTractates(this.value)" onfocus="showMishnaTractateList()"
+          autocomplete="off"
+          style="width:100%;padding:8px 12px;background:var(--card);color:var(--cream);
+                 border:1px solid var(--border);border-radius:8px;font-size:13px;
+                 font-family:'Heebo',sans-serif;direction:rtl;box-sizing:border-box"/>
+        <div id="mishna-tractate-list"
+          style="display:none;position:absolute;top:100%;right:0;left:0;z-index:100;
+                 background:var(--card);border:1px solid var(--gold-dim);border-radius:8px;
+                 max-height:200px;overflow-y:auto;margin-top:2px;
+                 box-shadow:0 4px 16px rgba(0,0,0,.4)">
+        </div>
+      </div>
+      <input type="hidden" id="mishna-tractate-sel" value=""/>
       <div style="display:flex;gap:6px">
         <select id="mishna-chapter-sel" onchange="onMishnaChapterChange()"
           style="flex:1;padding:8px;background:var(--card);color:var(--cream);
@@ -1229,7 +1250,7 @@
     💡 לכיול המצפן: הזז את הטלפון בתנועת ∞ (שמונה שוכב) מספר פעמים
   </div>
   <div style="text-align:center;color:var(--muted);font-size:11px;padding:12px 0 4px">
-    גרסה 5.83 · עיתים · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
+    גרסה 5.85 · עיתים · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
   </div>
 </div>
 
@@ -1288,20 +1309,20 @@
      JavaScript modules (load order matters)
      v4.3 – querystring busts browser/SW cache
      ═══════════════════════════════════════ -->
-<script src="js/network-log.js?v=5.83"></script>
-<script src="js/utils.js?v=5.83"></script>
-<script src="js/settings.js?v=5.83"></script>
-<script src="js/app.js?v=5.83"></script>
-<script src="js/tehilim.js?v=5.83"></script>
-<script src="js/calendar.js?v=5.83"></script>
-<script src="js/content.js?v=5.83"></script>
-<script src="js/tefilot.js?v=5.83"></script>
-<script src="js/siddur-inserts.js?v=5.83"></script>
-<script src="js/siddur.js?v=5.83"></script>
-<script src="js/omer.js?v=5.83"></script>
-<script src="js/brachot.js?v=5.83"></script>
-<script src="js/misc.js?v=5.83"></script>
-  <script src="js/emuna.js?v=5.83"></script>
-  <script src="js/init.js?v=5.83"></script>
+<script src="js/network-log.js?v=5.85"></script>
+<script src="js/utils.js?v=5.85"></script>
+<script src="js/settings.js?v=5.85"></script>
+<script src="js/app.js?v=5.85"></script>
+<script src="js/tehilim.js?v=5.85"></script>
+<script src="js/calendar.js?v=5.85"></script>
+<script src="js/content.js?v=5.85"></script>
+<script src="js/tefilot.js?v=5.85"></script>
+<script src="js/siddur-inserts.js?v=5.85"></script>
+<script src="js/siddur.js?v=5.85"></script>
+<script src="js/omer.js?v=5.85"></script>
+<script src="js/brachot.js?v=5.85"></script>
+<script src="js/misc.js?v=5.85"></script>
+  <script src="js/emuna.js?v=5.85"></script>
+  <script src="js/init.js?v=5.85"></script>
 </body>
 </html>
