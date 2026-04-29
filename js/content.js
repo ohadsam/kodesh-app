@@ -1826,14 +1826,8 @@ function setDafMode(mode) {
     loadDafYomi();
   } else {
     // Populate tractate selector
-    const sel = document.getElementById('daf-tractate-sel');
-    if (sel && sel.options.length === 1) {
-      BAVLI_TRACTATES.forEach(t => {
-        const opt = document.createElement('option');
-        opt.value = t.name; opt.textContent = t.he;
-        sel.appendChild(opt);
-      });
-    }
+    // Searchable list - populate on first use
+    _initDafTractateSearch();
     // Clear content
     const el = document.getElementById('daf-content');
     if (el) { el.className = 'content-text'; el.innerHTML =
@@ -1843,8 +1837,8 @@ function setDafMode(mode) {
   }
 }
 
-function onDafTractateChange() {
-  const tractate = document.getElementById('daf-tractate-sel')?.value;
+function onDafTractateChange(tractate) {
+  tractate = tractate || document.getElementById('daf-tractate-sel')?.value;
   const dafSel  = document.getElementById('daf-daf-sel');
   const amudSel = document.getElementById('daf-amud-sel');
   if (!dafSel || !amudSel) return;
@@ -2007,14 +2001,7 @@ function setMishnaMode(mode) {
     loaded['mishna'] = false;
     loadMishnaYomi();
   } else {
-    const sel = document.getElementById('mishna-tractate-sel');
-    if (sel && sel.options.length === 1) {
-      MISHNA_TRACTATES.forEach(t => {
-        const opt = document.createElement('option');
-        opt.value = t.name; opt.textContent = t.he;
-        sel.appendChild(opt);
-      });
-    }
+    _initMishnaTractateSearch();
     const el = document.getElementById('mishna-content');
     if (el) { el.className = 'content-text'; el.innerHTML =
       '<div style="color:var(--muted);text-align:center;padding:20px">בחר מסכת ופרק</div>'; }
@@ -2023,8 +2010,8 @@ function setMishnaMode(mode) {
   }
 }
 
-function onMishnaTractateChange() {
-  const tractate = document.getElementById('mishna-tractate-sel')?.value;
+function onMishnaTractateChange(tractate) {
+  tractate = tractate || document.getElementById('mishna-tractate-sel')?.value;
   const chSel    = document.getElementById('mishna-chapter-sel');
   const mSel     = document.getElementById('mishna-mishna-sel');
   if (!chSel || !mSel) return;
@@ -2223,4 +2210,109 @@ async function mishnaPickNext() {
     _pickMishnaNum = 1;
   }
   _loadPickedMishna();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// SEARCHABLE TRACTATE PICKERS
+// ═══════════════════════════════════════════════════════════════════════
+
+function _tractateListItem(he, name, onClickFn) {
+  const div = document.createElement('div');
+  div.textContent = he;
+  div.style.cssText = 'padding:10px 14px;cursor:pointer;font-size:14px;' +
+    'font-family:"Frank Ruhl Libre",serif;color:var(--cream);' +
+    'border-bottom:1px solid var(--border);text-align:right;direction:rtl';
+  div.onmouseenter = () => div.style.background = 'rgba(201,165,74,.12)';
+  div.onmouseleave = () => div.style.background = '';
+  div.onclick = () => onClickFn(name, he);
+  return div;
+}
+
+// ── DAF tractate search ──────────────────────────────────────────────
+let _dafSearchInit = false;
+function _initDafTractateSearch() {
+  if (_dafSearchInit) return;
+  _dafSearchInit = true;
+  // Close list when clicking outside
+  document.addEventListener('click', function(e) {
+    if (!document.getElementById('daf-tractate-wrap')?.contains(e.target)) {
+      const list = document.getElementById('daf-tractate-list');
+      if (list) list.style.display = 'none';
+    }
+  });
+}
+
+function showDafTractateList() {
+  _initDafTractateSearch();
+  filterDafTractates(document.getElementById('daf-tractate-search')?.value || '');
+}
+
+function filterDafTractates(query) {
+  const list = document.getElementById('daf-tractate-list');
+  if (!list) return;
+  list.innerHTML = '';
+  const q = query.trim();
+  const filtered = q
+    ? BAVLI_TRACTATES.filter(t => t.he.includes(q) || t.name.toLowerCase().includes(q.toLowerCase()))
+    : BAVLI_TRACTATES;
+  if (!filtered.length) {
+    list.innerHTML = '<div style="padding:10px;color:var(--muted);text-align:center">לא נמצאה מסכת</div>';
+  } else {
+    filtered.forEach(t => list.appendChild(_tractateListItem(t.he, t.name, selectDafTractate)));
+  }
+  list.style.display = 'block';
+}
+
+function selectDafTractate(name, he) {
+  const hiddenSel = document.getElementById('daf-tractate-sel');
+  const searchInput = document.getElementById('daf-tractate-search');
+  const list = document.getElementById('daf-tractate-list');
+  if (hiddenSel) hiddenSel.value = name;
+  if (searchInput) searchInput.value = he;
+  if (list) list.style.display = 'none';
+  onDafTractateChange(name);
+}
+
+// ── MISHNA tractate search ────────────────────────────────────────────
+let _mishnaSearchInit = false;
+function _initMishnaTractateSearch() {
+  if (_mishnaSearchInit) return;
+  _mishnaSearchInit = true;
+  document.addEventListener('click', function(e) {
+    if (!document.getElementById('mishna-tractate-wrap')?.contains(e.target)) {
+      const list = document.getElementById('mishna-tractate-list');
+      if (list) list.style.display = 'none';
+    }
+  });
+}
+
+function showMishnaTractateList() {
+  _initMishnaTractateSearch();
+  filterMishnaTractates(document.getElementById('mishna-tractate-search')?.value || '');
+}
+
+function filterMishnaTractates(query) {
+  const list = document.getElementById('mishna-tractate-list');
+  if (!list) return;
+  list.innerHTML = '';
+  const q = query.trim();
+  const filtered = q
+    ? MISHNA_TRACTATES.filter(t => t.he.includes(q) || t.name.toLowerCase().includes(q.toLowerCase()))
+    : MISHNA_TRACTATES;
+  if (!filtered.length) {
+    list.innerHTML = '<div style="padding:10px;color:var(--muted);text-align:center">לא נמצאה מסכת</div>';
+  } else {
+    filtered.forEach(t => list.appendChild(_tractateListItem(t.he, t.name, selectMishnaTractate)));
+  }
+  list.style.display = 'block';
+}
+
+function selectMishnaTractate(name, he) {
+  const hiddenSel = document.getElementById('mishna-tractate-sel');
+  const searchInput = document.getElementById('mishna-tractate-search');
+  const list = document.getElementById('mishna-tractate-list');
+  if (hiddenSel) hiddenSel.value = name;
+  if (searchInput) searchInput.value = he;
+  if (list) list.style.display = 'none';
+  onMishnaTractateChange(name);
 }

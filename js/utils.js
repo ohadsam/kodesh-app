@@ -1,4 +1,20 @@
 
+// ── Array.flat polyfill (for older Android browsers) ─────────────────
+if (!Array.prototype.flat) {
+  Array.prototype.flat = function(depth) {
+    depth = depth === undefined ? 1 : Math.floor(depth);
+    if (depth < 1) return this.slice();
+    return this.reduce(function(acc, val) {
+      return acc.concat(Array.isArray(val) ? val.flat(depth - 1) : val);
+    }, []);
+  };
+}
+if (!Array.prototype.flatMap) {
+  Array.prototype.flatMap = function(fn) {
+    return this.map(fn).flat(1);
+  };
+}
+
 // ═══════════════════════════════════════════
 // LOG CAPTURE SYSTEM
 // ═══════════════════════════════════════════
@@ -92,7 +108,7 @@ let currentAliya = 'all';
 let rashiLoaded = false;
 let rashiVisible = false;
 
-const APP_VERSION  = '5.83';
+const APP_VERSION  = '5.85';
 const STORAGE_KEY  = 'kodesh_app_v1';
 const SIDDUR_CACHE_KEY = 'siddur_cache_v';
 

@@ -37,10 +37,10 @@ const EMUNA_BOOKS = {
     icon: '🦅',
     color: '#7ab8d6',
     description: '8 פרקים · מבוא לפרקי אבות – פילוסופיה יהודית ומוסר',
-    // Chapters fetched on demand, split into paragraphs
-    buildUnits() { return _chaptersToUnits('perakim', 8, 'Eight_Chapters'); },
+    // Chapters fetched on demand, 1 paragraph per unit
+    buildUnits() { return _chaptersToUnits('perakim', 8, 'Eight_Chapters', false, 1); },
     chapterLabel(u) { return `פרק ${toGematria(u.ch)}`; },
-    unitLabel(u)    { return `פסקה ${u.par}`; },
+    unitLabel(u)    { return `פסקה ${toGematria(u.par)}`; },
     commentaryRef: null, // No structured commentary in Sefaria API
   },
   mesilat: {
@@ -50,9 +50,9 @@ const EMUNA_BOOKS = {
     icon: '✨',
     color: '#7ed6a0',
     description: '26 פרקים + הקדמה · מדרגות עבודת ה\'',
-    buildUnits() { return _chaptersToUnits('mesilat', 26, 'Mesillat_Yesharim', true); },
+    buildUnits() { return _chaptersToUnits('mesilat', 26, 'Mesillat_Yesharim', true, 2); },
     chapterLabel(u) { return u.ch === 0 ? 'הקדמה' : `פרק ${toGematria(u.ch)}`; },
-    unitLabel(u)    { return `פסקה ${u.par}`; },
+    unitLabel(u)    { return `פסקאות ${toGematria(u.par)}–${toGematria(u.parEnd||u.par+1)}`; },
     commentaryRef: null,
   },
 };
@@ -64,21 +64,57 @@ function _heNum(n) {
 
 // For chapter-based books: units are lazy-loaded
 // We store {ch, par} and fetch chapter text on demand
-function _chaptersToUnits(bookId, numChapters, baseRef, hasIntro) {
+// paragraphsPerUnit: 1 = one para/unit, 2 = two paras/unit, 0 = whole chapter
+// Units are placeholders; they expand once the chapter is fetched
+function _chaptersToUnits(bookId, numChapters, baseRef, hasIntro, paragraphsPerUnit) {
+  const ppu = paragraphsPerUnit || 0;
   const units = [];
   if (hasIntro) {
-    units.push({ id:'intro_1', ch:0, par:1, label:'הקדמה',
-      ref:`${baseRef},_Introduction`, isIntro:true });
+    units.push({ id:'intro_1', ch:0, par:1, ppu:ppu, label:'הקדמה',
+      ref:`${baseRef},_Introduction`, baseRef, isIntro:true });
   }
-  // We don't know paragraph counts until we load the chapter
-  // So we create placeholder units per chapter and expand lazily
-  // Store: ch = chapter number, par = -1 means "whole chapter" until expanded
   for (let ch = 1; ch <= numChapters; ch++) {
-    units.push({ id:`ch${ch}_1`, ch, par:1,
-      label:`פרק ${toGematria(ch)}, פסקה א׳`,
-      ref:`${baseRef}.${ch}`, baseRef });
+    // Placeholder: real unit list expands after chapter is fetched
+    units.push({ id:`ch${ch}_p1`, ch, par:1, ppu:ppu,
+      label:`פרק ${toGematria(ch)}`,
+      ref:`${baseRef}.${ch}`, baseRef, isPlaceholder:true });
   }
   return units;
+}
+
+// Expand a placeholder unit into real para-based units once chapter text is known
+function _expandChapterUnits(book, units, placeholderIdx, paragraphs) {
+  const unit = units[placeholderIdx];
+  if (!unit || !unit.isPlaceholder) return;
+  const ppu     = unit.ppu || 0;
+  const ch      = unit.ch;
+  const baseRef = unit.baseRef;
+  const total   = paragraphs.length;
+
+  if (ppu === 0 || total === 0) {
+    // Whole chapter = one unit; just mark as expanded
+    units[placeholderIdx] = Object.assign({}, unit, { isPlaceholder:false, parEnd:total });
+    return;
+  }
+
+  // Build replacement units
+  const newUnits = [];
+  for (let start = 1; start <= total; start += ppu) {
+    const end   = Math.min(start + ppu - 1, total);
+    const label = ppu === 1
+      ? `פרק ${toGematria(ch)}, פסקה ${toGematria(start)}`
+      : `פרק ${toGematria(ch)}, פסקאות ${toGematria(start)}–${toGematria(end)}`;
+    newUnits.push({
+      id:      `ch${ch}_p${start}`,
+      ch, par: start, parEnd: end, ppu,
+      label,
+      ref:     `${baseRef}.${ch}`,
+      baseRef, isPlaceholder: false,
+    });
+  }
+
+  // Replace placeholder with expanded units
+  units.splice(placeholderIdx, 1, ...newUnits);
 }
 
 // ── State ──────────────────────────────────────────────────────────────
@@ -203,7 +239,26 @@ async function _loadUnit(idx) {
     const unit = units[idx];
     const text = await _fetchUnitText(book, unit);
     if (!text) throw new Error('no text');
-    _renderUnit(book, units, idx, text, state);
+
+    // Expand placeholder if needed (first time this chapter is loaded)
+    if (unit.isPlaceholder && text.paragraphs.length > 0) {
+      _expandChapterUnits(book, units, idx, text.paragraphs);
+      // idx is still valid - expansion replaced units[idx] with first unit
+      state.currentUnit = idx; // keep position
+    }
+
+    // Slice paragraphs for this unit (par/parEnd are 1-based)
+    const currentUnit = units[idx];
+    const pStart = (currentUnit.par || 1) - 1;           // 0-based start
+    const pEnd   = currentUnit.parEnd !== undefined
+      ? currentUnit.parEnd                                 // 1-based end (inclusive)
+      : (currentUnit.ppu > 0 ? pStart + currentUnit.ppu : text.paragraphs.length);
+    const slicedParas = (currentUnit.ppu > 0 || currentUnit.parEnd !== undefined)
+      ? text.paragraphs.slice(pStart, pEnd)
+      : text.paragraphs;                                  // whole chapter (ppu=0)
+
+    const slicedText = Object.assign({}, text, { paragraphs: slicedParas });
+    _renderUnit(book, units, idx, slicedText, state);
   } catch(e) {
     console.error('[Emuna] error loading unit', idx, ':', e.message);
     el.innerHTML = _navHeader(book, idx, units.length) +
