@@ -290,7 +290,7 @@ async function _fetchUnitText(book, unit) {
   if (typeof he === 'string' && he.trim()) {
     paragraphs.push(he.trim());
   } else if (Array.isArray(he)) {
-    const flat = he.flat ? he.flat(10) : he;
+    const flat = deepFlat(he);
     flat.forEach(function(item) {
       if (typeof item === 'string' && item.trim()) paragraphs.push(item.trim());
     });

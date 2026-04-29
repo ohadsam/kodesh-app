@@ -880,7 +880,7 @@ async function loadRashiForRef(torahRef) {
                 typeof sample[0][0] !== 'string') {
               // Triple nested - flatten one level
               console.log('[Rashi] detected triple-nested structure, flattening');
-              heArr = heArr.flat(1);
+              heArr = deepFlat(heArr);
             }
           }
           
@@ -904,7 +904,7 @@ async function loadRashiForRef(torahRef) {
               const key = `${ch}:${vNum}`;
               let verseRashi = heArr[v];
               if (!verseRashi) continue;
-              const rawTexts = Array.isArray(verseRashi) ? verseRashi.flat(Infinity).filter(Boolean) : [verseRashi];
+              const rawTexts = Array.isArray(verseRashi) ? deepFlat(verseRashi).filter(Boolean) : [verseRashi];
               if (!rawTexts.length) continue;
               const cleaned = rawTexts.map(t => 
                 typeof t === 'string' ? t.replace(/<(?!\/?(?:b|i|strong)\b)[^>]+>/gi,'').trim() : ''
@@ -944,7 +944,7 @@ async function loadRashiForRef(torahRef) {
                 if (ch === endCh && vNum > endV) return;
                 const key = `${ch}:${vNum}`;
                 const rawTexts = Array.isArray(verseRashi)
-                  ? verseRashi.flat(Infinity).filter(Boolean)
+                  ? deepFlat(verseRashi).filter(Boolean)
                   : (verseRashi ? [verseRashi] : []);
                 const cleaned = rawTexts.map(t =>
                   typeof t === 'string' ? t.replace(/<(?!\/?(?:b|i|strong)\b)[^>]+>/gi,'').trim() : ''
@@ -994,7 +994,7 @@ async function loadRashiForRef(torahRef) {
             if (cCh === startCh && cV < startV) return;
             if (cCh === endCh   && cV > endV)   return;
             const key = `${cCh}:${cV}`;
-            let txt = Array.isArray(c.he) ? c.he.flat().filter(Boolean).join(' ') : (c.he||'');
+            let txt = Array.isArray(c.he) ? deepFlat(c.he).filter(Boolean).join(' ') : (c.he||'');
             txt = txt.replace(/<(?!\/?(?:b|i|strong)\b)[^>]+>/gi,'').trim();
             if (!verseMap.has(key)) verseMap.set(key, []);
             if (txt) verseMap.get(key).push(txt);
@@ -1275,7 +1275,7 @@ function _renderDafInline(rashiFlat, tosafotFlat) {
     let extras = '';
     if (rashiFlat && rashiFlat[i]) {
       const t = typeof rashiFlat[i] === 'string' ? rashiFlat[i]
-        : (Array.isArray(rashiFlat[i]) ? rashiFlat[i].flat().filter(Boolean).join(' ') : '');
+        : (Array.isArray(rashiFlat[i]) ? deepFlat(rashiFlat[i]).filter(Boolean).join(' ') : '');
       if (t) extras += `<div style="margin-top:5px;padding:4px 9px;
         background:rgba(126,214,160,.08);border-right:2px solid var(--addition);
         border-radius:0 4px 4px 0;color:var(--addition);
@@ -1284,7 +1284,7 @@ function _renderDafInline(rashiFlat, tosafotFlat) {
     }
     if (tosafotFlat && tosafotFlat[i]) {
       const t = typeof tosafotFlat[i] === 'string' ? tosafotFlat[i]
-        : (Array.isArray(tosafotFlat[i]) ? tosafotFlat[i].flat().filter(Boolean).join(' ') : '');
+        : (Array.isArray(tosafotFlat[i]) ? deepFlat(tosafotFlat[i]).filter(Boolean).join(' ') : '');
       if (t) extras += `<div style="margin-top:5px;padding:4px 9px;
         background:rgba(122,184,214,.08);border-right:2px solid #7ab8d6;
         border-radius:0 4px 4px 0;color:#7ab8d6;
@@ -1419,7 +1419,7 @@ async function switchMishnaView(view) {
     const btEntries = he.map((entry, i) => {
       if (!entry) return null;
       const raw = Array.isArray(entry)
-        ? entry.flat(Infinity).filter(Boolean).join(' ')
+        ? deepFlat(entry).filter(Boolean).join(' ')
         : String(entry);
       const kwMatch = raw.match(/<b>([\s\S]*?)<\/b>/);
       const keyword = kwMatch ? kwMatch[1].replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim() : '';
@@ -1666,7 +1666,7 @@ async function switchRambamView(view) {
         } else {
           // 1D: flat list — each entry is one keyword-comment
           he.filter(Boolean).forEach((entry, i) => {
-            const raw = Array.isArray(entry) ? entry.flat(Infinity).join(' ') : String(entry);
+            const raw = Array.isArray(entry) ? deepFlat(entry).join(' ') : String(entry);
             const kwMatch = raw.match(/<b>([\s\S]*?)<\/b>/);
             const keyword = kwMatch ? kwMatch[1].replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim() : '';
             const text = raw.replace(/<b>/g,'**').replace(/<\/b>/g,'**').replace(/<[^>]+>/g,'').trim();
@@ -2042,7 +2042,7 @@ async function onMishnaChapterChange() {
     const data = await sefariaText(ref, 100);
     const he   = data?.he;
     let count  = 5; // fallback
-    if (Array.isArray(he)) count = he.flat(Infinity).filter(Boolean).length;
+    if (Array.isArray(he)) count = deepFlat(he).filter(Boolean).length;
 
     mSel.innerHTML = '<option value="">משנה...</option>';
     for (let m = 1; m <= count; m++) {
@@ -2188,7 +2188,7 @@ async function mishnaPickPrev() {
         const ref = `${_pickMishnaTractate}.${_pickMishnaChapter}`;
         const data = await sefariaText(ref, 100);
         const he = data?.he;
-        const count = Array.isArray(he) ? he.flat(Infinity).filter(Boolean).length : 5;
+        const count = Array.isArray(he) ? deepFlat(he).filter(Boolean).length : 5;
         if (!_mishnaChapterSizes[_pickMishnaTractate]) _mishnaChapterSizes[_pickMishnaTractate] = {};
         _mishnaChapterSizes[_pickMishnaTractate][_pickMishnaChapter] = count;
         _pickMishnaNum = count;

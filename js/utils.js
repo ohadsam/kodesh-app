@@ -108,7 +108,7 @@ let currentAliya = 'all';
 let rashiLoaded = false;
 let rashiVisible = false;
 
-const APP_VERSION  = '5.85';
+const APP_VERSION  = '5.86';
 const STORAGE_KEY  = 'kodesh_app_v1';
 const SIDDUR_CACHE_KEY = 'siddur_cache_v';
 
@@ -148,6 +148,23 @@ function formatDisplayDate(d) {
 // ═══════════════════════════════════════════
 // API WITH DELAY
 // ═══════════════════════════════════════════
+
+// ── Safe flatten helper (works even if polyfill not yet active) ───────
+function deepFlat(arr) {
+  if (!Array.isArray(arr)) return arr ? [arr] : [];
+  var result = [];
+  for (var i = 0; i < arr.length; i++) {
+    var item = arr[i];
+    if (Array.isArray(item)) {
+      var sub = deepFlat(item);
+      for (var j = 0; j < sub.length; j++) result.push(sub[j]);
+    } else if (item !== undefined && item !== null) {
+      result.push(item);
+    }
+  }
+  return result;
+}
+
 // ── Gematria (Hebrew numerals) ────────────────────────────────────────
 function toGematria(n) {
   if (!n || n <= 0 || n >= 1000) return String(n);
@@ -178,7 +195,7 @@ function extractHeText(data) {
   // v2 API: data.he is the Hebrew text directly
   if (data?.he) {
     const t = data.he;
-    const flat = Array.isArray(t[0]) ? t.flat() : t;
+    const flat = Array.isArray(t[0]) ? deepFlat(t) : t;
     if (flat.filter(Boolean).length) return flat;
   }
   // v3 API: data.versions array
@@ -186,7 +203,7 @@ function extractHeText(data) {
     const heVer = data.versions.find(v => v.actualLanguage === 'he' || v.language === 'he');
     const ver = heVer || data.versions[0];
     const t = ver?.text || [];
-    return Array.isArray(t[0]) ? t.flat() : t;
+    return Array.isArray(t[0]) ? deepFlat(t) : t;
   }
   return [];
 }
@@ -205,7 +222,7 @@ async function sefariaText(ref, delay = 350) {
   // Log what came back so we can diagnose
   if (data?.warnings) console.warn(`[Sefaria] warnings for "${ref}":`, data.warnings);
   const heArr = data?.he;
-  const flat = heArr ? (Array.isArray(heArr[0]) ? heArr.flat() : heArr) : [];
+  const flat = heArr ? (Array.isArray(heArr[0]) ? deepFlat(heArr) : heArr) : [];
   const filled = flat.filter(Boolean);
   console.log(`[Sefaria] "${ref}" → ${filled.length} verses (he), text sample: "${String(filled[0]||'').slice(0,40)}"`);
   if (!filled.length) {
@@ -222,7 +239,7 @@ function heFlat(data) {
     t = heVer?.text;
   }
   if (!t) return [];
-  const flat = Array.isArray(t) ? t.flat(Infinity) : [t];
+  const flat = Array.isArray(t) ? deepFlat(t) : [t];
   return flat.filter(Boolean);
 }
 
