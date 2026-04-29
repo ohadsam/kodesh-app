@@ -1782,3 +1782,445 @@ function _renderRambamContent() {
     `<div style="margin-bottom:8px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}</div>`
   ).join('');
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// DAF YOMI PICKER – בחר דף
+// ═══════════════════════════════════════════════════════════════════════
+
+const BAVLI_TRACTATES = [
+  {name:'Berakhot',he:'ברכות',dafim:64},{name:'Shabbat',he:'שבת',dafim:157},
+  {name:'Eruvin',he:'עירובין',dafim:105},{name:'Pesachim',he:'פסחים',dafim:121},
+  {name:'Rosh_Hashanah',he:'ראש השנה',dafim:35},{name:'Yoma',he:'יומא',dafim:88},
+  {name:'Sukkah',he:'סוכה',dafim:56},{name:'Beitzah',he:'ביצה',dafim:40},
+  {name:'Taanit',he:'תענית',dafim:31},{name:'Megillah',he:'מגילה',dafim:32},
+  {name:'Moed_Katan',he:'מועד קטן',dafim:29},{name:'Chagigah',he:'חגיגה',dafim:27},
+  {name:'Yevamot',he:'יבמות',dafim:122},{name:'Ketubot',he:'כתובות',dafim:112},
+  {name:'Nedarim',he:'נדרים',dafim:91},{name:'Nazir',he:'נזיר',dafim:66},
+  {name:'Sotah',he:'סוטה',dafim:49},{name:'Gittin',he:'גיטין',dafim:90},
+  {name:'Kiddushin',he:'קידושין',dafim:82},{name:'Bava_Kamma',he:'בבא קמא',dafim:119},
+  {name:'Bava_Metzia',he:'בבא מציעא',dafim:119},{name:'Bava_Batra',he:'בבא בתרא',dafim:176},
+  {name:'Sanhedrin',he:'סנהדרין',dafim:113},{name:'Makkot',he:'מכות',dafim:24},
+  {name:'Shevuot',he:'שבועות',dafim:49},{name:'Avodah_Zarah',he:'עבודה זרה',dafim:76},
+  {name:'Horayot',he:'הוריות',dafim:14},{name:'Zevachim',he:'זבחים',dafim:120},
+  {name:'Menachot',he:'מנחות',dafim:110},{name:'Chullin',he:'חולין',dafim:142},
+  {name:'Bekhorot',he:'בכורות',dafim:61},{name:'Arakhin',he:'ערכין',dafim:34},
+  {name:'Temurah',he:'תמורה',dafim:34},{name:'Keritot',he:'כריתות',dafim:28},
+  {name:'Meilah',he:'מעילה',dafim:22},{name:'Niddah',he:'נדה',dafim:73},
+];
+
+let _dafMode = 'daily'; // 'daily' | 'pick'
+
+function setDafMode(mode) {
+  _dafMode = mode;
+  // Update toggle buttons
+  document.getElementById('daf-mode-daily')?.classList.toggle('active', mode === 'daily');
+  document.getElementById('daf-mode-pick')?.classList.toggle('active', mode === 'pick');
+  // Show/hide picker
+  const picker = document.getElementById('daf-picker');
+  if (picker) picker.style.display = mode === 'pick' ? 'block' : 'none';
+
+  if (mode === 'daily') {
+    // Reload daily daf
+    _dafFlat = null; _dafRashiFlat = null; _dafTosafotFlat = null;
+    loaded['daf'] = false;
+    loadDafYomi();
+  } else {
+    // Populate tractate selector
+    const sel = document.getElementById('daf-tractate-sel');
+    if (sel && sel.options.length === 1) {
+      BAVLI_TRACTATES.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.name; opt.textContent = t.he;
+        sel.appendChild(opt);
+      });
+    }
+    // Clear content
+    const el = document.getElementById('daf-content');
+    if (el) { el.className = 'content-text'; el.innerHTML =
+      '<div style="color:var(--muted);text-align:center;padding:20px">בחר מסכת ודף</div>'; }
+    const subEl = document.getElementById('daf-subtitle');
+    if (subEl) subEl.textContent = 'בחר דף';
+  }
+}
+
+function onDafTractateChange() {
+  const tractate = document.getElementById('daf-tractate-sel')?.value;
+  const dafSel  = document.getElementById('daf-daf-sel');
+  const amudSel = document.getElementById('daf-amud-sel');
+  if (!dafSel || !amudSel) return;
+
+  if (!tractate) { dafSel.style.display = 'none'; amudSel.style.display = 'none'; return; }
+
+  const t = BAVLI_TRACTATES.find(x => x.name === tractate);
+  if (!t) return;
+
+  dafSel.innerHTML = '<option value="">דף...</option>';
+  // Dafim start at 2 (daf 2a is the first daf)
+  for (let d = 2; d <= t.dafim; d++) {
+    const opt = document.createElement('option');
+    opt.value = d; opt.textContent = toGematria(d);
+    dafSel.appendChild(opt);
+  }
+  dafSel.style.display = 'block';
+  amudSel.style.display = 'block';
+  amudSel.value = 'a';
+}
+
+// Current daf pick state for navigation
+let _pickDafTractate = null, _pickDafNum = 2, _pickDafAmud = 'a';
+
+async function loadDafByPick() {
+  const tractate = document.getElementById('daf-tractate-sel')?.value;
+  const daf      = document.getElementById('daf-daf-sel')?.value;
+  const amud     = document.getElementById('daf-amud-sel')?.value || 'a';
+  if (!tractate || !daf) return;
+
+  _pickDafTractate = tractate;
+  _pickDafNum      = parseInt(daf);
+  _pickDafAmud     = amud;
+  await _loadPickedDaf();
+}
+
+async function _loadPickedDaf() {
+  const tractate = _pickDafTractate;
+  if (!tractate) return;
+  const daf  = _pickDafNum;
+  const amud = _pickDafAmud;
+  const t    = BAVLI_TRACTATES.find(x => x.name === tractate);
+  const maxDaf = t?.dafim || 64;
+
+  const ref     = `${tractate}.${daf}${amud}`;
+  const amudHe  = amud === 'a' ? 'ע"א' : 'ע"ב';
+  const subtitle = `${t?.he || tractate} דף ${toGematria(daf)} ${amudHe}`;
+
+  const el    = document.getElementById('daf-content');
+  const subEl = document.getElementById('daf-subtitle');
+  el.className = 'content-text loading'; el.textContent = 'טוען...';
+  if (subEl) subEl.textContent = subtitle;
+  _dafView = 'text'; _dafRashiFlat = null; _dafTosafotFlat = null;
+
+  // Sync selectors
+  const dafSel  = document.getElementById('daf-daf-sel');
+  const amudSel = document.getElementById('daf-amud-sel');
+  if (dafSel)  dafSel.value  = daf;
+  if (amudSel) amudSel.value = amud;
+
+  // Compute prev/next
+  let prevDaf = daf, prevAmud = amud, nextDaf = daf, nextAmud = amud;
+  if (amud === 'b') { prevAmud = 'a'; nextDaf = daf + 1; nextAmud = 'a'; }
+  else              { prevDaf  = daf - 1; prevAmud = 'b'; nextAmud = 'b'; }
+  const hasPrev = prevDaf >= 2;
+  const hasNext = nextDaf <= maxDaf;
+
+  try {
+    _dafRef = ref;
+    const data = await sefariaText(ref, 200);
+    _dafFlat = heFlat(data);
+    if (!_dafFlat.length) throw new Error('אין טקסט');
+    _renderDafButtons();
+    _renderDafContent();
+    _renderDafPickNav(hasPrev, hasNext, prevDaf, prevAmud, nextDaf, nextAmud, t?.he || tractate, maxDaf);
+    updateDoneButton('daf', ref);
+  } catch(e) {
+    el.className = 'content-text';
+    el.textContent = 'שגיאה: ' + e.message;
+  }
+}
+
+function _renderDafPickNav(hasPrev, hasNext, prevDaf, prevAmud, nextDaf, nextAmud, tractateHe, maxDaf) {
+  // Remove old nav if exists
+  document.getElementById('daf-pick-nav')?.remove();
+  const page = document.getElementById('page-daf');
+  if (!page) return;
+  const nav = document.createElement('div');
+  nav.id = 'daf-pick-nav';
+  nav.style.cssText = 'display:flex;gap:8px;padding:10px 16px 4px;position:sticky;bottom:60px;' +
+    'background:var(--bg);border-top:1px solid var(--border);z-index:10;margin-top:8px';
+  nav.innerHTML =
+    `<button onclick="dafPickPrev()" ${hasPrev?'':'disabled'}
+      style="flex:1;padding:9px;background:var(--card);color:${hasPrev?'var(--gold)':'var(--muted)'};
+             border:1px solid ${hasPrev?'var(--gold-dim)':'var(--border)'};border-radius:10px;
+             font-size:13px;cursor:${hasPrev?'pointer':'default'};font-family:'Heebo',sans-serif">
+      ◀ הדף הקודם
+    </button>
+    <button onclick="dafPickNext()" ${hasNext?'':'disabled'}
+      style="flex:1;padding:9px;background:var(--card);color:${hasNext?'var(--gold)':'var(--muted)'};
+             border:1px solid ${hasNext?'var(--gold-dim)':'var(--border)'};border-radius:10px;
+             font-size:13px;cursor:${hasNext?'pointer':'default'};font-family:'Heebo',sans-serif">
+      הדף הבא ▶
+    </button>`;
+  // Append after daf-content
+  const content = document.getElementById('daf-content');
+  content?.parentNode?.insertBefore(nav, content.nextSibling);
+}
+
+function dafPickPrev() {
+  if (_pickDafAmud === 'b') { _pickDafAmud = 'a'; }
+  else { _pickDafNum--; _pickDafAmud = 'b'; }
+  _loadPickedDaf();
+}
+function dafPickNext() {
+  if (_pickDafAmud === 'a') { _pickDafAmud = 'b'; }
+  else { _pickDafNum++; _pickDafAmud = 'a'; }
+  _loadPickedDaf();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// MISHNA PICKER – בחר משנה
+// ═══════════════════════════════════════════════════════════════════════
+
+const MISHNA_TRACTATES = [
+  {name:'Berakhot',he:'ברכות',chapters:9},{name:'Peah',he:'פאה',chapters:8},
+  {name:'Demai',he:'דמאי',chapters:7},{name:'Kilayim',he:'כלאים',chapters:9},
+  {name:'Sheviit',he:'שביעית',chapters:10},{name:'Terumot',he:'תרומות',chapters:11},
+  {name:'Maasrot',he:'מעשרות',chapters:5},{name:'Maaser_Sheni',he:'מעשר שני',chapters:5},
+  {name:'Challah',he:'חלה',chapters:4},{name:'Orlah',he:'ערלה',chapters:3},
+  {name:'Bikkurim',he:'ביכורים',chapters:4},{name:'Shabbat',he:'שבת',chapters:24},
+  {name:'Eruvin',he:'עירובין',chapters:10},{name:'Pesachim',he:'פסחים',chapters:10},
+  {name:'Shekalim',he:'שקלים',chapters:8},{name:'Yoma',he:'יומא',chapters:8},
+  {name:'Sukkah',he:'סוכה',chapters:5},{name:'Beitzah',he:'ביצה',chapters:5},
+  {name:'Rosh_Hashanah',he:'ראש השנה',chapters:4},{name:'Taanit',he:'תענית',chapters:4},
+  {name:'Megillah',he:'מגילה',chapters:4},{name:'Moed_Katan',he:'מועד קטן',chapters:3},
+  {name:'Chagigah',he:'חגיגה',chapters:3},{name:'Yevamot',he:'יבמות',chapters:16},
+  {name:'Ketubot',he:'כתובות',chapters:13},{name:'Nedarim',he:'נדרים',chapters:11},
+  {name:'Nazir',he:'נזיר',chapters:9},{name:'Sotah',he:'סוטה',chapters:9},
+  {name:'Gittin',he:'גיטין',chapters:9},{name:'Kiddushin',he:'קידושין',chapters:4},
+  {name:'Bava_Kamma',he:'בבא קמא',chapters:10},{name:'Bava_Metzia',he:'בבא מציעא',chapters:10},
+  {name:'Bava_Batra',he:'בבא בתרא',chapters:10},{name:'Sanhedrin',he:'סנהדרין',chapters:11},
+  {name:'Makkot',he:'מכות',chapters:3},{name:'Shevuot',he:'שבועות',chapters:8},
+  {name:'Avodah_Zarah',he:'עבודה זרה',chapters:5},{name:'Avot',he:'פרקי אבות',chapters:5},
+  {name:'Horayot',he:'הוריות',chapters:3},
+];
+
+// Approximate mishna counts per chapter (fallback: load and count dynamically)
+let _mishnaMode = 'daily';
+
+function setMishnaMode(mode) {
+  _mishnaMode = mode;
+  document.getElementById('mishna-mode-daily')?.classList.toggle('active', mode === 'daily');
+  document.getElementById('mishna-mode-pick')?.classList.toggle('active', mode === 'pick');
+  const picker = document.getElementById('mishna-picker');
+  if (picker) picker.style.display = mode === 'pick' ? 'block' : 'none';
+
+  if (mode === 'daily') {
+    _mishnaFlat = null;
+    loaded['mishna'] = false;
+    loadMishnaYomi();
+  } else {
+    const sel = document.getElementById('mishna-tractate-sel');
+    if (sel && sel.options.length === 1) {
+      MISHNA_TRACTATES.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.name; opt.textContent = t.he;
+        sel.appendChild(opt);
+      });
+    }
+    const el = document.getElementById('mishna-content');
+    if (el) { el.className = 'content-text'; el.innerHTML =
+      '<div style="color:var(--muted);text-align:center;padding:20px">בחר מסכת ופרק</div>'; }
+    const subEl = document.getElementById('mishna-subtitle');
+    if (subEl) subEl.textContent = 'בחר משנה';
+  }
+}
+
+function onMishnaTractateChange() {
+  const tractate = document.getElementById('mishna-tractate-sel')?.value;
+  const chSel    = document.getElementById('mishna-chapter-sel');
+  const mSel     = document.getElementById('mishna-mishna-sel');
+  if (!chSel || !mSel) return;
+  if (!tractate) { chSel.style.display = 'none'; mSel.style.display = 'none'; return; }
+
+  const t = MISHNA_TRACTATES.find(x => x.name === tractate);
+  if (!t) return;
+
+  chSel.innerHTML = '<option value="">פרק...</option>';
+  for (let ch = 1; ch <= t.chapters; ch++) {
+    const opt = document.createElement('option');
+    opt.value = ch; opt.textContent = `פרק ${toGematria(ch)}`;
+    chSel.appendChild(opt);
+  }
+  chSel.style.display = 'block';
+  mSel.style.display = 'none';
+}
+
+async function onMishnaChapterChange() {
+  const tractate = document.getElementById('mishna-tractate-sel')?.value;
+  const chapter  = document.getElementById('mishna-chapter-sel')?.value;
+  const mSel     = document.getElementById('mishna-mishna-sel');
+  if (!tractate || !chapter || !mSel) return;
+
+  // Fetch chapter to find mishna count
+  try {
+    const ref  = `${tractate}.${chapter}`;
+    const data = await sefariaText(ref, 100);
+    const he   = data?.he;
+    let count  = 5; // fallback
+    if (Array.isArray(he)) count = he.flat(Infinity).filter(Boolean).length;
+
+    mSel.innerHTML = '<option value="">משנה...</option>';
+    for (let m = 1; m <= count; m++) {
+      const opt = document.createElement('option');
+      opt.value = m; opt.textContent = `משנה ${toGematria(m)}`;
+      mSel.appendChild(opt);
+    }
+    mSel.style.display = 'block';
+  } catch(e) {
+    console.warn('[MishnaPicker] chapter fetch error:', e.message);
+    // Fallback: show 10 mishnayot
+    mSel.innerHTML = '<option value="">משנה...</option>';
+    for (let m = 1; m <= 10; m++) {
+      const opt = document.createElement('option');
+      opt.value = m; opt.textContent = `משנה ${toGematria(m)}`;
+      mSel.appendChild(opt);
+    }
+    mSel.style.display = 'block';
+  }
+}
+
+// Current mishna pick state for navigation
+let _pickMishnaTractate = null, _pickMishnaChapter = 1, _pickMishnaNum = 1;
+// Chapter sizes cache: {tractate: {chapter: count}}
+const _mishnaChapterSizes = {};
+
+async function loadMishnaByPick() {
+  const tractate  = document.getElementById('mishna-tractate-sel')?.value;
+  const chapter   = document.getElementById('mishna-chapter-sel')?.value;
+  const mishnaNum = document.getElementById('mishna-mishna-sel')?.value;
+  if (!tractate || !chapter || !mishnaNum) return;
+
+  _pickMishnaTractate = tractate;
+  _pickMishnaChapter  = parseInt(chapter);
+  _pickMishnaNum      = parseInt(mishnaNum);
+  await _loadPickedMishna();
+}
+
+async function _loadPickedMishna() {
+  const tractate = _pickMishnaTractate;
+  if (!tractate) return;
+  const ch  = _pickMishnaChapter;
+  const num = _pickMishnaNum;
+  const t   = MISHNA_TRACTATES.find(x => x.name === tractate);
+  const maxChapter = t?.chapters || 1;
+
+  const ref = `${tractate}.${ch}.${num}`;
+  const subtitle = `${t?.he || tractate} פרק ${toGematria(ch)} משנה ${toGematria(num)}`;
+
+  const el    = document.getElementById('mishna-content');
+  const subEl = document.getElementById('mishna-subtitle');
+  el.className = 'content-text loading'; el.textContent = 'טוען...';
+  if (subEl) subEl.textContent = subtitle;
+  _mishnaView = 'text';
+
+  // Sync selectors
+  const chSel = document.getElementById('mishna-chapter-sel');
+  const mSel  = document.getElementById('mishna-mishna-sel');
+  if (chSel) chSel.value = ch;
+  if (mSel)  mSel.value  = num;
+
+  try {
+    _mishnaRef = ref;
+    const data = await sefariaText(ref, 200);
+    _mishnaFlat = heFlat(data);
+    if (!_mishnaFlat.length) throw new Error('אין טקסט');
+
+    // Cache mishna count for current chapter if unknown
+    if (!_mishnaChapterSizes[tractate]) _mishnaChapterSizes[tractate] = {};
+    // We know current num exists; try to get max from selector
+    const mSelOpts = document.getElementById('mishna-mishna-sel');
+    if (mSelOpts && mSelOpts.options.length > 1) {
+      _mishnaChapterSizes[tractate][ch] = mSelOpts.options.length - 1; // -1 for placeholder
+    }
+
+    _renderMishnaButtons();
+    _renderMishnaContent();
+    await _renderMishnaPickNav(tractate, ch, num, maxChapter, t);
+    updateDoneButton('mishna', ref);
+  } catch(e) {
+    el.className = 'content-text';
+    el.textContent = 'שגיאה: ' + e.message;
+  }
+}
+
+async function _renderMishnaPickNav(tractate, ch, num, maxChapter, t) {
+  document.getElementById('mishna-pick-nav')?.remove();
+
+  // Get mishna count for current chapter (from cache or selector)
+  let maxMishna = _mishnaChapterSizes[tractate]?.[ch] || 99;
+  const mSel = document.getElementById('mishna-mishna-sel');
+  if (mSel && mSel.options.length > 1) maxMishna = mSel.options.length - 1;
+
+  // Compute prev/next
+  let prevCh = ch, prevNum = num - 1;
+  let nextCh = ch, nextNum = num + 1;
+
+  if (prevNum < 1) {
+    prevCh = ch - 1;
+    // Get last mishna of prev chapter — use cached or fallback 10
+    prevNum = _mishnaChapterSizes[tractate]?.[prevCh] || 10;
+  }
+  if (nextNum > maxMishna) { nextCh = ch + 1; nextNum = 1; }
+
+  const hasPrev = prevCh >= 1;
+  const hasNext = nextCh <= maxChapter;
+
+  const page = document.getElementById('page-mishna');
+  if (!page) return;
+  const nav = document.createElement('div');
+  nav.id = 'mishna-pick-nav';
+  nav.style.cssText = 'display:flex;gap:8px;padding:10px 16px 4px;' +
+    'background:var(--bg);border-top:1px solid var(--border);z-index:10;margin-top:8px';
+  nav.innerHTML =
+    `<button onclick="mishnaPickPrev()" ${hasPrev?'':'disabled'}
+      style="flex:1;padding:9px;background:var(--card);color:${hasPrev?'var(--gold)':'var(--muted)'};
+             border:1px solid ${hasPrev?'var(--gold-dim)':'var(--border)'};border-radius:10px;
+             font-size:13px;cursor:${hasPrev?'pointer':'default'};font-family:'Heebo',sans-serif">
+      ◀ המשנה הקודמת
+    </button>
+    <button onclick="mishnaPickNext()" ${hasNext?'':'disabled'}
+      style="flex:1;padding:9px;background:var(--card);color:${hasNext?'var(--gold)':'var(--muted)'};
+             border:1px solid ${hasNext?'var(--gold-dim)':'var(--border)'};border-radius:10px;
+             font-size:13px;cursor:${hasNext?'pointer':'default'};font-family:'Heebo',sans-serif">
+      המשנה הבאה ▶
+    </button>`;
+  const content = document.getElementById('mishna-content');
+  content?.parentNode?.insertBefore(nav, content.nextSibling);
+}
+
+async function mishnaPickPrev() {
+  _pickMishnaNum--;
+  if (_pickMishnaNum < 1) {
+    _pickMishnaChapter--;
+    if (_pickMishnaChapter < 1) return;
+    // Get last mishna of prev chapter
+    const cached = _mishnaChapterSizes[_pickMishnaTractate]?.[_pickMishnaChapter];
+    if (cached) {
+      _pickMishnaNum = cached;
+    } else {
+      // Fetch to find count
+      try {
+        const ref = `${_pickMishnaTractate}.${_pickMishnaChapter}`;
+        const data = await sefariaText(ref, 100);
+        const he = data?.he;
+        const count = Array.isArray(he) ? he.flat(Infinity).filter(Boolean).length : 5;
+        if (!_mishnaChapterSizes[_pickMishnaTractate]) _mishnaChapterSizes[_pickMishnaTractate] = {};
+        _mishnaChapterSizes[_pickMishnaTractate][_pickMishnaChapter] = count;
+        _pickMishnaNum = count;
+      } catch(e) { _pickMishnaNum = 5; }
+    }
+  }
+  _loadPickedMishna();
+}
+async function mishnaPickNext() {
+  const t = MISHNA_TRACTATES.find(x => x.name === _pickMishnaTractate);
+  const maxCh = t?.chapters || 1;
+  const cached = _mishnaChapterSizes[_pickMishnaTractate]?.[_pickMishnaChapter];
+  const mSel = document.getElementById('mishna-mishna-sel');
+  const maxM = cached || (mSel && mSel.options.length > 1 ? mSel.options.length - 1 : 99);
+  _pickMishnaNum++;
+  if (_pickMishnaNum > maxM) {
+    _pickMishnaChapter++;
+    if (_pickMishnaChapter > maxCh) return;
+    _pickMishnaNum = 1;
+  }
+  _loadPickedMishna();
+}

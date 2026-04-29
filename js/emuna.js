@@ -1,396 +1,420 @@
 // ═══════════════════════════════════════════════════════════════════════
-// EMUNA.JS – טאב אמונה – v5.78
-// ספר הכוזרי – לימוד יומי מספריא
-// 5 פסקאות ביום, שמירת מצב, ניווט קדימה/אחורה
+// EMUNA.JS – טאב אמונה – v5.79
+// ספר הכוזרי, שמונה פרקים לרמב"ם, מסילת ישרים
 // ═══════════════════════════════════════════════════════════════════════
 
-// ── Kuzari structure: 5 mamarim ──────────────────────────────────────
-// Mamaar 1: sections 1-115 (~115 sections)
-// Mamaar 2: sections 1-82  (~82)
-// Mamaar 3: sections 1-73  (~73)
-// Mamaar 4: sections 1-31  (~31)
-// Mamaar 5: sections 1-28  (~28)
-// Total ~329 sections → 5/unit = ~66 learning units
+// ── Book definitions ──────────────────────────────────────────────────
+const EMUNA_BOOKS = {
+  kuzari: {
+    id: 'kuzari',
+    title: 'ספר הכוזרי',
+    author: 'רבי יהודה הלוי',
+    icon: '📖',
+    color: '#c9a54a',
+    description: '5 מאמרים · לימוד דיאלוגי על עקרי האמונה',
+    // Pre-built units: one section per unit
+    buildUnits() {
+      const maamarim = [{num:1,size:115},{num:2,size:82},{num:3,size:73},{num:4,size:31},{num:5,size:28}];
+      const units = [];
+      for (const m of maamarim) {
+        for (let sec = 1; sec <= m.size; sec++) {
+          units.push({ id:`${m.num}_${sec}`, ch:m.num, par:sec,
+            label:`מאמר ${_heNum(m.num)}, סעיף ${sec}`,
+            ref:`Kuzari.${m.num}.${sec}` });
+        }
+      }
+      return units;
+    },
+    chapterLabel(u) { return `מאמר ${_heNum(u.ch)}`; },
+    unitLabel(u)    { return `סעיף ${u.par}`; },
+    // No commentary available via API
+    commentaryRef: null,
+  },
+  perakim: {
+    id: 'perakim',
+    title: 'שמונה פרקים',
+    author: 'הרמב"ם',
+    icon: '🦅',
+    color: '#7ab8d6',
+    description: '8 פרקים · מבוא לפרקי אבות – פילוסופיה יהודית ומוסר',
+    // Chapters fetched on demand, split into paragraphs
+    buildUnits() { return _chaptersToUnits('perakim', 8, 'Eight_Chapters'); },
+    chapterLabel(u) { return `פרק ${toGematria(u.ch)}`; },
+    unitLabel(u)    { return `פסקה ${u.par}`; },
+    commentaryRef: null, // No structured commentary in Sefaria API
+  },
+  mesilat: {
+    id: 'mesilat',
+    title: 'מסילת ישרים',
+    author: 'רמח"ל',
+    icon: '✨',
+    color: '#7ed6a0',
+    description: '26 פרקים + הקדמה · מדרגות עבודת ה\'',
+    buildUnits() { return _chaptersToUnits('mesilat', 26, 'Mesillat_Yesharim', true); },
+    chapterLabel(u) { return u.ch === 0 ? 'הקדמה' : `פרק ${toGematria(u.ch)}`; },
+    unitLabel(u)    { return `פסקה ${u.par}`; },
+    commentaryRef: null,
+  },
+};
 
-const KUZARI_UNITS = _buildKuzariUnits();
+// ── Helpers ────────────────────────────────────────────────────────────
+function _heNum(n) {
+  return ['א','ב','ג','ד','ה'][n-1] || String(n);
+}
 
-function _buildKuzariUnits() {
-  // Mamaar sizes based on Sefaria index
-  const maamarim = [
-    { num: 1, size: 115 },
-    { num: 2, size: 82  },
-    { num: 3, size: 73  },
-    { num: 4, size: 31  },
-    { num: 5, size: 28  },
-  ];
+// For chapter-based books: units are lazy-loaded
+// We store {ch, par} and fetch chapter text on demand
+function _chaptersToUnits(bookId, numChapters, baseRef, hasIntro) {
   const units = [];
-  for (const m of maamarim) {
-    for (let sec = 1; sec <= m.size; sec++) {
-      units.push({
-        id:     `${m.num}_${sec}`,
-        mamaar: m.num,
-        start:  sec,
-        end:    sec,
-        label:  `מאמר ${_hebrewNumeral(m.num)}, סעיף ${sec}`,
-        ref:    `Kuzari.${m.num}.${sec}`,
-      });
-    }
+  if (hasIntro) {
+    units.push({ id:'intro_1', ch:0, par:1, label:'הקדמה',
+      ref:`${baseRef},_Introduction`, isIntro:true });
+  }
+  // We don't know paragraph counts until we load the chapter
+  // So we create placeholder units per chapter and expand lazily
+  // Store: ch = chapter number, par = -1 means "whole chapter" until expanded
+  for (let ch = 1; ch <= numChapters; ch++) {
+    units.push({ id:`ch${ch}_1`, ch, par:1,
+      label:`פרק ${toGematria(ch)}, פסקה א׳`,
+      ref:`${baseRef}.${ch}`, baseRef });
   }
   return units;
 }
 
-function _hebrewNumeral(n) {
-  return ['א','ב','ג','ד','ה'][n-1] || String(n);
+// ── State ──────────────────────────────────────────────────────────────
+function _getBookState(bookId) {
+  if (!appState.emuna) appState.emuna = {};
+  if (!appState.emuna[bookId]) appState.emuna[bookId] = { currentUnit:0, completed:{}, chapterCache:{} };
+  return appState.emuna[bookId];
 }
+function _saveState() { saveState(); }
 
-// ── State helpers ─────────────────────────────────────────────────────
-function _getKuzariState() {
-  if (!appState.kuzari) appState.kuzari = { currentUnit: 0, completedUnits: {} };
-  return appState.kuzari;
-}
+// In-memory chapter cache (survives within session only)
+const _chapterCache = {};
 
-function _saveKuzariState() { saveState(); }
-
-// ── Render emuna tab ──────────────────────────────────────────────────
-let _emunaBookOpen = false;
-let _emunaLoading  = false;
+// ── Main render ────────────────────────────────────────────────────────
+let _currentBook = null;
+let _currentUnits = [];
+let _loading = false;
 
 function loadEmuna() {
-  _emunaBookOpen = !!_getKuzariState().currentUnit || _getKuzariState().currentUnit === 0;
   _renderEmunaMenu();
 }
 
 function _renderEmunaMenu() {
   const el = document.getElementById('emuna-content');
   if (!el) return;
-  const state = _getKuzariState();
-  const total     = KUZARI_UNITS.length;
-  const completed = Object.keys(state.completedUnits || {}).length;
-  const pct       = Math.round(completed / total * 100);
+  _currentBook = null;
 
   el.innerHTML = `
-    <div style="padding:0 0 80px">
-      <!-- Header card -->
-      <div style="text-align:center;padding:20px 16px 16px">
-        <div style="font-size:32px;margin-bottom:8px">📖</div>
-        <div style="font-family:'Frank Ruhl Libre',serif;font-size:22px;font-weight:700;
-                    color:var(--gold)">ספר הכוזרי</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:4px">
-          לרבי יהודה הלוי
-        </div>
+    <div style="padding:0 16px 80px">
+      <div style="text-align:center;padding:20px 0 16px">
+        <div style="font-size:13px;color:var(--muted)">בחר ספר ללימוד</div>
       </div>
-
-      <!-- Progress -->
-      ${completed > 0 ? `
-      <div style="margin:0 16px 16px;background:var(--card);border-radius:12px;padding:12px 14px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <span style="font-size:12px;color:var(--muted)">התקדמות</span>
-          <span style="font-size:12px;color:var(--gold)">${completed} / ${total} יחידות (${pct}%)</span>
-        </div>
-        <div style="background:var(--bg);border-radius:4px;height:6px;overflow:hidden">
-          <div style="background:var(--gold);height:100%;width:${pct}%;border-radius:4px;transition:width .3s"></div>
-        </div>
-      </div>` : ''}
-
-      <!-- Main button -->
-      <div style="padding:0 16px">
-        <button onclick="openKuzariLearning()"
-          style="width:100%;padding:16px;background:var(--gold);color:#1a1108;border:none;
-                 border-radius:14px;font-size:17px;font-weight:700;cursor:pointer;
-                 font-family:'Frank Ruhl Libre',serif;
-                 box-shadow:0 4px 16px rgba(201,165,74,.3)">
-          ${completed === 0 ? '🌟 פתח את ספר הכוזרי' : '📖 המשך לימוד'}
-        </button>
-
-        ${completed > 0 ? `
-        <div style="display:flex;gap:8px;margin-top:10px">
-          <button onclick="kuzariPrev()"
-            style="flex:1;padding:10px;background:var(--card);color:var(--gold);
-                   border:1px solid var(--gold-dim);border-radius:10px;
-                   font-size:13px;cursor:pointer;font-family:'Heebo',sans-serif">
-            ◀ הקודם
-          </button>
-          <button onclick="kuzariNext()"
-            style="flex:1;padding:10px;background:var(--card);color:var(--gold);
-                   border:1px solid var(--gold-dim);border-radius:10px;
-                   font-size:13px;cursor:pointer;font-family:'Heebo',sans-serif">
-            הבא ▶
-          </button>
-        </div>` : ''}
-
-        <!-- Info -->
-        <div style="margin-top:16px;padding:12px;background:var(--card);border-radius:10px;
-                    border-right:3px solid var(--gold-dim)">
-          <div style="font-size:11px;color:var(--muted);line-height:1.6">
-            🔯 ${total} יחידות לימוד · סעיף אחד כל יחידה<br>
-            ✍️ נוסח: אבן תיבון (מתוך ספריא)<br>
-            📅 כ-${Math.ceil(total/30)} חודשים ללימוד מלא
-          </div>
-        </div>
-      </div>
+      ${Object.values(EMUNA_BOOKS).map(book => {
+        const state = _getBookState(book.id);
+        const total = _getBookUnits(book).length;
+        const done  = Object.keys(state.completed || {}).length;
+        const pct   = total ? Math.round(done/total*100) : 0;
+        return `
+          <div onclick="openBook('${book.id}')"
+            style="margin-bottom:12px;padding:14px;background:var(--card);border-radius:14px;
+                   cursor:pointer;border-right:4px solid ${book.color};
+                   active:opacity:.8">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+              <span style="font-size:24px">${book.icon}</span>
+              <div>
+                <div style="font-family:'Frank Ruhl Libre',serif;font-size:16px;
+                            font-weight:700;color:var(--cream)">${book.title}</div>
+                <div style="font-size:11px;color:var(--muted)">${book.author}</div>
+              </div>
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:8px">${book.description}</div>
+            ${done > 0 ? `
+              <div style="display:flex;justify-content:space-between;
+                          font-size:10px;color:var(--muted);margin-bottom:4px">
+                <span>התקדמות</span><span>${done}/${total} (${pct}%)</span>
+              </div>
+              <div style="background:var(--bg);border-radius:3px;height:4px">
+                <div style="background:${book.color};height:100%;width:${pct}%;border-radius:3px"></div>
+              </div>` : `
+              <div style="font-size:10px;color:${book.color}">לחץ להתחיל ▶</div>`}
+          </div>`;
+      }).join('')}
     </div>`;
 }
 
-async function openKuzariLearning() {
-  const state = _getKuzariState();
-  const idx = state.currentUnit || 0;
-  await _loadKuzariUnit(idx);
+function _getBookUnits(book) {
+  if (!book._units) book._units = book.buildUnits();
+  return book._units;
 }
 
-async function kuzariPrev() {
-  const state = _getKuzariState();
-  const idx = Math.max(0, (state.currentUnit || 0) - 1);
-  await _loadKuzariUnit(idx);
+// Update book bar active state
+function _updateEmunaBar(bookId) {
+  ['kuzari','perakim','mesilat'].forEach(id => {
+    const btn = document.getElementById('emuna-btn-' + id);
+    if (btn) btn.classList.toggle('active', id === bookId);
+  });
+  // Show floating nav once a book is open
+  const nav = document.getElementById('emuna-float-nav');
+  if (nav) nav.style.display = bookId ? 'block' : 'none';
 }
 
-async function kuzariNext() {
-  const state = _getKuzariState();
-  const idx = Math.min(KUZARI_UNITS.length - 1, (state.currentUnit || 0) + 1);
-  await _loadKuzariUnit(idx);
+function openEmunaNav() {
+  document.getElementById('emuna-nav-overlay').style.display = 'block';
+  document.getElementById('emuna-nav-popup').style.display = 'block';
+}
+function closeEmunaNav() {
+  document.getElementById('emuna-nav-overlay').style.display = 'none';
+  document.getElementById('emuna-nav-popup').style.display = 'none';
 }
 
-async function kuzariMarkDone() {
-  const state = _getKuzariState();
-  const idx = state.currentUnit || 0;
-  const unit = KUZARI_UNITS[idx];
-  if (!unit) return;
-
-  // Mark as completed
-  if (!state.completedUnits) state.completedUnits = {};
-  state.completedUnits[unit.id] = true;
-
-  // Advance to next unit
-  const nextIdx = Math.min(KUZARI_UNITS.length - 1, idx + 1);
-  state.currentUnit = nextIdx;
-  _saveKuzariState();
-
-  if (nextIdx === idx) {
-    // Finished the whole book!
-    _renderKuzariFinished();
-  } else {
-    await _loadKuzariUnit(nextIdx);
-  }
+async function openBook(bookId) {
+  const book = EMUNA_BOOKS[bookId];
+  if (!book) return;
+  _currentBook = book;
+  _currentUnits = _getBookUnits(book);
+  _updateEmunaBar(bookId);
+  const state = _getBookState(bookId);
+  await _loadUnit(state.currentUnit || 0);
 }
 
-async function _loadKuzariUnit(idx) {
-  if (_emunaLoading) return;
-  _emunaLoading = true;
+// ── Unit loading ───────────────────────────────────────────────────────
+async function _loadUnit(idx) {
+  if (_loading) return;
+  _loading = true;
+  const book  = _currentBook;
+  const units = _currentUnits;
+  const state = _getBookState(book.id);
+
+  // Clamp index
+  idx = Math.max(0, Math.min(units.length - 1, idx));
+  state.currentUnit = idx;
+  _saveState();
 
   const el = document.getElementById('emuna-content');
-  if (!el) { _emunaLoading = false; return; }
+  if (!el) { _loading = false; return; }
 
-  const state = _getKuzariState();
-  state.currentUnit = idx;
-  _saveKuzariState();
-
-  const unit = KUZARI_UNITS[idx];
-  if (!unit) { _emunaLoading = false; return; }
-
-  const isCompleted = !!(state.completedUnits || {})[unit.id];
-  const isLast      = idx === KUZARI_UNITS.length - 1;
-  const isFirst     = idx === 0;
-
-  // Show loading state
-  el.innerHTML = `
-    <div style="padding:16px 16px 80px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-        <button onclick="_renderEmunaMenu()"
-          style="background:none;border:none;color:var(--muted);cursor:pointer;
-                 font-size:13px;padding:4px 8px">← חזור</button>
-        <div style="font-size:12px;color:var(--muted)">${idx+1} / ${KUZARI_UNITS.length}</div>
-      </div>
-      <div style="text-align:center;padding:40px;color:var(--muted)">
-        <div style="font-size:28px;margin-bottom:12px">📖</div>
-        טוען ${unit.label}...
-      </div>
-    </div>`;
+  // Show loading
+  el.innerHTML = _navHeader(book, idx, units.length) +
+    `<div style="text-align:center;padding:40px;color:var(--muted)">טוען ${units[idx]?.label || ''}...</div>`;
 
   try {
-    console.log('[Kuzari] loading unit', idx, 'ref:', unit.ref);
-    // Use fetch directly - bypass heFlat to avoid any version issues
-    await new Promise(r => setTimeout(r, 300));
-    const kuzariUrl = 'https://www.sefaria.org/api/texts/' +
-      encodeURIComponent(unit.ref) + '?lang=he&commentary=0&context=0';
-    console.log('[Kuzari] fetching:', kuzariUrl);
-    const resp = await fetch(kuzariUrl);
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const data = await resp.json();
-    
-    // Extract Hebrew text - handle ALL possible Sefaria structures
-    const he = data && data.he;
-    console.log('[Kuzari] he type:', typeof he, '| isArray:', Array.isArray(he),
-                '| val:', JSON.stringify(he)?.slice(0, 80));
-    
-    const sections = [];
-    if (typeof he === 'string' && he.trim()) {
-      sections.push(he);
-    } else if (Array.isArray(he)) {
-      const fl = he.flat ? he.flat(10) : he;
-      fl.forEach(function(item) {
-        if (typeof item === 'string' && item.trim()) sections.push(item);
-      });
-    }
-    if (!sections.length && data && data.versions) {
-      // Fallback: try versions array
-      const heVer = data.versions.find(function(v) {
-        return v.actualLanguage === 'he' || v.language === 'he';
-      }) || data.versions[0];
-      const t = heVer && heVer.text;
-      if (typeof t === 'string' && t.trim()) sections.push(t);
-      else if (Array.isArray(t)) t.forEach(function(s) {
-        if (typeof s === 'string' && s.trim()) sections.push(s);
-      });
-    }
-    
-    // Clean HTML - inline to avoid any dependency issues
-    const flat = sections.map(function(s) {
-      return s.replace(/<(?!\/?(b|i|strong)\b)[^>]+>/gi, '').trim();
-    }).filter(Boolean);
-    console.log('[Kuzari] sections ready:', flat.length);
-
-    if (!flat.length) throw new Error('no text returned');
-
-    const completedCount = Object.keys(state.completedUnits || {}).length;
-    const totalUnits = KUZARI_UNITS.length;
-
-    el.innerHTML = `
-      <div style="padding:0 16px 100px">
-        <!-- Nav header -->
-        <div style="display:flex;align-items:center;justify-content:space-between;
-                    padding:12px 0;position:sticky;top:0;background:var(--bg);z-index:10">
-          <button onclick="_renderEmunaMenu()"
-            style="background:none;border:none;color:var(--muted);cursor:pointer;
-                   font-size:13px;padding:6px 8px">← אמונה</button>
-          <div style="font-size:11px;color:var(--muted)">${idx+1} / ${totalUnits}</div>
-        </div>
-
-        <!-- Title -->
-        <div style="text-align:center;margin-bottom:16px;padding:12px;
-                    background:rgba(201,165,74,.08);border-radius:12px">
-          <div style="font-size:14px;font-weight:700;color:var(--gold);
-                      font-family:'Frank Ruhl Libre',serif">ספר הכוזרי</div>
-          <div style="font-size:13px;color:var(--cream);margin-top:3px">${unit.label}</div>
-          ${isCompleted ? '<div style="font-size:11px;color:#7ed6a0;margin-top:4px">✅ נלמד</div>' : ''}
-        </div>
-
-        <!-- Text -->
-        <div style="font-family:\'Frank Ruhl Libre\',serif;direction:rtl">
-          ${flat.map((section, i) => `
-            <div style="margin-bottom:16px;padding:12px 14px;background:var(--card);
-                        border-radius:10px;border-right:3px solid ${i===0?'var(--gold)':'var(--border)'}">
-              <div style="font-size:10px;color:var(--muted);margin-bottom:6px;
-                          font-family:\'Heebo\',sans-serif">
-                מאמר ${_hebrewNumeral(unit.mamaar)}, סעיף ${unit.start + i}
-              </div>
-              <div style="font-size:var(--font-size);line-height:1.9;color:var(--cream)">
-                ${section}
-              </div>
-            </div>`).join('')}
-        </div>
-
-        <!-- Action buttons -->
-        <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
-          ${!isCompleted ? `
-          <button onclick="kuzariMarkDone()"
-            style="width:100%;padding:14px;background:var(--gold);color:#1a1108;
-                   border:none;border-radius:12px;font-size:16px;font-weight:700;
-                   cursor:pointer;font-family:\'Frank Ruhl Libre\',serif;
-                   box-shadow:0 4px 12px rgba(201,165,74,.3)">
-            ✅ סמן כנלמד${!isLast ? ' → הבא' : ' → סיום'}
-          </button>` : `
-          <button onclick="kuzariNext()" ${isLast ? 'disabled' : ''}
-            style="width:100%;padding:14px;background:var(--card);color:var(--gold);
-                   border:1px solid var(--gold-dim);border-radius:12px;font-size:15px;
-                   font-weight:600;cursor:pointer;font-family:\'Heebo\',sans-serif;
-                   ${isLast ? 'opacity:.5;cursor:default' : ''}">
-            הלימוד הבא ▶
-          </button>`}
-
-          <div style="display:flex;gap:8px">
-            <button onclick="kuzariPrev()" ${isFirst ? 'disabled' : ''}
-              style="flex:1;padding:10px;background:var(--card);color:var(--muted);
-                     border:1px solid var(--border);border-radius:10px;font-size:13px;
-                     cursor:pointer;font-family:\'Heebo\',sans-serif;
-                     ${isFirst ? 'opacity:.4;cursor:default' : ''}">
-              ◀ הקודם
-            </button>
-            <button onclick="_renderEmunaMenu()"
-              style="flex:1;padding:10px;background:var(--card);color:var(--muted);
-                     border:1px solid var(--border);border-radius:10px;font-size:13px;
-                     cursor:pointer;font-family:\'Heebo\',sans-serif">
-              📋 תפריט
-            </button>
-            <button onclick="kuzariNext()" ${isLast ? 'disabled' : ''}
-              style="flex:1;padding:10px;background:var(--card);color:var(--muted);
-                     border:1px solid var(--border);border-radius:10px;font-size:13px;
-                     cursor:pointer;font-family:\'Heebo\',sans-serif;
-                     ${isLast ? 'opacity:.4;cursor:default' : ''}">
-              הבא ▶
-            </button>
-          </div>
-        </div>
-
-        <!-- Progress bar -->
-        <div style="margin-top:14px;background:var(--card);border-radius:8px;padding:8px 12px">
-          <div style="display:flex;justify-content:space-between;
-                      font-size:11px;color:var(--muted);margin-bottom:6px">
-            <span>התקדמות</span>
-            <span>${completedCount}/${totalUnits}</span>
-          </div>
-          <div style="background:var(--bg);border-radius:3px;height:4px">
-            <div style="background:var(--gold);height:100%;
-                        width:${Math.round(completedCount/totalUnits*100)}%;
-                        border-radius:3px"></div>
-          </div>
-        </div>
-      </div>`;
-
-    console.log('[Kuzari] loaded', flat.length, 'sections for unit', idx);
+    const unit = units[idx];
+    const text = await _fetchUnitText(book, unit);
+    if (!text) throw new Error('no text');
+    _renderUnit(book, units, idx, text, state);
   } catch(e) {
-    console.error('[Kuzari] error:', e.message);
-    el.innerHTML = `
-      <div style="padding:16px">
-        <button onclick="_renderEmunaMenu()"
-          style="background:none;border:none;color:var(--muted);cursor:pointer;
-                 font-size:13px;padding:4px 8px;margin-bottom:16px">← חזור</button>
-        <div style="text-align:center;padding:30px;color:var(--muted)">
-          <div style="font-size:28px;margin-bottom:12px">⚠️</div>
-          <div style="margin-bottom:16px">לא ניתן לטעון את הכוזרי כעת</div>
-          <button onclick="_loadKuzariUnit(${idx})"
-            style="background:var(--gold);color:#000;border:none;border-radius:10px;
-                   padding:10px 24px;font-size:14px;cursor:pointer">
-            נסה שוב
-          </button>
-        </div>
+    console.error('[Emuna] error loading unit', idx, ':', e.message);
+    el.innerHTML = _navHeader(book, idx, units.length) +
+      `<div style="text-align:center;padding:30px;color:var(--muted)">
+        <div style="font-size:24px;margin-bottom:10px">⚠️</div>
+        <div style="margin-bottom:14px">שגיאה בטעינה: ${e.message}</div>
+        <button onclick="_loadUnit(${idx})"
+          style="background:var(--gold);color:#000;border:none;border-radius:8px;
+                 padding:8px 20px;font-size:13px;cursor:pointer">נסה שוב</button>
       </div>`;
   }
-  _emunaLoading = false;
+  _loading = false;
 }
 
-function _renderKuzariFinished() {
+async function _fetchUnitText(book, unit) {
+  const cacheKey = book.id + ':' + unit.ref;
+  if (_chapterCache[cacheKey]) return _chapterCache[cacheKey];
+
+  const url = 'https://www.sefaria.org/api/texts/' +
+    encodeURIComponent(unit.ref) + '?lang=he&commentary=0&context=0';
+  console.log('[Emuna] GET', url);
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  const data = await resp.json();
+
+  const he = data && data.he;
+  const paragraphs = [];
+
+  if (typeof he === 'string' && he.trim()) {
+    paragraphs.push(he.trim());
+  } else if (Array.isArray(he)) {
+    const flat = he.flat ? he.flat(10) : he;
+    flat.forEach(function(item) {
+      if (typeof item === 'string' && item.trim()) paragraphs.push(item.trim());
+    });
+  }
+
+  // Clean HTML
+  const clean = paragraphs
+    .map(s => { const d = document.createElement('div'); d.innerHTML = s; return (d.textContent || d.innerText || '').trim(); })
+    .filter(Boolean);
+
+  const result = { paragraphs: clean, unit };
+  _chapterCache[cacheKey] = result;
+  return result;
+}
+
+function _renderUnit(book, units, idx, textData, state) {
   const el = document.getElementById('emuna-content');
   if (!el) return;
+
+  const unit      = units[idx];
+  const paras     = textData.paragraphs;
+  const isFirst   = idx === 0;
+  const isLast    = idx === units.length - 1;
+  const isDone    = !!(state.completed || {})[unit.id];
+  const doneCount = Object.keys(state.completed || {}).length;
+  const pct       = Math.round(doneCount / units.length * 100);
+
+  // Check for chapter break (show chapter header if different from prev unit)
+  const prevUnit  = idx > 0 ? units[idx - 1] : null;
+  const showChHdr = !prevUnit || prevUnit.ch !== unit.ch;
+
+  el.innerHTML = `
+  <div style="padding:0 16px 100px">
+    ${_navHeader(book, idx, units.length)}
+
+    ${showChHdr ? `<div style="text-align:center;margin-bottom:12px;padding:10px;
+      background:rgba(${_hexToRgb(book.color)},.08);border-radius:10px">
+      <div style="font-family:'Frank Ruhl Libre',serif;font-size:16px;
+                  font-weight:700;color:${book.color}">${book.title}</div>
+      <div style="font-size:13px;color:var(--cream);margin-top:2px">${book.chapterLabel(unit)}</div>
+      ${isDone ? '<div style="font-size:11px;color:#7ed6a0;margin-top:3px">✅ נלמד</div>' : ''}
+    </div>` : `<div style="text-align:center;margin-bottom:8px;font-size:12px;color:var(--muted)">
+      ${book.chapterLabel(unit)} · ${book.unitLabel(unit)}
+      ${isDone ? '<span style="color:#7ed6a0;margin-right:4px">✅</span>' : ''}
+    </div>`}
+
+    <!-- Text -->
+    <div style="font-family:'Frank Ruhl Libre',serif;direction:rtl">
+      ${paras.length === 0 ?
+        '<div style="color:var(--muted);padding:20px;text-align:center">אין טקסט זמין</div>' :
+        paras.map((p, i) => `
+          <div style="margin-bottom:14px;padding:12px 14px;background:var(--card);
+                      border-radius:10px;border-right:3px solid ${i===0?book.color:'var(--border)'}">
+            <div style="font-size:var(--font-size);line-height:1.9;color:var(--cream)">${p}</div>
+          </div>`).join('')}
+    </div>
+
+    <!-- Actions -->
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px">
+      ${!isDone ? `
+      <button onclick="markDone()"
+        style="width:100%;padding:13px;background:${book.color};color:#1a1108;
+               border:none;border-radius:12px;font-size:15px;font-weight:700;
+               cursor:pointer;font-family:'Frank Ruhl Libre',serif;
+               box-shadow:0 4px 12px rgba(201,165,74,.25)">
+        ✅ סמן כנלמד${!isLast ? ' → הבא' : ''}
+      </button>` : `
+      <button onclick="${isLast ? '' : '_loadUnit(' + (idx+1) + ')'}" ${isLast ? 'disabled' : ''}
+        style="width:100%;padding:13px;background:var(--card);color:${book.color};
+               border:1px solid ${book.color}44;border-radius:12px;font-size:14px;
+               font-weight:600;cursor:${isLast?'default':'pointer'};
+               font-family:'Heebo',sans-serif;${isLast?'opacity:.5':''}">
+        ${isLast ? '🏆 סיימת!' : 'הבא ▶'}
+      </button>`}
+
+      <div style="display:flex;gap:6px">
+        <button onclick="_loadUnit(${idx-1})" ${isFirst ? 'disabled' : ''}
+          style="flex:1;padding:9px;background:var(--card);color:var(--muted);
+                 border:1px solid var(--border);border-radius:10px;font-size:12px;
+                 cursor:pointer;${isFirst ? 'opacity:.4;cursor:default' : ''}">
+          ◀ הקודם
+        </button>
+        <button onclick="_renderEmunaMenu()"
+          style="flex:1;padding:9px;background:var(--card);color:var(--muted);
+                 border:1px solid var(--border);border-radius:10px;font-size:12px;cursor:pointer">
+          📚 ספרים
+        </button>
+        <button onclick="_loadUnit(${idx+1})" ${isLast ? 'disabled' : ''}
+          style="flex:1;padding:9px;background:var(--card);color:var(--muted);
+                 border:1px solid var(--border);border-radius:10px;font-size:12px;
+                 cursor:pointer;${isLast ? 'opacity:.4;cursor:default' : ''}">
+          הבא ▶
+        </button>
+      </div>
+    </div>
+
+    <!-- Progress -->
+    <div style="margin-top:12px;background:var(--card);border-radius:8px;padding:8px 12px">
+      <div style="display:flex;justify-content:space-between;font-size:10px;
+                  color:var(--muted);margin-bottom:4px">
+        <span>${book.title}</span>
+        <span>${doneCount}/${units.length} (${pct}%)</span>
+      </div>
+      <div style="background:var(--bg);border-radius:3px;height:4px">
+        <div style="background:${book.color};height:100%;width:${pct}%;border-radius:3px"></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function _navHeader(book, idx, total) {
+  return `<div style="display:flex;align-items:center;justify-content:flex-end;
+    padding:8px 0 4px;margin-bottom:2px">
+    <div style="display:flex;align-items:center;gap:6px">
+      <span style="font-size:16px">${book?.icon || '📖'}</span>
+      <span style="font-size:11px;color:var(--muted)">${idx+1} / ${total}</span>
+    </div>
+  </div>`;
+}
+
+function _hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `${r},${g},${b}`;
+}
+
+// ── Actions ────────────────────────────────────────────────────────────
+function markDone() {
+  if (!_currentBook) return;
+  const state = _getBookState(_currentBook.id);
+  const idx   = state.currentUnit || 0;
+  const unit  = _currentUnits[idx];
+  if (!unit) return;
+  if (!state.completed) state.completed = {};
+  state.completed[unit.id] = true;
+  const nextIdx = Math.min(_currentUnits.length - 1, idx + 1);
+  state.currentUnit = nextIdx;
+  _saveState();
+  if (nextIdx === idx) {
+    _renderFinished();
+  } else {
+    _loadUnit(nextIdx);
+  }
+}
+
+function _renderFinished() {
+  const el = document.getElementById('emuna-content');
+  if (!el || !_currentBook) return;
+  const book = _currentBook;
   el.innerHTML = `
     <div style="padding:40px 24px;text-align:center">
       <div style="font-size:64px;margin-bottom:16px">🏆</div>
-      <div style="font-family:'Frank Ruhl Libre',serif;font-size:24px;font-weight:700;
-                  color:var(--gold);margin-bottom:8px">
-        סיימת את ספר הכוזרי!
+      <div style="font-family:'Frank Ruhl Libre',serif;font-size:22px;font-weight:700;
+                  color:${book.color};margin-bottom:8px">סיימת את ${book.title}!</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:24px">תזכו לחזור וללמוד שוב</div>
+      <div style="display:flex;gap:10px;justify-content:center">
+        <button onclick="_resetBook()"
+          style="background:var(--card);color:${book.color};border:1px solid ${book.color}44;
+                 border-radius:12px;padding:10px 20px;font-size:13px;cursor:pointer;
+                 font-family:'Heebo',sans-serif">🔄 התחל מחדש</button>
+        <button onclick="_renderEmunaMenu()"
+          style="background:var(--card);color:var(--muted);border:1px solid var(--border);
+                 border-radius:12px;padding:10px 20px;font-size:13px;cursor:pointer;
+                 font-family:'Heebo',sans-serif">📚 ספרים</button>
       </div>
-      <div style="font-size:14px;color:var(--muted);margin-bottom:24px;line-height:1.6">
-        תזכו לחזור וללמוד שוב
-      </div>
-      <button onclick="_resetKuzari()"
-        style="background:var(--card);color:var(--gold);border:1px solid var(--gold-dim);
-               border-radius:12px;padding:12px 28px;font-size:14px;cursor:pointer;
-               font-family:'Heebo',sans-serif">
-        🔄 התחל מחדש
-      </button>
     </div>`;
 }
 
-function _resetKuzari() {
-  appState.kuzari = { currentUnit: 0, completedUnits: {} };
-  _saveKuzariState();
+function _resetBook() {
+  if (!_currentBook) return;
+  if (!appState.emuna) appState.emuna = {};
+  appState.emuna[_currentBook.id] = { currentUnit:0, completed:{}, chapterCache:{} };
+  _saveState();
   _renderEmunaMenu();
 }
+
+// Legacy: keep openKuzariLearning working if called from old cached HTML
+function openKuzariLearning() { openBook('kuzari'); }
+function kuzariPrev() { if(_currentBook) { const s=_getBookState(_currentBook.id); _loadUnit((s.currentUnit||0)-1); } }
+function kuzariNext() { if(_currentBook) { const s=_getBookState(_currentBook.id); _loadUnit((s.currentUnit||0)+1); } }
+function kuzariMarkDone() { markDone(); }
