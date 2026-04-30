@@ -1261,7 +1261,9 @@ function _renderDafButtons() {
 async function _fetchDafCommentary(type) {
   const cached = type === 'rashi' ? _dafRashiFlat : _dafTosafotFlat;
   if (cached) return cached;
-  const ref = type === 'rashi' ? `Rashi on ${_dafRef}` : `Tosafot on ${_dafRef}`;
+  // Convert underscore+dot ref to space-based: "Bava_Metzia.4b" → "Bava Metzia 4b"
+  const commentRef = _dafRef.replace(/_/g, ' ').replace(/\.(?=[0-9])/, ' ');
+  const ref = type === 'rashi' ? `Rashi on ${commentRef}` : `Tosafot on ${commentRef}`;
   console.log('[DafYomi] fetching', ref);
   const data = await sefariaText(ref, 200);
   const flat = heFlat(data).filter(Boolean);
@@ -1322,7 +1324,9 @@ async function switchDafView(view) {
       if (!r.length && !t.length) throw new Error('אין רש"י ותוספות זמין');
       el.innerHTML = _renderDafInline(r, t);
     } else if (view === 'steinsaltz') {
-      const data = await sefariaText(`Steinsaltz on ${_dafRef}`, 300);
+      // Convert ref format for commentary: "Bava_Metzia.4b" → "Bava Metzia 4b"
+      const steinsaltzCommentRef = _dafRef.replace(/_/g, ' ').replace(/\.(?=[0-9])/, ' ');
+      const data = await sefariaText(`Steinsaltz on ${steinsaltzCommentRef}`, 300);
       const flat = heFlat(data).filter(Boolean);
       if (!flat.length) throw new Error('אין שטיינזלץ זמין');
       el.innerHTML = flat.map((v,i) =>
