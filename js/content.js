@@ -1261,32 +1261,73 @@ function _renderDafButtons() {
 async function _fetchDafCommentary(type) {
   const cached = type === 'rashi' ? _dafRashiFlat : _dafTosafotFlat;
   if (cached) return cached;
-  // Convert underscore+dot ref to space-based: "Bava_Metzia.4b" → "Bava Metzia 4b"
-  const commentRef = _dafRef.replace(/_/g, ' ').replace(/\.(?=[0-9])/, ' ');
-  const ref = type === 'rashi' ? `Rashi on ${commentRef}` : `Tosafot on ${commentRef}`;
-  console.log('[DafYomi] fetching', ref);
-  const data = await sefariaText(ref, 200);
-  const flat = heFlat(data).filter(Boolean);
-  if (type === 'rashi') _dafRashiFlat = flat; else _dafTosafotFlat = flat;
-  return flat;
+
+  // Build commentary ref:
+  // _dafRef can be "Bava_Metzia.4b" (pick mode) or "Bava Metzia 4b" (daily)
+  // Sefaria commentary needs: "Rashi on Bava Metzia.4b" (dot before daf#, space not underscore)
+  // e.g. "Bava_Metzia.4b" → "Bava Metzia.4b"
+  //      "Bava Metzia 4b" → "Bava Metzia.4b"  (space before daf → dot)
+  const normalized = _dafRef
+    .replace(/_/g, ' ')                // underscores → spaces
+    .replace(/\s+(\d+[ab])$/, '.$1'); // "Bava Metzia 4b" → "Bava Metzia.4b"
+  const commentaryName = type === 'rashi' ? 'Rashi' : 'Tosafot';
+  const ref = `${commentaryName} on ${normalized}`;
+
+  // CRITICAL: do NOT use context=0 for daf commentaries!
+  // context=0 returns only line 1; we need the whole daf's commentary.
+  // Use a direct fetch without context=0 parameter.
+  const url = `https://www.sefaria.org/api/texts/${encodeURI(ref)}?lang=he&commentary=0`;
+  console.log('[DafYomi] fetching', url);
+  await new Promise(r => setTimeout(r, 200));
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  const data = await resp.json();
+
+  // Sefaria returns he[line_index] = [comment1, comment2, ...]
+  // This per-line structure maps each comment to its gemara line.
+  const he = data?.he;
+  let perLine;
+  if (!he) {
+    perLine = [];
+  } else if (Array.isArray(he)) {
+    perLine = he; // keep per-line structure intact
+  } else if (typeof he === 'string') {
+    perLine = he.trim() ? [[he]] : [];
+  } else {
+    perLine = [];
+  }
+  console.log('[DafYomi]', type, '| lines:', perLine.length,
+    '| with comment:', perLine.filter(function(x){
+      return Array.isArray(x) ? x.length > 0 : !!x;
+    }).length);
+  if (type === 'rashi') _dafRashiFlat = perLine; else _dafTosafotFlat = perLine;
+  return perLine;
 }
 
 // Render gemara with optional rashi (green) and tosafot (blue) inline
 function _renderDafInline(rashiFlat, tosafotFlat) {
   return _dafFlat.map((v, i) => {
     let extras = '';
-    if (rashiFlat && rashiFlat[i]) {
-      const t = typeof rashiFlat[i] === 'string' ? rashiFlat[i]
-        : (Array.isArray(rashiFlat[i]) ? deepFlat(rashiFlat[i]).filter(Boolean).join(' ') : '');
+    if (rashiFlat && rashiFlat[i] &&
+        (Array.isArray(rashiFlat[i]) ? rashiFlat[i].length : rashiFlat[i])) {
+      const raw = rashiFlat[i];
+      const t = typeof raw === 'string' ? raw
+        : (Array.isArray(raw) ? deepFlat(raw).filter(Boolean)
+            .map(function(s){ return s.replace(/<(?!\/?(b|i|strong))[^>]+>/gi,'').trim(); })
+            .filter(Boolean).join('<br>') : '');
       if (t) extras += `<div style="margin-top:5px;padding:4px 9px;
         background:rgba(126,214,160,.08);border-right:2px solid var(--addition);
         border-radius:0 4px 4px 0;color:var(--addition);
         font-size:calc(var(--font-size)*0.83);font-style:italic;line-height:1.75">
         <span style="font-size:9px;font-weight:700;margin-left:5px;opacity:.85">📝 רש"י</span>${t.replace(/<[^>]+>/g,'')}</div>`;
     }
-    if (tosafotFlat && tosafotFlat[i]) {
-      const t = typeof tosafotFlat[i] === 'string' ? tosafotFlat[i]
-        : (Array.isArray(tosafotFlat[i]) ? deepFlat(tosafotFlat[i]).filter(Boolean).join(' ') : '');
+    if (tosafotFlat && tosafotFlat[i] &&
+        (Array.isArray(tosafotFlat[i]) ? tosafotFlat[i].length : tosafotFlat[i])) {
+      const raw = tosafotFlat[i];
+      const t = typeof raw === 'string' ? raw
+        : (Array.isArray(raw) ? deepFlat(raw).filter(Boolean)
+            .map(function(s){ return s.replace(/<(?!\/?(b|i|strong))[^>]+>/gi,'').trim(); })
+            .filter(Boolean).join('<br>') : '');
       if (t) extras += `<div style="margin-top:5px;padding:4px 9px;
         background:rgba(122,184,214,.08);border-right:2px solid #7ab8d6;
         border-radius:0 4px 4px 0;color:#7ab8d6;
