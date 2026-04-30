@@ -1282,20 +1282,48 @@ async function _fetchDafCommentary(type) {
   // Sefaria returns he[line_index] = [comment1, comment2, ...]
   // This per-line structure maps each comment to its gemara line.
   const he = data?.he;
+  // DEEP STRUCTURE LOGGING - to diagnose alignment
+  console.log('[DafComm] ' + type + ' raw he type:', typeof he,
+    '| isArray:', Array.isArray(he),
+    '| length:', he ? (he.length || 'n/a') : 0);
+  if (Array.isArray(he) && he.length > 0) {
+    console.log('[DafComm] he[0] type:', typeof he[0], '| isArray:', Array.isArray(he[0]),
+      '| val:', JSON.stringify(he[0]).slice(0, 80));
+    if (he.length > 1)
+      console.log('[DafComm] he[1] type:', typeof he[1], '| isArray:', Array.isArray(he[1]),
+        '| val:', JSON.stringify(he[1]).slice(0, 80));
+  }
+  console.log('[DafComm] sectionNames:', JSON.stringify(data?.sectionNames));
+  console.log('[DafComm] sections:', JSON.stringify(data?.sections));
+  console.log('[DafComm] toSections:', JSON.stringify(data?.toSections));
+  console.log('[DafComm] _dafFlat lines:', _dafFlat ? _dafFlat.length : 0);
+
   let perLine;
   if (!he) {
     perLine = [];
   } else if (Array.isArray(he)) {
-    perLine = he; // keep per-line structure intact
+    // Log first few non-empty entries with their index
+    var nonEmpty = 0;
+    for (var di = 0; di < he.length && nonEmpty < 4; di++) {
+      var entry = he[di];
+      var hasContent = Array.isArray(entry) ? entry.length > 0 : !!entry;
+      if (hasContent) {
+        console.log('[DafComm] he[' + di + ']:', JSON.stringify(entry).slice(0, 100));
+        nonEmpty++;
+      }
+    }
+    perLine = he;
   } else if (typeof he === 'string') {
+    console.log('[DafComm] string he:', he.slice(0, 80));
     perLine = he.trim() ? [[he]] : [];
   } else {
     perLine = [];
   }
-  console.log('[DafYomi]', type, '| lines:', perLine.length,
-    '| with comment:', perLine.filter(function(x){
-      return Array.isArray(x) ? x.length > 0 : !!x;
-    }).length);
+  var withComment = perLine.filter(function(x){
+    return Array.isArray(x) ? x.length > 0 : !!x;
+  }).length;
+  console.log('[DafComm] ' + type + ' | perLine.length:', perLine.length,
+    '| with comment:', withComment, '| _dafFlat.length:', _dafFlat ? _dafFlat.length : 0);
   if (type === 'rashi') _dafRashiFlat = perLine; else _dafTosafotFlat = perLine;
   return perLine;
 }
