@@ -1262,14 +1262,10 @@ async function _fetchDafCommentary(type) {
   const cached = type === 'rashi' ? _dafRashiFlat : _dafTosafotFlat;
   if (cached) return cached;
 
-  // Build commentary ref:
-  // _dafRef can be "Bava_Metzia.4b" (pick mode) or "Bava Metzia 4b" (daily)
-  // Sefaria commentary needs: "Rashi on Bava Metzia.4b" (dot before daf#, space not underscore)
-  // e.g. "Bava_Metzia.4b" → "Bava Metzia.4b"
-  //      "Bava Metzia 4b" → "Bava Metzia.4b"  (space before daf → dot)
-  const normalized = _dafRef
-    .replace(/_/g, ' ')                // underscores → spaces
-    .replace(/\s+(\d+[ab])$/, '.$1'); // "Bava Metzia 4b" → "Bava Metzia.4b"
+  // Build commentary ref using SPACE notation (not dot):
+  // "Bava_Metzia.4b" → "Bava Metzia 4b"
+  // "Bava Metzia 4b" stays "Bava Metzia 4b"
+  const normalized = _dafRef.replace(/_/g, ' ').replace(/\./g, ' ').trim();
   const commentaryName = type === 'rashi' ? 'Rashi' : 'Tosafot';
   const ref = `${commentaryName} on ${normalized}`;
 
