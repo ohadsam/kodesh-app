@@ -1258,73 +1258,68 @@ function _renderDafButtons() {
 }
 
 // Fetch and cache a Daf commentary type
+const _dafLinksCache = {}; // cache links per daf ref
+
 async function _fetchDafCommentary(type) {
   const cached = type === 'rashi' ? _dafRashiFlat : _dafTosafotFlat;
   if (cached) return cached;
 
-  // Build commentary ref using SPACE notation (not dot):
-  // "Bava_Metzia.4b" → "Bava Metzia 4b"
-  // "Bava Metzia 4b" stays "Bava Metzia 4b"
-  const normalized = _dafRef.replace(/_/g, ' ').replace(/\./g, ' ').trim();
-  const commentaryName = type === 'rashi' ? 'Rashi' : 'Tosafot';
-  const ref = `${commentaryName} on ${normalized}`;
+  // Use /api/links/ to get ALL Rashi/Tosafot for the daf at once
+  // This is the only reliable way - text API returns only line 1
+  const linkRef = _dafRef.trim();
+  const collectiveTitle = type === 'rashi' ? 'Rashi' : 'Tosafot';
 
-  // CRITICAL: do NOT use context=0 for daf commentaries!
-  // context=0 returns only line 1; we need the whole daf's commentary.
-  // Use a direct fetch without context=0 parameter.
-  const url = `https://www.sefaria.org/api/texts/${encodeURI(ref)}?lang=he&commentary=0`;
-  console.log('[DafYomi] fetching', url);
-  await new Promise(r => setTimeout(r, 200));
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error('HTTP ' + resp.status);
-  const data = await resp.json();
-
-  // Sefaria returns he[line_index] = [comment1, comment2, ...]
-  // This per-line structure maps each comment to its gemara line.
-  const he = data?.he;
-  // DEEP STRUCTURE LOGGING - to diagnose alignment
-  console.log('[DafComm] ' + type + ' raw he type:', typeof he,
-    '| isArray:', Array.isArray(he),
-    '| length:', he ? (he.length || 'n/a') : 0);
-  if (Array.isArray(he) && he.length > 0) {
-    console.log('[DafComm] he[0] type:', typeof he[0], '| isArray:', Array.isArray(he[0]),
-      '| val:', JSON.stringify(he[0]).slice(0, 80));
-    if (he.length > 1)
-      console.log('[DafComm] he[1] type:', typeof he[1], '| isArray:', Array.isArray(he[1]),
-        '| val:', JSON.stringify(he[1]).slice(0, 80));
+  // Cache links per daf (shared between rashi + tosafot calls)
+  if (!_dafLinksCache[linkRef]) {
+    const url = 'https://www.sefaria.org/api/links/' + encodeURI(linkRef) + '?with_text=1&lang=he';
+    console.log('[DafComm] fetching links:', url);
+    await new Promise(function(r){ setTimeout(r, 200); });
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    _dafLinksCache[linkRef] = await resp.json();
+    console.log('[DafComm] total links:', _dafLinksCache[linkRef].length);
   }
-  console.log('[DafComm] sectionNames:', JSON.stringify(data?.sectionNames));
-  console.log('[DafComm] sections:', JSON.stringify(data?.sections));
-  console.log('[DafComm] toSections:', JSON.stringify(data?.toSections));
-  console.log('[DafComm] _dafFlat lines:', _dafFlat ? _dafFlat.length : 0);
+  const links = _dafLinksCache[linkRef];
 
-  let perLine;
-  if (!he) {
-    perLine = [];
-  } else if (Array.isArray(he)) {
-    // Log first few non-empty entries with their index
-    var nonEmpty = 0;
-    for (var di = 0; di < he.length && nonEmpty < 4; di++) {
-      var entry = he[di];
-      var hasContent = Array.isArray(entry) ? entry.length > 0 : !!entry;
-      if (hasContent) {
-        console.log('[DafComm] he[' + di + ']:', JSON.stringify(entry).slice(0, 100));
-        nonEmpty++;
-      }
+  // Filter to this commentary type
+  const items = links.filter(function(l) {
+    const ct = l.collectiveTitle && (l.collectiveTitle.en || '');
+    return ct === collectiveTitle && l.category === 'Commentary';
+  });
+  console.log('[DafComm]', type, '| items:', items.length);
+
+  // Map each item to 0-based daf line index
+  // sourceRef e.g. "Rashi on Berakhot 5a:3" → line 3 → idx 2
+  const totalLines = _dafFlat ? _dafFlat.length : 100;
+  const perLine = new Array(totalLines).fill(null);
+
+  items.forEach(function(item) {
+    const ref = item.sourceRef || item.ref || '';
+    const m = ref.match(/:(\d+)(?:-\d+)?$/);
+    if (!m) return;
+    const idx = parseInt(m[1]) - 1; // 1-based → 0-based
+    if (idx < 0 || idx >= totalLines) return;
+
+    const he = item.he;
+    var text = '';
+    if (typeof he === 'string') {
+      text = he;
+    } else if (Array.isArray(he)) {
+      text = deepFlat(he).filter(Boolean).join(' / ');
     }
-    perLine = he;
-  } else if (typeof he === 'string') {
-    console.log('[DafComm] string he:', he.slice(0, 80));
-    perLine = he.trim() ? [[he]] : [];
-  } else {
-    perLine = [];
-  }
-  var withComment = perLine.filter(function(x){
-    return Array.isArray(x) ? x.length > 0 : !!x;
-  }).length;
-  console.log('[DafComm] ' + type + ' | perLine.length:', perLine.length,
-    '| with comment:', withComment, '| _dafFlat.length:', _dafFlat ? _dafFlat.length : 0);
-  if (type === 'rashi') _dafRashiFlat = perLine; else _dafTosafotFlat = perLine;
+    // Strip HTML except b/i
+    text = text.replace(/<[^>]+>/g, '').trim();
+    if (!text) return;
+
+    if (!perLine[idx]) perLine[idx] = [];
+    perLine[idx].push(text);
+  });
+
+  const withComment = perLine.filter(function(x){ return x && x.length; }).length;
+  console.log('[DafComm]', type, '| lines with comment:', withComment, '/ ', totalLines);
+
+  if (type === 'rashi') _dafRashiFlat = perLine;
+  else _dafTosafotFlat = perLine;
   return perLine;
 }
 
