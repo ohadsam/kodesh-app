@@ -1,4 +1,4 @@
-const APP_VERSION = '5.96';
+const APP_VERSION = '5.97';
 const CACHE = `kodesh-v${APP_VERSION}`;
 
 const FONT_URLS = [
