@@ -1288,55 +1288,39 @@ async function _fetchDafCommentary(type) {
   });
   console.log('[DafComm]', type, '| items:', items.length);
 
-  // Map each item to 0-based daf line index
-  // sourceRef e.g. "Rashi on Berakhot 5a:3" → line 3 → idx 2
+  // Determine which amud we're viewing:
+  // _dafRef can be "Chullin 2" (daily, defaults to 2a)
+  //                "Chullin.2a" or "Chullin.2b" (pick mode)
+  //                "Berakhot.5a" etc.
+  const amudMatch = _dafRef.match(/(\d+)([ab])$/i);
+  const currentAmud = amudMatch ? amudMatch[2].toLowerCase() : 'a'; // default to 'a'
+  const dafNum = amudMatch ? amudMatch[1] : (_dafRef.match(/(\d+)$/) || [])[1] || '';
+  console.log('[DafComm] currentAmud:', currentAmud, '| dafNum:', dafNum);
+
   const totalLines = _dafFlat ? _dafFlat.length : 100;
   const perLine = new Array(totalLines).fill(null);
 
-  // Log first few items to understand structure
-  if (items.length > 0) {
-    console.log('[DafComm] sample item[0] keys:', Object.keys(items[0]).join(','));
-    console.log('[DafComm] item[0].ref:', items[0].ref);
-    console.log('[DafComm] item[0].sourceRef:', items[0].sourceRef);
-    console.log('[DafComm] item[0].anchorRef:', items[0].anchorRef);
-    console.log('[DafComm] item[0].anchorVerse:', items[0].anchorVerse);
-    console.log('[DafComm] item[0].he type:', typeof items[0].he,
-      Array.isArray(items[0].he) ? 'len:'+items[0].he.length : '');
-    console.log('[DafComm] item[0].he sample:', JSON.stringify(items[0].he).slice(0,80));
-    if (items.length > 1) {
-      console.log('[DafComm] item[1].ref:', items[1].ref);
-      console.log('[DafComm] item[1].anchorRef:', items[1].anchorRef);
-      console.log('[DafComm] item[1].anchorVerse:', items[1].anchorVerse);
-    }
-    if (items.length > 2) {
-      console.log('[DafComm] item[2].ref:', items[2].ref);
-      console.log('[DafComm] item[2].anchorRef:', items[2].anchorRef);
-    }
-  }
-
   items.forEach(function(item) {
-    // anchorRef = the gemara ref this comment is linked to
-    // e.g. "Berakhot 5a:3" = gemara line 3
-    const anchorRef = item.anchorRef || item.sourceRef || item.ref || '';
-    console.log('[DafComm] mapping anchorRef:', anchorRef);
-    // Extract line number: last :N or :N-M
-    const m = anchorRef.match(/:(\d+)(?:-\d+)?$/);
-    if (!m) {
-      console.log('[DafComm] no line match for:', anchorRef);
-      return;
-    }
-    const idx = parseInt(m[1]) - 1; // 1-based → 0-based
-    if (idx < 0 || idx >= totalLines) {
-      console.log('[DafComm] idx out of range:', idx, '/', totalLines);
-      return;
-    }
+    const anchorRef = item.anchorRef || '';
+    // anchorRef format: "Tractate DAFa:LINE" e.g. "Chullin 2a:3"
+    // Extract amud and line: match "Na:N" or "Nb:N" at end
+    const am = anchorRef.match(/(\d+)([ab]):(\d+)(?:-\d+)?$/i);
+    if (!am) return;
+    const itemAmud = am[2].toLowerCase();
+    const lineNum  = parseInt(am[3]); // 1-based line within this amud
+
+    // Only process links matching our current amud
+    if (itemAmud !== currentAmud) return;
+
+    const idx = lineNum - 1; // 0-based
+    if (idx < 0 || idx >= totalLines) return;
 
     const he = item.he;
     var text = '';
     if (typeof he === 'string') {
       text = he;
     } else if (Array.isArray(he)) {
-      text = deepFlat(he).filter(Boolean).join(' / ');
+      text = deepFlat(he).filter(Boolean).join('<br>');
     }
     text = text.replace(/<[^>]+>/g, '').trim();
     if (!text) return;
