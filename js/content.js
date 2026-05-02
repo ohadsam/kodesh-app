@@ -1293,12 +1293,43 @@ async function _fetchDafCommentary(type) {
   const totalLines = _dafFlat ? _dafFlat.length : 100;
   const perLine = new Array(totalLines).fill(null);
 
+  // Log first few items to understand structure
+  if (items.length > 0) {
+    console.log('[DafComm] sample item[0] keys:', Object.keys(items[0]).join(','));
+    console.log('[DafComm] item[0].ref:', items[0].ref);
+    console.log('[DafComm] item[0].sourceRef:', items[0].sourceRef);
+    console.log('[DafComm] item[0].anchorRef:', items[0].anchorRef);
+    console.log('[DafComm] item[0].anchorVerse:', items[0].anchorVerse);
+    console.log('[DafComm] item[0].he type:', typeof items[0].he,
+      Array.isArray(items[0].he) ? 'len:'+items[0].he.length : '');
+    console.log('[DafComm] item[0].he sample:', JSON.stringify(items[0].he).slice(0,80));
+    if (items.length > 1) {
+      console.log('[DafComm] item[1].ref:', items[1].ref);
+      console.log('[DafComm] item[1].anchorRef:', items[1].anchorRef);
+      console.log('[DafComm] item[1].anchorVerse:', items[1].anchorVerse);
+    }
+    if (items.length > 2) {
+      console.log('[DafComm] item[2].ref:', items[2].ref);
+      console.log('[DafComm] item[2].anchorRef:', items[2].anchorRef);
+    }
+  }
+
   items.forEach(function(item) {
-    const ref = item.sourceRef || item.ref || '';
-    const m = ref.match(/:(\d+)(?:-\d+)?$/);
-    if (!m) return;
+    // anchorRef = the gemara ref this comment is linked to
+    // e.g. "Berakhot 5a:3" = gemara line 3
+    const anchorRef = item.anchorRef || item.sourceRef || item.ref || '';
+    console.log('[DafComm] mapping anchorRef:', anchorRef);
+    // Extract line number: last :N or :N-M
+    const m = anchorRef.match(/:(\d+)(?:-\d+)?$/);
+    if (!m) {
+      console.log('[DafComm] no line match for:', anchorRef);
+      return;
+    }
     const idx = parseInt(m[1]) - 1; // 1-based → 0-based
-    if (idx < 0 || idx >= totalLines) return;
+    if (idx < 0 || idx >= totalLines) {
+      console.log('[DafComm] idx out of range:', idx, '/', totalLines);
+      return;
+    }
 
     const he = item.he;
     var text = '';
@@ -1307,7 +1338,6 @@ async function _fetchDafCommentary(type) {
     } else if (Array.isArray(he)) {
       text = deepFlat(he).filter(Boolean).join(' / ');
     }
-    // Strip HTML except b/i
     text = text.replace(/<[^>]+>/g, '').trim();
     if (!text) return;
 
