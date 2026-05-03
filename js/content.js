@@ -1,21 +1,7 @@
 // ═══════════════════════════════════════════
-// HALACHA – Daily Halacha (Ashkenazi)
-// ═══════════════════════════════════════════
-// ═══════════════════════════════════════════
 // HALACHA – קיצור שולחן ערוך יומי
-// 221 chapters, 2 seifim per day
+// Source: Sefaria calendar "Halacha Yomit"
 // ═══════════════════════════════════════════
-function getKitzurRef(d) {
-  const start = new Date(d.getFullYear(), 0, 1);
-  const dayOfYear = Math.floor((d - start) / 86400000) + 1;
-  const chapterIdx = (dayOfYear - 1) % 221;
-  const chapter = chapterIdx + 1;
-  const seifPairIdx = Math.floor((dayOfYear - 1) / 221) % 5;
-  const seif1 = seifPairIdx * 2 + 1;
-  const seif2 = seif1 + 1;
-  return { ref: `Kitzur_Shulchan_Arukh.${chapter}`, chapter, seif1, seif2 };
-}
-
 async function loadHalacha() {
   const el    = document.getElementById('halacha-content');
   const refEl = document.getElementById('halacha-ref');
@@ -25,24 +11,38 @@ async function loadHalacha() {
   const ds = formatDate(d);
 
   try {
-    const { ref, chapter, seif1, seif2 } = getKitzurRef(d);
-    refEl.textContent = `קיצור שולחן ערוך – פרק ${chapter}, סעיפים ${seif1}–${seif2}`;
-    console.log('[Halacha] ref:', ref, 'seifim:', seif1, seif2);
+    // Use Sefaria calendar for the correct daily ref (sequential seifim)
+    const cal  = await fetchWithDelay(_sefariaCalendarUrl());
+    const item = (cal?.calendar_items || []).find(i =>
+      (i.title?.en || '').toLowerCase().includes('halacha') ||
+      (i.title?.he || '').includes('הלכה')
+    );
+    if (!item) throw new Error('לא נמצאה הלכה יומית בלוח ספריא');
+
+    const ref = item.ref;
+    const heRef = item.heRef || ref;
+    console.log('[Halacha] calendar ref:', ref, '| he:', heRef);
+    refEl.textContent = heRef;
+
     const data = await sefariaText(ref, 400);
     const flat = heFlat(data);
-    if (!flat.length) throw new Error(`אין טקסט לפרק ${chapter}`);
-    const idx1   = Math.min(seif1 - 1, flat.length - 1);
-    const idx2   = Math.min(seif2 - 1, flat.length - 1);
-    const toShow = idx1 === idx2 ? [flat[idx1]] : [flat[idx1], flat[idx2]].filter(Boolean);
+    if (!flat.length) throw new Error('אין טקסט לסעיפים אלו');
+
+    // Parse seif numbers from ref for display labels
+    // ref format: "Kitzur Shulchan Arukh 123:5-6" or "Kitzur Shulchan Arukh 123:5"
+    const seifMatch = ref.match(/:(\d+)(?:-(\d+))?$/);
+    const seif1 = seifMatch ? parseInt(seifMatch[1]) : 1;
+
     el.className = 'content-text';
-    el.innerHTML = toShow.map((v, i) =>
-      `<div style="margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid var(--border)">
-         <div style="font-size:10px;color:var(--gold);margin-bottom:3px">סעיף ${seif1 + i}</div>
-         <div style="line-height:1.8">${v}</div>
+    el.innerHTML = flat.map((v, i) =>
+      `<div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)">
+         <div style="font-size:10px;color:var(--gold);margin-bottom:3px">סעיף ${toGematria(seif1 + i)}</div>
+         <div style="line-height:1.8;font-family:'Frank Ruhl Libre',serif;
+                     font-size:var(--font-size)">${v}</div>
        </div>`
     ).join('');
     updateDoneButton('halacha', ds);
-    console.log('[Halacha] OK –', toShow.length, 'seifim shown');
+    console.log('[Halacha] OK –', flat.length, 'seifim shown');
   } catch(e) {
     console.error('[Halacha] error:', e);
     el.textContent = 'שגיאה בטעינת ההלכה: ' + e.message;
