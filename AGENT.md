@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.26 (April 9, 2026)
+**Last updated:** v5.99 (May 10, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -15,6 +15,13 @@
 6. Hard reload on device OR press **"💥 איפוס מוחלט"** in settings
 
 **Important:** The inline HEAD script is the ONLY version guard. Do NOT add another in utils.js — causes infinite reload loop.
+
+---
+
+## Supporting Files
+- **CLAUDE.md** – Agent instructions (read every session): API rules, code standards, test requirements
+- **STRUCTURE.md** – Full code map: file layout, key functions, HTML IDs, API endpoints, all BRACHOT/TEFILOT keys
+- Consult STRUCTURE.md before scanning source files to save tokens.
 
 ---
 
@@ -165,6 +172,20 @@ could be more precise for edge cases.
 - ✅ תפילת הדרך added to Brachot tab (with תהילים קכא)
 - ✅ Siddur: 3rd floating button 📋 shows prayer status popup
 - ✅ Tehilim search: gematria support (פרק קל, כג, 130 etc.)
+
+### v5.99 (May 10, 2026)
+- ✅ תפילת הדרך לטיסה added to Brachot tab (key: `tefila_haderech`), activates pre-existing `bb-tefila_haderech` button
+- ✅ Floating nav for Brachot picks up new prayer automatically (built from Object.keys(BRACHOT))
+- ✅ CLAUDE.md created: agent instructions for every session (API checks, orthodox standards, test requirements)
+- ✅ STRUCTURE.md created: full code map, entry points, all keys – use before scanning files
+- ✅ .gitignore added: excludes Python __pycache__ from Tests/
+
+### v5.27 (April 9, 2026) – Fixes
+- ✅ Siddur seasonal: RED strikethrough for wrong-season blocks
+- ✅ Rambam Steinsaltz: per-halacha inline, raw array indexing (no heFlat drift)
+- ✅ Compass: uncalibrated sensor detection, figure-8 instruction, iOS declination 4.5°
+- ✅ Tehilim scroll: scrolls to #tehilim-num-title (chapter title)
+- ✅ Brachot TTS: readBrachaAloud() via Web Speech API, stop/resume toggle
 
 ### v5.25 (prior)
 - ✅ Various fixes (see previous AGENT.md)
