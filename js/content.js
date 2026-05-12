@@ -85,22 +85,48 @@ function _updateAliyaNavBottom() {
 
 function _renderAliyaNav(nav) {
   if (!nav || !aliyot.length) return;
-  const idx = typeof currentAliya === 'number' ? currentAliya : -1;
-  const hasPrev = idx > 0;
-  const hasNext = idx < aliyot.length - 1;
+  const idx    = typeof currentAliya === 'number' ? currentAliya : -1;
+  const isAll  = currentAliya === 'all';
   const aliyaNames = ['א','ב','ג','ד','ה','ו','ז','מפטיר'];
-  const btnStyle = (enabled) =>
-    `background:var(--surface);border:1px solid ${enabled?'var(--gold-dim)':'var(--border)'};` +
-    `color:${enabled?'var(--gold)':'var(--muted)'};padding:6px 14px;border-radius:20px;` +
-    `font-size:12px;cursor:${enabled?'pointer':'default'};font-family:'Heebo',sans-serif`;
-  nav.innerHTML = hasPrev
-    ? `<button style="${btnStyle(true)}" onclick="navAliya(${idx-1})">→ עליה ${aliyaNames[idx-1]||''}</button>`
-    : `<span></span>`;
-  if (hasNext) {
-    nav.innerHTML += `<button style="${btnStyle(true)}" onclick="navAliya(${idx+1})">עליה ${aliyaNames[idx+1]||''} ←</button>`;
+
+  const hasPrevAliya = idx > 0;
+  const hasNextAliya = idx >= 0 && idx < aliyot.length - 1;
+
+  // Parasha prev/next
+  const pIdx       = currentParashaRef ? ALL_PARASHIOT.findIndex(p => p.ref === currentParashaRef) : -1;
+  const prevParasha = pIdx > 0 ? ALL_PARASHIOT[pIdx - 1] : null;
+  const nextParasha = pIdx >= 0 && pIdx < ALL_PARASHIOT.length - 1 ? ALL_PARASHIOT[pIdx + 1] : null;
+  const showPrevParasha = (isAll || idx === 0) && prevParasha;
+  const showNextParasha = (isAll || (idx >= 0 && idx === aliyot.length - 1)) && nextParasha;
+
+  const aliyaStyle =
+    `background:var(--surface);border:1px solid var(--gold-dim);color:var(--gold);` +
+    `padding:6px 14px;border-radius:20px;font-size:12px;cursor:pointer;font-family:'Heebo',sans-serif`;
+  const parashaStyle =
+    `background:var(--surface);border:1px solid var(--gold);color:var(--cream);` +
+    `padding:6px 14px;border-radius:20px;font-size:12px;cursor:pointer;font-family:'Heebo',sans-serif`;
+
+  // First element in HTML = visually RIGHT in RTL = "back / prev" direction
+  let leftBtn;
+  if (hasPrevAliya) {
+    leftBtn = `<button style="${aliyaStyle}" onclick="navAliya(${idx-1})">→ עליה ${aliyaNames[idx-1]||''}</button>`;
+  } else if (showPrevParasha) {
+    leftBtn = `<button style="${parashaStyle}" onclick="loadSpecificParasha('${prevParasha.ref}')">→ ${prevParasha.he}</button>`;
   } else {
-    nav.innerHTML += `<span></span>`;
+    leftBtn = '<span></span>';
   }
+
+  // Second element in HTML = visually LEFT in RTL = "forward / next" direction
+  let rightBtn;
+  if (hasNextAliya) {
+    rightBtn = `<button style="${aliyaStyle}" onclick="navAliya(${idx+1})">עליה ${aliyaNames[idx+1]||''} ←</button>`;
+  } else if (showNextParasha) {
+    rightBtn = `<button style="${parashaStyle}" onclick="loadSpecificParasha('${nextParasha.ref}')">${nextParasha.he} ←</button>`;
+  } else {
+    rightBtn = '<span></span>';
+  }
+
+  nav.innerHTML = leftBtn + rightBtn;
 }
 
 async function navAliya(idx) {
