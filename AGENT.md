@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.100 (May 19, 2026)
+**Last updated:** v5.101 (May 19, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -172,6 +172,11 @@ could be more precise for edge cases.
 - ✅ תפילת הדרך added to Brachot tab (with תהילים קכא)
 - ✅ Siddur: 3rd floating button 📋 shows prayer status popup
 - ✅ Tehilim search: gematria support (פרק קל, כג, 130 etc.)
+
+### v5.101 (May 19, 2026)
+- ✅ Rashi Strategy 1: unwrap outer single-element array `[[v1,v2,...]]→[v1,v2,...]` — Sefaria wraps some chapters' `he` in an extra outer array causing `chapLen=1 < 2` → `isPerVerse=false` → entire Strategy 1 bypassed
+- ✅ Rashi Strategy 2: same unwrap for range-ref responses
+- ✅ Rashi Strategy 2: only set `success=true` if `chEntries > 0` — prevents silently succeeding with 0 entries when all Rashi is inside the skipped wrapper, allowing fallthrough to Strategy 3
 
 ### v5.100 (May 19, 2026)
 - ✅ Fixed Rashi mapping for aliyot spanning multiple chapters (e.g., Naso aliya 6)

@@ -912,6 +912,15 @@ async function loadRashiForRef(torahRef) {
             }
           }
 
+          // Unwrap outer single-element array wrapper: [[v1,v2,...]] → [v1,v2,...]
+          // Sefaria sometimes wraps the entire per-verse array in an extra outer array,
+          // giving heArr.length=1 which causes chapLen<2 → isPerVerse=false → falls through
+          if (!didDeepFlat && Array.isArray(heArr) && heArr.length === 1 &&
+              Array.isArray(heArr[0]) && heArr[0].length >= 2) {
+            console.log('[Rashi] S1 unwrapping outer single-element array, inner length:', heArr[0].length);
+            heArr = heArr[0];
+          }
+
           chapterLengths[ch] = Array.isArray(heArr) ? heArr.length : 0;
           const chapLen = chapterLengths[ch];
           // Check if structure is per-verse:
@@ -967,6 +976,11 @@ async function loadRashiForRef(torahRef) {
           if (resp2.ok) {
             const data2 = await resp2.json();
             let heArr2 = data2.he;
+            // Unwrap outer single-element array: [[v1,v2,...]] → [v1,v2,...]
+            if (Array.isArray(heArr2) && heArr2.length === 1 && Array.isArray(heArr2[0])) {
+              console.log('[Rashi] S2 unwrapping outer single-element array, inner length:', heArr2[0].length);
+              heArr2 = heArr2[0];
+            }
             // Use data2.sections to get actual verse start (Sefaria may return from ch start, not chStart)
             const actualVerseStart = (data2.sections && data2.sections.length >= 2)
               ? data2.sections[data2.sections.length - 1]
@@ -994,8 +1008,13 @@ async function loadRashiForRef(torahRef) {
               const maxVerseFound = actualVerseStart + heArr2.length - 1;
               // Do NOT include chEnd (which is 200 for non-last chapters) — use actual data only
               chapterLengths[ch] = Math.max(chapterLengths[ch] || 0, maxVerseFound);
-              console.log('[Rashi] range ref OK, ch', ch, '| actualStart:', actualVerseStart, '| entries:', chEntries, '| chapterLengths:', chapterLengths[ch]);
-              success = true;
+              console.log('[Rashi] S2 range ref: actualStart:', actualVerseStart, '| entries:', chEntries, '| chapterLengths:', chapterLengths[ch]);
+              // Only mark success if we actually found entries; otherwise fall through to Strategy 3
+              if (chEntries > 0) {
+                success = true;
+              } else {
+                console.warn('[Rashi] S2 returned 0 verseMap entries for ch', ch, ', falling to Strategy 3');
+              }
             }
           }
         } catch(e2) {
