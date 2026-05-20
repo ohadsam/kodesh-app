@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.101 (May 19, 2026)
+**Last updated:** v5.102 (May 20, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -173,17 +173,11 @@ could be more precise for edge cases.
 - ✅ Siddur: 3rd floating button 📋 shows prayer status popup
 - ✅ Tehilim search: gematria support (פרק קל, כג, 130 etc.)
 
-### v5.101 (May 19, 2026)
-- ✅ Rashi Strategy 1: unwrap outer single-element array `[[v1,v2,...]]→[v1,v2,...]` — Sefaria wraps some chapters' `he` in an extra outer array causing `chapLen=1 < 2` → `isPerVerse=false` → entire Strategy 1 bypassed
-- ✅ Rashi Strategy 2: same unwrap for range-ref responses
-- ✅ Rashi Strategy 2: only set `success=true` if `chEntries > 0` — prevents silently succeeding with 0 entries when all Rashi is inside the skipped wrapper, allowing fallthrough to Strategy 3
-
-### v5.100 (May 19, 2026)
-- ✅ Fixed Rashi mapping for aliyot spanning multiple chapters (e.g., Naso aliya 6)
-- ✅ Strategy 1: `isPerVerse` now correctly accepts flat string arrays from Sefaria (tracks `didDeepFlat` to distinguish from post-deepFlat blobs)
-- ✅ Strategy 2: `chEnd` changed from 60 to 200 for non-last chapters — Sefaria returns only actual verses, so `maxVerseFound` reflects true chapter length
-- ✅ Strategy 2: Removed `chEnd` from `Math.max` in `chapterLengths` update — prevents overestimating chapter length and breaking verse-to-index mapping
-- ✅ Strategy 2: Uses `data2.sections` to detect actual verse start (handles Sefaria returning from chapter start instead of requested verse)
+### v5.102 (May 20, 2026)
+- ✅ Rashi fix: `loadRashiForRef` Strategy 1 now checks `chapLen >= minRequiredChapLen` before setting `success=true`
+- ✅ Rashi fix: Strategy 2 checks `coveredThrough >= s2minRequired` before setting `success=true`
+- ✅ Sefaria section-level responses (e.g. 3 parasha sections instead of 27 verse-level entries) are now detected and discarded, allowing Strategy 3 (commentary=1) to run and populate all verses correctly
+- ✅ Fixes missing Rashi from verse 4+ in long aliyot (e.g. Naso aliya 5, Numbers 6:1-27)
 
 ### v5.99 (May 10, 2026)
 - ✅ תפילת הדרך לטיסה added to Brachot tab (key: `tefila_haderech`), activates pre-existing `bb-tefila_haderech` button
