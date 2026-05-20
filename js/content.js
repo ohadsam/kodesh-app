@@ -899,41 +899,27 @@ async function loadRashiForRef(torahRef) {
           // Detect extra nesting: if heArr[0] is an array of arrays, we may need to unwrap
           // The correct structure should be: heArr[verseIdx] = array of strings/HTML
           // If heArr[0][0] is also an array, we have double nesting
-          let didDeepFlat = false;
           if (Array.isArray(heArr) && heArr.length > 0) {
             // Check if it's doubly nested (heArr is [[verse_comments...], ...] where verse_comments are arrays)
             const sample = heArr[0];
-            if (Array.isArray(sample) && sample.length > 0 && Array.isArray(sample[0]) &&
+            if (Array.isArray(sample) && sample.length > 0 && Array.isArray(sample[0]) && 
                 typeof sample[0][0] !== 'string') {
               // Triple nested - flatten one level
               console.log('[Rashi] detected triple-nested structure, flattening');
               heArr = deepFlat(heArr);
-              didDeepFlat = true;
             }
           }
-
-          // Unwrap outer single-element array wrapper: [[v1,v2,...]] → [v1,v2,...]
-          // Sefaria sometimes wraps the entire per-verse array in an extra outer array,
-          // giving heArr.length=1 which causes chapLen<2 → isPerVerse=false → falls through
-          if (!didDeepFlat && Array.isArray(heArr) && heArr.length === 1 &&
-              Array.isArray(heArr[0]) && heArr[0].length >= 2) {
-            console.log('[Rashi] S1 unwrapping outer single-element array, inner length:', heArr[0].length);
-            heArr = heArr[0];
-          }
-
+          
           chapterLengths[ch] = Array.isArray(heArr) ? heArr.length : 0;
           const chapLen = chapterLengths[ch];
-          // Check if structure is per-verse:
-          // - Array elements (normal Sefaria per-verse structure), OR
-          // - Flat strings WITHOUT deepFlat (Sefaria sometimes returns one string per verse)
-          // - NOT flat strings after deepFlat (those are all comment segments, not per-verse)
+          // Check if structure is per-verse (each element should be array of strings, not a single string)
           const firstElem = heArr[0];
-          const isPerVerse = chapLen >= 2 && (Array.isArray(firstElem) || (!didDeepFlat && typeof firstElem === 'string'));
-          console.log('[Rashi] ch', ch, 'heArr structure: length=', chapLen, 'sample type:', typeof firstElem, Array.isArray(firstElem) ? 'array('+firstElem.length+')' : '', didDeepFlat ? '(deepFlat)' : '');
-
-          // If structure is not per-verse (too short or flattened blob), fall to strategy 2
+          const isPerVerse = chapLen >= 2 && (Array.isArray(firstElem) || typeof firstElem !== 'string');
+          console.log('[Rashi] ch', ch, 'heArr structure: length=', chapLen, 'sample type:', typeof firstElem, Array.isArray(firstElem) ? 'array('+firstElem.length+')' : '');
+          
+          // If structure is not per-verse (too short or single string), fall to strategy 2
           if (!isPerVerse) {
-            console.warn('[Rashi] ch', ch, 'not per-verse structure (chapLen=', chapLen, ', didDeepFlat=', didDeepFlat, '), trying range ref');
+            console.warn('[Rashi] ch', ch, 'chapLen too low (', chapLen, '), trying commentary=1 fallback');
             // Don't set success - fall through to strategy 2
           } else {
             let chEntries = 0;
@@ -955,15 +941,22 @@ async function loadRashiForRef(torahRef) {
                 chEntries++;
               }
             }
-            console.log('[Rashi] ch', ch, 'direct OK, chapLen:', chapLen, '| entries:', chEntries, '| total:', verseMap.size);
-            success = true;
-            continue;
+            const minRequiredChapLen = (ch === endCh) ? endV : 10;
+            if (chapLen >= minRequiredChapLen && chEntries > 0) {
+              console.log('[Rashi] S1 OK, chapLen:', chapLen, '| entries:', chEntries);
+              success = true;
+              continue;
+            } else {
+              // Sefaria returned section-level data (e.g. 3 parasha sections instead of 27 verses)
+              [...verseMap.keys()].filter(k => k.startsWith(ch+':')).forEach(k => verseMap.delete(k));
+              console.warn('[Rashi] S1 section-level? chapLen', chapLen, '<', minRequiredChapLen, '| entries:', chEntries, '— discarded, trying S2');
+            }
           }
         }
 
         // Strategy 2: "Rashi on Book Chapter:1-N" range ref — returns per-verse structure
-        // Request up to 200 verses for non-last chapters (Sefaria returns only actual verses)
-        const chEnd = ch === endCh ? endV : 200;
+        // Use a chapter length estimate (Torah chapters rarely exceed 60 verses)
+        const chEnd = ch === endCh ? endV : 60;
         const chStart = ch === startCh ? startV : 1;
         const rangeRef = `Rashi on ${book} ${ch}:${chStart}-${ch}:${chEnd}`;
         try {
@@ -976,20 +969,11 @@ async function loadRashiForRef(torahRef) {
           if (resp2.ok) {
             const data2 = await resp2.json();
             let heArr2 = data2.he;
-            // Unwrap outer single-element array: [[v1,v2,...]] → [v1,v2,...]
-            if (Array.isArray(heArr2) && heArr2.length === 1 && Array.isArray(heArr2[0])) {
-              console.log('[Rashi] S2 unwrapping outer single-element array, inner length:', heArr2[0].length);
-              heArr2 = heArr2[0];
-            }
-            // Use data2.sections to get actual verse start (Sefaria may return from ch start, not chStart)
-            const actualVerseStart = (data2.sections && data2.sections.length >= 2)
-              ? data2.sections[data2.sections.length - 1]
-              : chStart;
             if (heArr2 && Array.isArray(heArr2) && heArr2.length >= 2) {
-              // Range ref returns array indexed from actualVerseStart
+              // Range ref returns array indexed from chStart
               heArr2.forEach((verseRashi, idx) => {
-                const vNum = actualVerseStart + idx;
-                if (ch === startCh && vNum < startV) return;
+                const vNum = chStart + idx;
+                if (vNum > chEnd) return;
                 if (ch === endCh && vNum > endV) return;
                 const key = `${ch}:${vNum}`;
                 const rawTexts = Array.isArray(verseRashi)
@@ -1004,16 +988,16 @@ async function loadRashiForRef(torahRef) {
                 }
               });
               const chEntries = [...verseMap.keys()].filter(k => k.startsWith(ch+':')).length;
-              // maxVerseFound: actual last verse returned (reflects true chapter length for non-last chapters)
-              const maxVerseFound = actualVerseStart + heArr2.length - 1;
-              // Do NOT include chEnd (which is 200 for non-last chapters) — use actual data only
-              chapterLengths[ch] = Math.max(chapterLengths[ch] || 0, maxVerseFound);
-              console.log('[Rashi] S2 range ref: actualStart:', actualVerseStart, '| entries:', chEntries, '| chapterLengths:', chapterLengths[ch]);
-              // Only mark success if we actually found entries; otherwise fall through to Strategy 3
-              if (chEntries > 0) {
+              const maxVerseFound = heArr2.length > 0 ? chStart + heArr2.length - 1 : chEnd;
+              chapterLengths[ch] = Math.max(chapterLengths[ch] || 0, maxVerseFound, chEnd);
+              const coveredThrough = maxVerseFound;
+              const s2minRequired = (ch === endCh) ? endV : 10;
+              if (coveredThrough >= s2minRequired && chEntries > 0) {
+                console.log('[Rashi] S2 OK: covered to', coveredThrough, '| entries:', chEntries);
                 success = true;
               } else {
-                console.warn('[Rashi] S2 returned 0 verseMap entries for ch', ch, ', falling to Strategy 3');
+                [...verseMap.keys()].filter(k => k.startsWith(ch+':')).forEach(k => verseMap.delete(k));
+                console.warn('[Rashi] S2 insufficient: covered to', coveredThrough, '/', s2minRequired, '| entries:', chEntries, '— discarded, trying S3');
               }
             }
           }
