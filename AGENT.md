@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.99 (May 10, 2026)
+**Last updated:** v5.100 (May 19, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -172,6 +172,13 @@ could be more precise for edge cases.
 - ✅ תפילת הדרך added to Brachot tab (with תהילים קכא)
 - ✅ Siddur: 3rd floating button 📋 shows prayer status popup
 - ✅ Tehilim search: gematria support (פרק קל, כג, 130 etc.)
+
+### v5.100 (May 19, 2026)
+- ✅ Fixed Rashi mapping for aliyot spanning multiple chapters (e.g., Naso aliya 6)
+- ✅ Strategy 1: `isPerVerse` now correctly accepts flat string arrays from Sefaria (tracks `didDeepFlat` to distinguish from post-deepFlat blobs)
+- ✅ Strategy 2: `chEnd` changed from 60 to 200 for non-last chapters — Sefaria returns only actual verses, so `maxVerseFound` reflects true chapter length
+- ✅ Strategy 2: Removed `chEnd` from `Math.max` in `chapterLengths` update — prevents overestimating chapter length and breaking verse-to-index mapping
+- ✅ Strategy 2: Uses `data2.sections` to detect actual verse start (handles Sefaria returning from chapter start instead of requested verse)
 
 ### v5.99 (May 10, 2026)
 - ✅ תפילת הדרך לטיסה added to Brachot tab (key: `tefila_haderech`), activates pre-existing `bb-tefila_haderech` button
