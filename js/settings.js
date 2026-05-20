@@ -8,7 +8,7 @@ const ALL_TABS = [
   { id: 'lashon',   label: '🗣 הלכות לשון הרע'                },
   { id: 'tehilim',  label: '🙏 תהילים יומי'                   },
   { id: 'daf',      label: '📚 דף יומי (בבלי)'                },
-  { id: 'mishna',   label: '📜 משנה יומי'                     },
+  { id: 'mishna',   label: '⚖️ משנה יומי'                     },
   { id: '929',      label: '✡️ 929 – תנ"ך יומי'               },
   { id: 'parasha',  label: '📜 פרשת השבוע'                    },
   { id: 'igeret',   label: '✉️ אגרת הרמב"ן'                   },
@@ -287,7 +287,7 @@ const REMINDER_ITEMS = [
   { key: 'tehilim',  name: '🙏 תהילים יומי',     daily: true },
   { key: 'lashon',   name: '🗣 שמירת הלשון',     daily: true },
   { key: 'daf',      name: '📚 דף יומי',         daily: true },
-  { key: 'mishna',   name: '📜 משנה יומית',       daily: true },
+  { key: 'mishna',   name: '⚖️ משנה יומית',       daily: true },
   { key: 'rambam',   name: '📗 רמב"ם יומי',      daily: true },
   { key: 'parasha',  name: '📜 פרשת השבוע',      weekly: true },
 ];
