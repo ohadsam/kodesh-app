@@ -491,7 +491,9 @@ async function loadParasha() {
     const hbData = await fetchWithDelay(hbUrl);
     const items  = hbData?.items || [];
 
-    const parashaEvent = items.find(i => i.category === 'parashat');
+    // Hebcal may include the preceding Shabbat's parasha (week starts Sunday in Jewish calendar),
+    // so filter to events on or after today to skip last week's parasha.
+    const parashaEvent = items.find(i => i.category === 'parashat' && i.date >= ds);
 
     // Detect if we're in a holiday period (Chol HaMoed, Yom Tov)
     const holidayThisWeek = items.find(i =>

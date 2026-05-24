@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.102 (May 20, 2026)
+**Last updated:** v5.103 (May 24, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -172,6 +172,9 @@ could be more precise for edge cases.
 - ✅ תפילת הדרך added to Brachot tab (with תהילים קכא)
 - ✅ Siddur: 3rd floating button 📋 shows prayer status popup
 - ✅ Tehilim search: gematria support (פרק קל, כג, 130 etc.)
+
+### v5.103 (May 24, 2026)
+- ✅ Parasha: fixed wrong parasha shown on Sunday morning — Hebcal includes last Shabbat's parashat event when queried from Sunday; now filtered to `i.date >= today`
 
 ### v5.102 (May 20, 2026)
 - ✅ Rashi fix: `loadRashiForRef` Strategy 1 now checks `chapLen >= minRequiredChapLen` before setting `success=true`
