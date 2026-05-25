@@ -499,7 +499,11 @@ async function loadParasha() {
     const _dow = _today.getDay(); // 0=Sun … 6=Sat
     const _daysToSat = _dow === 6 ? 0 : (6 - _dow);
     const _nextSatStr = formatDate(new Date(_today.getTime() + _daysToSat * 86400000));
-    const parashaEvent = items.find(i => i.category === 'parashat' && i.date >= _nextSatStr);
+    console.log('[Parasha] today:', ds, 'dow:', _dow, 'nextSat:', _nextSatStr);
+    const allParashaItems = items.filter(i => i.category === 'parashat');
+    console.log('[Parasha] all parashat items from Hebcal:', JSON.stringify(allParashaItems.map(i => ({date: i.date, title: i.title, he: i.hebrew}))));
+    const parashaEvent = allParashaItems.find(i => i.date >= _nextSatStr);
+    console.log('[Parasha] selected event:', parashaEvent ? `${parashaEvent.date} / ${parashaEvent.hebrew}` : 'NONE');
 
     // Detect if we're in a holiday period (Chol HaMoed, Yom Tov)
     const holidayThisWeek = items.find(i =>
