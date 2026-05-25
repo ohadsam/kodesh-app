@@ -529,9 +529,12 @@ async function loadParasha() {
     // Match to our ALL_PARASHIOT list
     // Handle combined parshiot like "תזריע-מצורע" / "תזריע-מצרע" (Hebcal spelling varies)
     const clean = heName.replace(/־/g, '-').replace(/פרשת\s*/,'').trim();
+    // Strip medial vav/yod for vowel-letter-insensitive match (e.g. "בהעלתך" ↔ "בהעלותך")
+    const _stripVL = s => s ? s.replace(/(?<=[א-ת])[וי](?=[א-ת])/g, '') : '';
     let matchP = ALL_PARASHIOT.find(p => clean === p.he)
       || ALL_PARASHIOT.find(p => heName === p.he || heName === 'פרשת ' + p.he)
-      || ALL_PARASHIOT.find(p => clean.length >= 3 && p.he.startsWith(clean) && p.he.length <= clean.length + 2);
+      || ALL_PARASHIOT.find(p => clean.length >= 3 && p.he.startsWith(clean) && p.he.length <= clean.length + 2)
+      || ALL_PARASHIOT.find(p => _stripVL(clean) === _stripVL(p.he));
 
     // Combined parsha fallback: "תזריע-מצרע" → match each part with fuzzy matching
     // Normalize Hebrew maqaf (U+05BE ־) to regular hyphen before splitting

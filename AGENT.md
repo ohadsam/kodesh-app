@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.106 (May 25, 2026)
+**Last updated:** v5.107 (May 25, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -172,6 +172,9 @@ could be more precise for edge cases.
 - ✅ תפילת הדרך added to Brachot tab (with תהילים קכא)
 - ✅ Siddur: 3rd floating button 📋 shows prayer status popup
 - ✅ Tehilim search: gematria support (פרק קל, כג, 130 etc.)
+
+### v5.107 (May 25, 2026)
+- ✅ Parasha match: added `_stripVL` (strip medial vav/yod) to main match chain — fixes "בהעלתך" (Hebcal Israel mode) not matching "בהעלותך" in ALL_PARASHIOT
 
 ### v5.106 (May 25, 2026)
 - ✅ Parasha: root cause found — Hebcal URLs in content.js were missing `&i=on` (Israel mode). In diaspora mode, when Shavuot day 2 falls on Shabbat, Naso is delayed a week; Israel mode returns the correct Israeli schedule. Added `&i=on` to both Hebcal parasha URLs.
