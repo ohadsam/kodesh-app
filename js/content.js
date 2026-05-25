@@ -440,7 +440,7 @@ async function loadSpecificParasha(ref) {
     try {
       const ds  = formatDate(getTargetDate());
       const ds2 = formatDate(new Date(getTargetDate().getTime() + 60 * 86400000));
-      const hbData = await fetchWithDelay(`https://www.hebcal.com/hebcal?v=1&cfg=json&s=on&start=${ds}&end=${ds2}`);
+      const hbData = await fetchWithDelay(`https://www.hebcal.com/hebcal?v=1&cfg=json&s=on&i=on&start=${ds}&end=${ds2}`);
       const heParasha = p?.he || '';
       const matchEvent = (hbData?.items || []).find(i =>
         i.category === 'parashat' && (
@@ -487,23 +487,17 @@ async function loadParasha() {
     const ds  = formatDate(getTargetDate());
     // Search up to 21 days to find next parasha (handles Yom Tov + Chol HaMoed periods)
     const ds3w = formatDate(new Date(getTargetDate().getTime() + 21 * 86400000));
-    const hbUrl  = `https://www.hebcal.com/hebcal?v=1&cfg=json&s=on&start=${ds}&end=${ds3w}`;
+    // &i=on = Israel mode: correct parasha when diaspora schedule differs (e.g. Shavuot on Shabbat in diaspora delays Naso by a week)
+    const hbUrl  = `https://www.hebcal.com/hebcal?v=1&cfg=json&s=on&i=on&start=${ds}&end=${ds3w}`;
     const hbData = await fetchWithDelay(hbUrl);
     const items  = hbData?.items || [];
 
-    // Hebcal dates parashat events to either the Shabbat (Sat) or the Sunday of that week.
-    // On Sunday, last week's Naso might appear as date="2026-05-24" (today), passing a
-    // simple >= today filter. Anchor to the next upcoming Saturday so we always skip
-    // any parasha whose Shabbat has already passed.
+    // Anchor to the next upcoming Saturday so we always get the UPCOMING parasha, not last week's.
     const _today = getTargetDate();
     const _dow = _today.getDay(); // 0=Sun … 6=Sat
     const _daysToSat = _dow === 6 ? 0 : (6 - _dow);
     const _nextSatStr = formatDate(new Date(_today.getTime() + _daysToSat * 86400000));
-    console.log('[Parasha] today:', ds, 'dow:', _dow, 'nextSat:', _nextSatStr);
-    const allParashaItems = items.filter(i => i.category === 'parashat');
-    console.log('[Parasha] all parashat items from Hebcal:', JSON.stringify(allParashaItems.map(i => ({date: i.date, title: i.title, he: i.hebrew}))));
-    const parashaEvent = allParashaItems.find(i => i.date >= _nextSatStr);
-    console.log('[Parasha] selected event:', parashaEvent ? `${parashaEvent.date} / ${parashaEvent.hebrew}` : 'NONE');
+    const parashaEvent = items.find(i => i.category === 'parashat' && i.date >= _nextSatStr);
 
     // Detect if we're in a holiday period (Chol HaMoed, Yom Tov)
     const holidayThisWeek = items.find(i =>
