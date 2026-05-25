@@ -491,9 +491,15 @@ async function loadParasha() {
     const hbData = await fetchWithDelay(hbUrl);
     const items  = hbData?.items || [];
 
-    // Hebcal may include the preceding Shabbat's parasha (week starts Sunday in Jewish calendar),
-    // so filter to events on or after today to skip last week's parasha.
-    const parashaEvent = items.find(i => i.category === 'parashat' && i.date >= ds);
+    // Hebcal dates parashat events to either the Shabbat (Sat) or the Sunday of that week.
+    // On Sunday, last week's Naso might appear as date="2026-05-24" (today), passing a
+    // simple >= today filter. Anchor to the next upcoming Saturday so we always skip
+    // any parasha whose Shabbat has already passed.
+    const _today = getTargetDate();
+    const _dow = _today.getDay(); // 0=Sun … 6=Sat
+    const _daysToSat = _dow === 6 ? 0 : (6 - _dow);
+    const _nextSatStr = formatDate(new Date(_today.getTime() + _daysToSat * 86400000));
+    const parashaEvent = items.find(i => i.category === 'parashat' && i.date >= _nextSatStr);
 
     // Detect if we're in a holiday period (Chol HaMoed, Yom Tov)
     const holidayThisWeek = items.find(i =>
