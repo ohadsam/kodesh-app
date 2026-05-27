@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.107 (May 25, 2026)
+**Last updated:** v5.108 (May 27, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -172,6 +172,11 @@ could be more precise for edge cases.
 - ✅ תפילת הדרך added to Brachot tab (with תהילים קכא)
 - ✅ Siddur: 3rd floating button 📋 shows prayer status popup
 - ✅ Tehilim search: gematria support (פרק קל, כג, 130 etc.)
+
+### v5.108 (May 27, 2026)
+- ✅ Rashi: restored `actualVerseStart` from `data2.sections` in Strategy 2 — Sefaria may return from ch:1 even for mid-chapter range queries; without this, verse indices were off
+- ✅ Rashi: removed `chEnd` (=60) from `Math.max` for `chapterLengths[ch]` in Strategy 2 — inflated chapter length caused mapping loop to iterate 26 extra times for intermediate chapters, misaligning all subsequent chapter Rashi assignments
+- ✅ Fixes missing Rashi mid-aliya in multi-chapter aliyot (e.g. Beha'alotcha aliyot 5 and 6)
 
 ### v5.107 (May 25, 2026)
 - ✅ Parasha match: added `_stripVL` (strip medial vav/yod) to main match chain — fixes "בהעלתך" (Hebcal Israel mode) not matching "בהעלותך" in ALL_PARASHIOT

@@ -978,12 +978,16 @@ async function loadRashiForRef(torahRef) {
           if (resp2.ok) {
             const data2 = await resp2.json();
             let heArr2 = data2.he;
-            if (heArr2 && Array.isArray(heArr2) && heArr2.length >= 2) {
-              // Range ref returns array indexed from chStart
+            if (heArr2 && Array.isArray(heArr2) && heArr2.length >= 1) {
+              // Sefaria may return data from chapter start (sections=[ch,1]) even when we
+              // requested a mid-chapter range. Use sections[] to get the actual start verse.
+              const actualVerseStart = (Array.isArray(data2.sections) && data2.sections.length >= 2)
+                ? data2.sections[data2.sections.length - 1]
+                : chStart;
               heArr2.forEach((verseRashi, idx) => {
-                const vNum = chStart + idx;
-                if (vNum > chEnd) return;
-                if (ch === endCh && vNum > endV) return;
+                const vNum = actualVerseStart + idx;
+                if (ch === startCh && vNum < startV) return;
+                if (ch === endCh   && vNum > endV)   return;
                 const key = `${ch}:${vNum}`;
                 const rawTexts = Array.isArray(verseRashi)
                   ? deepFlat(verseRashi).filter(Boolean)
@@ -997,8 +1001,11 @@ async function loadRashiForRef(torahRef) {
                 }
               });
               const chEntries = [...verseMap.keys()].filter(k => k.startsWith(ch+':')).length;
-              const maxVerseFound = heArr2.length > 0 ? chStart + heArr2.length - 1 : chEnd;
-              chapterLengths[ch] = Math.max(chapterLengths[ch] || 0, maxVerseFound, chEnd);
+              const maxVerseFound = actualVerseStart + heArr2.length - 1;
+              // Do NOT include chEnd in max: inflating chapterLengths to 60 for intermediate
+              // chapters causes the mapping loop to iterate over non-existent verses and
+              // mis-aligns Rashi indices for subsequent chapters.
+              chapterLengths[ch] = Math.max(chapterLengths[ch] || 0, maxVerseFound);
               const coveredThrough = maxVerseFound;
               const s2minRequired = (ch === endCh) ? endV : 10;
               if (coveredThrough >= s2minRequired && chEntries > 0) {
