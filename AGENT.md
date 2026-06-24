@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.108 (May 27, 2026)
+**Last updated:** v5.109 (Jun 24, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -173,28 +173,16 @@ could be more precise for edge cases.
 - ✅ Siddur: 3rd floating button 📋 shows prayer status popup
 - ✅ Tehilim search: gematria support (פרק קל, כג, 130 etc.)
 
+### v5.109 (Jun 24, 2026)
+- ✅ Rashi: fixed verse mis-alignment in multi-chapter aliyot (e.g., Balak aliya 6, Numbers 23:27-24:13 showed Rashi 2 verses too early)
+- ✅ Root cause: `chapterLengths[ch]` (from Rashi endpoint) was inflated, causing phantom iterations before ch advance; now `_torahChLengths` (from Torah text's nested `data.he`) is used as authoritative source
+- ✅ `_computeVerseNums`: now uses `_torahChLengths` for correct chapter boundary detection even before Rashi loads (chapter headers in text view)
+- ✅ Race condition fix: stale-aliya check moved to BEFORE `_aliyaVerseNums` overwrite in `loadRashiForRef` — prevents corrupting newly loaded aliya's chapter display when user switches while Rashi is fetching
+
 ### v5.108 (May 27, 2026)
-- ✅ Rashi: restored `actualVerseStart` from `data2.sections` in Strategy 2 — Sefaria may return from ch:1 even for mid-chapter range queries; without this, verse indices were off
-- ✅ Rashi: removed `chEnd` (=60) from `Math.max` for `chapterLengths[ch]` in Strategy 2 — inflated chapter length caused mapping loop to iterate 26 extra times for intermediate chapters, misaligning all subsequent chapter Rashi assignments
-- ✅ Fixes missing Rashi mid-aliya in multi-chapter aliyot (e.g. Beha'alotcha aliyot 5 and 6)
-
-### v5.107 (May 25, 2026)
-- ✅ Parasha match: added `_stripVL` (strip medial vav/yod) to main match chain — fixes "בהעלתך" (Hebcal Israel mode) not matching "בהעלותך" in ALL_PARASHIOT
-
-### v5.106 (May 25, 2026)
-- ✅ Parasha: root cause found — Hebcal URLs in content.js were missing `&i=on` (Israel mode). In diaspora mode, when Shavuot day 2 falls on Shabbat, Naso is delayed a week; Israel mode returns the correct Israeli schedule. Added `&i=on` to both Hebcal parasha URLs.
-
-### v5.104 (May 24, 2026)
-- ✅ Parasha: fixed wrong parasha on Sunday — Hebcal dates parashat events to the Sunday of the week (not Shabbat), so `>= today` on Sunday still matched last week's parasha; now filters to `i.date >= nextSaturday` so only the upcoming Shabbat's parasha is selected
-
-### v5.103 (May 24, 2026)
-- ✅ Parasha: partial fix — filtered to `i.date >= today` (insufficient, see v5.104)
-
-### v5.102 (May 20, 2026)
-- ✅ Rashi fix: `loadRashiForRef` Strategy 1 now checks `chapLen >= minRequiredChapLen` before setting `success=true`
-- ✅ Rashi fix: Strategy 2 checks `coveredThrough >= s2minRequired` before setting `success=true`
-- ✅ Sefaria section-level responses (e.g. 3 parasha sections instead of 27 verse-level entries) are now detected and discarded, allowing Strategy 3 (commentary=1) to run and populate all verses correctly
-- ✅ Fixes missing Rashi from verse 4+ in long aliyot (e.g. Naso aliya 5, Numbers 6:1-27)
+- ✅ Rashi: restored `actualVerseStart` from `data2.sections` in Strategy 2 — Sefaria may return from ch:1 even for mid-chapter range queries
+- ✅ Rashi: removed `chEnd` (=60) from `Math.max` for `chapterLengths[ch]` in Strategy 2 — inflated chapter length caused mapping loop mis-alignment
+- ✅ Fixes missing Rashi mid-aliya in multi-chapter aliyot (e.g., Beha'alotcha aliyot 5 and 6)
 
 ### v5.99 (May 10, 2026)
 - ✅ תפילת הדרך לטיסה added to Brachot tab (key: `tefila_haderech`), activates pre-existing `bb-tefila_haderech` button

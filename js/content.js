@@ -648,6 +648,7 @@ async function loadParasha() {
 
 let _currentAliyaRef = null;  // tracks which ref Rashi/Onkelos are loading for
 let _aliyaVerseNums  = [];    // absolute verse numbers (e.g. "21:3") for each parashaVerses index
+let _torahChLengths  = {};    // actual last-verse number per Torah chapter, derived from Sefaria text response
 
 // ── Haftara loading ─────────────────────────────────────────────────────────
 // haftaraRef from Hebcal is like "I Kings 18:46-19:21"
@@ -774,24 +775,23 @@ async function _kickoffHaftara(haftaraRef) {
 // Returns array like ["21:1","21:2",...] matching parashaVerses length
 function _computeVerseNums(ref, count) {
   const nums = new Array(count).fill('');
-  // Match ref like "Book CH:V-CH2:V2" or "Book CH:V"
   const m = ref.match(/([A-Za-z\s]+)\s+(\d+):(\d+)(?:-(\d+):(\d+))?/);
   if (!m) return nums;
   const startCh = parseInt(m[2]), startV = parseInt(m[3]);
-  // For single-chapter refs (no second ch:v): just number from startV
+  const endCh   = m[4] ? parseInt(m[4]) : startCh;
   if (!m[4]) {
     for (let i = 0; i < count; i++) nums[i] = `${startCh}:${startV + i}`;
     return nums;
   }
-  // Multi-chapter: we don't know exact chapter lengths without API data
-  // Use a best-effort sequential fill starting at startCh:startV
-  // This will be overwritten with accurate data when Rashi loads
+  // Multi-chapter: use _torahChLengths (populated from Torah text response) for chapter breaks
   let ch = startCh, v = startV, idx = 0;
   while (idx < count) {
     nums[idx] = `${ch}:${v}`;
-    v++; idx++;
-    // Rough chapter size estimate - will be corrected by Rashi loader
-    // Most Torah chapters: 20-60 verses
+    idx++; v++;
+    if (ch < endCh) {
+      const actualLastV = _torahChLengths[ch];
+      if (actualLastV && v > actualLastV) { ch++; v = 1; }
+    }
   }
   return nums;
 }
@@ -805,7 +805,7 @@ async function loadAliyaText(ref) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
   const page = document.getElementById('page-parasha');
   if (page) page.scrollTop = 0;
-  parashaVerses = []; rashiVerses = []; onkelosVerses = []; _aliyaVerseNums = [];
+  parashaVerses = []; rashiVerses = []; onkelosVerses = []; _aliyaVerseNums = []; _torahChLengths = {};
   rashiLoaded = false; onkelosLoaded = false;
   _rashiLoading = false;   // cancel any in-progress Rashi load
   _onkelosLoading = false; // cancel any in-progress Onkelos load
@@ -815,6 +815,25 @@ async function loadAliyaText(ref) {
     console.log('[Parasha] loading text for ref:', ref);
     const data = await sefariaText(ref);
     if (_currentAliyaRef !== ref) return; // aliya changed while loading
+
+    // Derive authoritative chapter lengths from nested Torah text structure.
+    // For multi-chapter aliyot Sefaria returns data.he as an array-of-arrays:
+    //   data.he[0] = verses from startV to end of startCh
+    //   data.he[1] = ALL verses of next chapter, etc.
+    // From these lengths we compute the actual last verse of each chapter.
+    _torahChLengths = {};
+    const _refM = ref.match(/(\d+):(\d+)/);
+    if (_refM && Array.isArray(data.he) && data.he.length > 1 && Array.isArray(data.he[0])) {
+      const _sCh = parseInt(_refM[1]), _sV = parseInt(_refM[2]);
+      data.he.forEach((chArr, i) => {
+        if (!Array.isArray(chArr)) return;
+        // startCh starts at _sV (not 1), so actual last verse = _sV-1 + length
+        // subsequent chapters start at v1, so last verse = length
+        _torahChLengths[_sCh + i] = (i === 0) ? (_sV - 1 + chArr.length) : chArr.length;
+      });
+      console.log('[Parasha] _torahChLengths:', JSON.stringify(_torahChLengths));
+    }
+
     parashaVerses = heFlat(data);
     console.log(`[Parasha] got ${parashaVerses.length} verses`);
     if (!parashaVerses.length) throw new Error('no Hebrew verses returned');
@@ -1065,19 +1084,28 @@ async function loadRashiForRef(torahRef) {
 
   setRashiProgress(totalCh, '');
 
-  // Map Rashi to verse indices
-  // Don't rely on chapterLengths from Rashi endpoint (can differ from Torah)
-  // Instead, iterate exactly the verse range we need
+  // Guard before overwriting shared state: if the user switched aliyot while we were
+  // fetching, discard this Rashi data entirely. The check MUST come before any writes
+  // to rashiVerses / _aliyaVerseNums to avoid corrupting the newly displayed aliya.
+  if (_currentAliyaRef !== torahRef) {
+    console.log('[Rashi] discarding - aliya changed while loading');
+    _rashiLoading = false;
+    return;
+  }
+
+  // Map Rashi to verse indices.
+  // Use _torahChLengths (from Torah text response) as authoritative chapter bounds.
+  // chapterLengths (from Rashi endpoint) can differ from Torah, causing mis-alignment.
   rashiVerses      = new Array(parashaVerses.length).fill('');
   _aliyaVerseNums  = new Array(parashaVerses.length).fill('');
   let idx = 0;
   for (let ch = startCh; ch <= endCh; ch++) {
     const firstV   = (ch === startCh) ? startV : 1;
-    const lastV    = (ch === endCh) ? endV : (chapterLengths[ch] || 200);
+    const lastV    = (ch === endCh) ? endV : (_torahChLengths[ch] || chapterLengths[ch] || 200);
     for (let v = firstV; v <= lastV; v++) {
       if (idx >= parashaVerses.length) break;
       const key = `${ch}:${v}`;
-      _aliyaVerseNums[idx] = key;   // store absolute verse ref
+      _aliyaVerseNums[idx] = key;
       if (verseMap.has(key)) {
         rashiVerses[idx] = verseMap.get(key).join('<br><br>');
       }
@@ -1086,12 +1114,8 @@ async function loadRashiForRef(torahRef) {
   }
   console.log('[Rashi] mapping done: idx reached', idx, '| parashaVerses:', parashaVerses.length, '| verseMap keys:', [...verseMap.keys()].join(','));
 
-  rashiLoaded    = true;
-  _rashiLoading  = false;
-  if (_currentAliyaRef !== torahRef) {
-    console.log('[Rashi] discarding - aliya changed while loading');
-    return;
-  }
+  rashiLoaded   = true;
+  _rashiLoading = false;
   const cnt = rashiVerses.filter(Boolean).length;
   console.log('[Rashi] ✅', cnt, '/', parashaVerses.length, 'verses with Rashi');
   if (parashaView === 'rashi') renderParasha();
