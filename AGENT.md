@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.110 (Jun 24, 2026)
+**Last updated:** v5.111 (Jun 24, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -205,6 +205,26 @@ could be more precise for edge cases.
 - ✅ תפילת הדרך added to Brachot tab (with תהילים קכא)
 - ✅ Siddur: 3rd floating button 📋 shows prayer status popup
 - ✅ Tehilim search: gematria support (פרק קל, כג, 130 etc.)
+
+### v5.111 (Aug 3, 2026) – Motzei Shabbat prayer text correction
+- ✅ Corrected the wording of `TEFILOT.motzash` (תפילה למוצאי שבת, ר' לוי יצחק
+  מברדיטשוב) in **both** `js/tefilot.js` and root `tefilot.js` (kept in sync per
+  STRUCTURE.md's documented dual-file convention — the root copy was found stale
+  during review and would otherwise have silently diverged).
+- ✅ Corrected text supplied verbatim by the app owner; reconstructed the array's
+  line breaks and verified character-for-character equality against the supplied
+  text before committing (script-verified, not eyeballed).
+- ✅ Restored two diacritics present in the old text but dropped from the pasted
+  correction (likely lost in copy/paste, not an intentional change): the sin/shin
+  dot in `דִשְׁמַיָּא` and the dagesh in `חַיֵּי`. Wording otherwise unchanged from
+  what was supplied.
+- ✅ Added `// TODO: verify source` above `motzash.text` per CLAUDE.md §3 — this
+  wording came directly from the app owner, not independently cross-checked
+  against Sefaria/Chabad/a printed siddur.
+- 🟡 **Known Issue added:** the exact wording of a few phrases (e.g. `מִכָּל רָע
+  בִּתְהִלָּתֶךָ` vs the prior `מִכָּל רָע, לְמַעַן תְּהִלָּתֶךָ`; the added
+  `לְהוֹדוֹת לְךָ` clause) has not been independently verified against a printed
+  edition of this Berditchever text — flagging per the TODO above, not blocking.
 
 ### v5.110 (Aug 3, 2026) – Qibla compass
 - ✅ **Root cause of "compass points the wrong way": the turn guidance was inverted.**
