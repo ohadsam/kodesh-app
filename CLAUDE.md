@@ -87,6 +87,71 @@ After every user-visible change:
 
 ---
 
+## 11. What This Project Is
+
+**עיתים (Itim)** — an Orthodox Jewish daily-learning and prayer PWA.
+Vanilla JS, no build step, no framework, no bundler. `index.html` loads a fixed list of
+`js/*.js` files in order; every function is a global. Deployed on GitHub Pages straight
+from `main` — **pushing to `main` IS the deploy.** Users are Hebrew-speaking, in Israel,
+on phones, often offline.
+
+Tabs: לוח שנה (zmanim), סידור, פרשת שבוע, תהילים, דף יומי, משנה יומי, רמב"ם, ברכות,
+ספירת העומר, מצפן.
+
+### The three constraints that shape everything
+
+1. **No build step.** Do not introduce imports/exports, TypeScript, JSX, or npm
+   dependencies. New file ⇒ add a `<script src="js/x.js?v=VERSION">` tag to index.html
+   in dependency order, and add it to the SW cache list.
+2. **Aggressive caching.** A change is invisible to users until `APP_VERSION` is bumped
+   in **both** `utils.js` and `sw.js` **and** every `?v=` in index.html is updated.
+   Skipping the bump is the single most common way a "fix" appears not to work.
+3. **Halachic correctness outranks code elegance.** A wrong prayer text or a wrong
+   parasha is a real-world failure, not a cosmetic bug.
+
+## 12. Working Rhythm for a Fix
+
+1. `AGENT.md` → Known Issues + Recently Fixed; `STRUCTURE.md` → find the function.
+2. Reproduce from the user's description before editing. The Hebrew report usually
+   names the exact tab, parasha and aliya — use it.
+3. Fix, then **verify the maths numerically** (`node -e` / a scratch script) rather than
+   reasoning in prose. Compass bearings, verse-index mapping and Hebrew-date arithmetic
+   have all shipped bugs that "looked right".
+4. `python3 Tests/test_runner.py`. `test_siddur_seasonal` (54) and `test_omer` (63) must
+   stay green. Network suites 403 in the sandbox — expected, ignore.
+5. Bump the version everywhere (see §2 above and AGENT.md → Deploy Checklist).
+6. Rewrite the what's-new modal (§9) — delete the old bullets, don't append.
+7. Update AGENT.md / STRUCTURE.md in the same commit.
+
+### Version bumping — use Python, not sed
+`sed` has corrupted the version string in this repo (`5.109` → `5.100`). Use:
+```bash
+python3 - <<'PY'
+for p in ['index.html','js/utils.js','sw.js']:
+    c=open(p,encoding='utf-8').read()
+    open(p,'w',encoding='utf-8').write(c.replace('5.109','5.110'))
+PY
+```
+Then confirm: `grep -c "5\.110" index.html js/utils.js sw.js` → 20, 1, 1.
+
+## 13. Landmines (each of these has caused a real bug)
+
+- **`calcBearing()` takes RADIANS.** `calcDistanceKm()` takes DEGREES. Same file.
+- **CSS `rotate()` is clockwise.** A positive needle angle means turn RIGHT (ימינה).
+- **Sefaria `data.he` shape is unstable.** Flat array, array-of-arrays (one per chapter),
+  or deeper. Always branch on `Array.isArray(data.he[0])`. Never trust its length as a
+  chapter length — derive chapter bounds from the Torah text response (`_torahChLengths`).
+- **Sefaria may return a whole chapter for a mid-chapter range.** Read `data.sections`
+  for the real starting verse.
+- **Hebcal needs `&i=on`** (Israel) on every call, or the diaspora parasha schedule leaks
+  in and the parasha is a week off after a festival.
+- **Hebcal Hebrew spellings differ** from `ALL_PARASHIOT` (בהעלתך vs בהעלותך) — match
+  through the `_stripVL` fallback chain.
+- **Async loaders race.** `loadRashiForRef` / `loadOnkelosForRef` must re-check
+  `_currentAliyaRef` **before** writing shared state, not after.
+- **The inline `<head>` script is the only version guard.** A second one anywhere causes
+  an infinite reload loop.
+
 ## Quick Reference
 
 | Task | File |
@@ -98,4 +163,6 @@ After every user-visible change:
 | Run tests | `python3 Tests/test_runner.py` |
 | Prayer texts | `js/tefilot.js`, `js/brachot.js` |
 | Siddur pipeline | `js/siddur.js`, `js/siddur-inserts.js` |
+| Parasha / Rashi / daily study | `js/content.js` |
+| Compass / Qibla | `js/misc.js` |
 | HTML structure | `index.html` (single-file app) |

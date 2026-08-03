@@ -26,11 +26,133 @@ function toggleDone(section, key) {
 const JERUSALEM_LAT = 31.77668 * Math.PI / 180;  // Kotel exact: 31°46'36.04″N
 const JERUSALEM_LON = 35.23444 * Math.PI / 180;  // Kotel exact: 35°14'4″E
 
+// Magnetic declination in Israel (~+4.5°E, 2026 epoch).
+// calcBearing() returns a TRUE (geographic) bearing, so any heading that is
+// referenced to MAGNETIC north must be converted:  true = magnetic + declination.
+// Sources and their reference frame:
+//   - Android deviceorientationabsolute / AbsoluteOrientationSensor:
+//       built on TYPE_ROTATION_VECTOR, documented as pointing to MAGNETIC north
+//       → declination MUST be added.
+//   - iOS webkitCompassHeading:
+//       WebKit reports CLHeading, which is TRUE-north referenced whenever
+//       Location Services are authorised (this app requests GPS on init)
+//       → declination must NOT be added.
+const MAGNETIC_DECLINATION = 4.5;
+
 let qiblaAngle      = null;
 let deviceHeading   = null;
 let deviceBeta      = null;  // front-back tilt (0=flat, 90=upright portrait)
+let deviceTilt      = null;  // total tilt away from flat, degrees (0=flat on a table)
 let compassListener = null;
 let qiblaInitDone   = false;
+
+// ── Heading source priority ───────────────────────────────────────────────
+// A lower-quality source must never overwrite a better one that is still live.
+const HSRC_RELATIVE = 1;   // deviceorientation, absolute===false (drifts)
+const HSRC_ABSOLUTE = 2;   // deviceorientationabsolute
+const HSRC_BEST     = 3;   // iOS webkitCompassHeading / AbsoluteOrientationSensor
+let _headingRank    = 0;
+let _headingRankTs  = 0;
+const HSRC_STALE_MS = 3000;
+
+// Set when no orientation reading arrives at all, so the UI can say so instead of
+// leaving the arrow pointing at the top of the screen next to a confident bearing.
+let _compassUnavailable = false;
+let _compassWatchdog    = null;
+
+function _acceptHeadingSource(rank) {
+  const now = Date.now();
+  if (rank >= _headingRank || (now - _headingRankTs) > HSRC_STALE_MS) {
+    // Switching source: drop the smoothing state. Two sources can use completely
+    // different zero references (relative orientation in particular), so blending
+    // across the switch would slew the arrow smoothly to a bogus bearing instead
+    // of jumping cleanly to the new source's reading.
+    if (rank !== _headingRank) { _smoothX = null; _smoothY = null; }
+    _headingRank   = rank;
+    _headingRankTs = now;
+    return true;
+  }
+  return false;
+}
+
+function _screenAngle() {
+  return (window.screen?.orientation?.angle ?? window.orientation ?? 0);
+}
+
+// Minimum horizontal length of the screen-up axis for the azimuth to be meaningful
+// (~sin 9°). Below this the phone is effectively edge-on and the heading is noise.
+const HEADING_MIN_PROJ = 0.15;
+
+// ── Tilt-correct compass heading ──────────────────────────────────────────
+// Returns the azimuth (clockwise from north) that the TOP OF THE SCREEN points
+// at, for any device attitude — including a phone lying flat on a table.
+//
+// The old code used the shortcut `360 - alpha`, which silently breaks when
+// cos(beta) < 0 (device tilted past vertical / screen facing down): the true
+// azimuth flips by 180° but `360 - alpha` does not, so the arrow pointed the
+// exact opposite way. Building the rotation matrix and reading the screen-up
+// axis handles every attitude correctly.
+//
+// W3C DeviceOrientation: intrinsic Z-X'-Y'' (alpha, beta, gamma).
+// Earth frame is East-North-Up. R = Rz(a)·Rx(b)·Ry(g).
+function _headingFromEuler(alpha, beta, gamma, screenAngle) {
+  const d = Math.PI / 180;
+  const a = (alpha || 0) * d, b = (beta || 0) * d, g = (gamma || 0) * d;
+  const cA = Math.cos(a), sA = Math.sin(a);
+  const cB = Math.cos(b), sB = Math.sin(b);
+  const cG = Math.cos(g), sG = Math.sin(g);
+
+  // Columns of R that we need (device x and y axes expressed in earth frame)
+  const r00 = cA * cG - sA * sB * sG,  r01 = -sA * cB;   // east  components
+  const r10 = sA * cG + cA * sB * sG,  r11 =  cA * cB;   // north components
+
+  // "Up on screen" expressed in device coordinates, per screen rotation
+  const s  = (screenAngle || 0) * d;
+  const sS = Math.sin(s), cS = Math.cos(s);
+
+  const east  = r00 * sS + r01 * cS;
+  const north = r10 * sS + r11 * cS;
+  // When the screen-up axis approaches vertical (phone held upright, beta ~ 90°)
+  // its horizontal projection collapses and the azimuth becomes pure noise.
+  // Reject well before the exact-zero singularity.
+  if (Math.hypot(east, north) < HEADING_MIN_PROJ) return null;
+
+  return ((Math.atan2(east, north) * 180 / Math.PI) + 360) % 360;
+}
+
+// Same result from an AbsoluteOrientationSensor quaternion [x, y, z, w].
+function _headingFromQuaternion(q, screenAngle) {
+  if (!q || q.length < 4) return null;
+  const [x, y, z, w] = q;
+  const r00 = 1 - 2 * (y * y + z * z), r01 = 2 * (x * y - z * w);
+  const r10 = 2 * (x * y + z * w),     r11 = 1 - 2 * (x * x + z * z);
+
+  const s  = (screenAngle || 0) * Math.PI / 180;
+  const sS = Math.sin(s), cS = Math.cos(s);
+
+  const east  = r00 * sS + r01 * cS;
+  const north = r10 * sS + r11 * cS;
+  if (Math.hypot(east, north) < HEADING_MIN_PROJ) return null;
+
+  return ((Math.atan2(east, north) * 180 / Math.PI) + 360) % 360;
+}
+
+// ── Circular smoothing ────────────────────────────────────────────────────
+// Magnetometer output is noisy; averaging the raw degrees would break across
+// the 359°→0° wrap, so smooth the unit vector instead.
+let _smoothX = null, _smoothY = null;
+const SMOOTH_K = 0.25;
+
+function _smoothHeading(h) {
+  const r = h * Math.PI / 180;
+  const x = Math.cos(r), y = Math.sin(r);
+  if (_smoothX === null) { _smoothX = x; _smoothY = y; }
+  else {
+    _smoothX += (x - _smoothX) * SMOOTH_K;
+    _smoothY += (y - _smoothY) * SMOOTH_K;
+  }
+  return ((Math.atan2(_smoothY, _smoothX) * 180 / Math.PI) + 360) % 360;
+}
 
 function calcBearing(lat1, lon1, lat2, lon2) {
   const dLon = lon2 - lon1;
@@ -90,7 +212,7 @@ function updateCompassUI() {
 
     // Rotate the arrow SVG to point at Jerusalem
     const arrowEl = document.getElementById('compass-arrows');
-    if (arrowEl) arrowEl.style.transform = `rotate(${needleAngle}deg)`;
+    if (arrowEl) { arrowEl.style.transform = `rotate(${needleAngle}deg)`; arrowEl.style.opacity = '1'; }
 
     // Legacy elements
     const needle = document.getElementById('jerusalem-needle');
@@ -106,27 +228,41 @@ function updateCompassUI() {
     console.log('[Compass] deviceHeading:', Math.round(deviceHeading), '° | qiblaAngle:', Math.round(qiblaAngle), '° | needleAngle:', Math.round(needleAngle), '° | diff from forward:', Math.round(absDiff), '°');
     const ind = document.getElementById('alignment-indicator');
     if (ind) {
+      // CSS rotate() is CLOCKWISE for positive angles, so needleAngle > 0 draws the
+      // arrow to the RIGHT of screen-up — meaning the Kotel is clockwise from where
+      // you face and you must turn RIGHT (ימינה). The labels used to be inverted,
+      // telling the user to turn left when the arrow pointed right; that alone made
+      // the compass read as pointing the wrong way.
+      const dir = normDiff > 0 ? 'ימינה ↻' : 'שמאלה ↺';
       if (absDiff < 8) {
         ind.style.cssText += ';background:rgba(61,140,90,.25);color:#5cb87a;border-color:#3d8c5a';
         ind.textContent = '✅ פנה ירושלים! התפלל כעת';
       } else if (absDiff < 20) {
-        const dir = normDiff > 0 ? 'שמאלה ←' : '← ימינה';
         ind.style.cssText += ';background:rgba(201,165,74,.2);color:var(--gold);border-color:var(--gold-dim)';
-        ind.textContent = `↻ כמעט – סובב ${dir} ${Math.round(absDiff)}°`;
+        ind.textContent = `כמעט – סובב ${dir} ${Math.round(absDiff)}°`;
       } else {
-        const dir = normDiff > 0 ? 'שמאלה ←' : '← ימינה';
         ind.style.cssText += ';background:rgba(100,70,20,.2);color:var(--muted);border-color:var(--border)';
         ind.textContent = `סובב ${dir} ${Math.round(absDiff)}° – החץ יצביע לירושלים`;
       }
     }
-    // Tilt warning
+    // Tilt warning — prefer the true tilt-from-flat when we have it (the
+    // AbsoluteOrientationSensor path has no beta at all), else fall back to beta.
     const tiltWarn = document.getElementById('tilt-warning');
-    if (tiltWarn && deviceBeta !== null) {
-      tiltWarn.style.display = Math.abs(deviceBeta) > 30 ? 'block' : 'none';
+    const tilt = (deviceTilt !== null) ? deviceTilt
+               : (deviceBeta !== null) ? Math.abs(deviceBeta) : null;
+    if (tiltWarn && tilt !== null) {
+      tiltWarn.style.display = tilt > 30 ? 'block' : 'none';
     }
   } else {
+    // No heading yet. Dim the arrow so a compass that is merely pointing at the top
+    // of the screen is not mistaken for a live reading sitting next to a confident
+    // bearing number.
+    const arrowEl = document.getElementById('compass-arrows');
+    if (arrowEl) { arrowEl.style.transform = 'rotate(0deg)'; arrowEl.style.opacity = '.25'; }
     const ind = document.getElementById('alignment-indicator');
-    if (ind) { ind.textContent = 'לחץ "הפעל חיישן כיוון" למטה'; ind.style.color = 'var(--muted)'; }
+    if (ind) { ind.textContent = _compassUnavailable
+      ? '⚠️ אין חיישן מצפן זמין במכשיר – הכיוון למעלה אינו אמיתי'
+      : 'לחץ "הפעל חיישן כיוון" למטה'; ind.style.color = 'var(--muted)'; }
     console.log('[Compass] no device heading yet – waiting for sensor data');
   }
 }
@@ -183,50 +319,134 @@ function startCompassListener() {
   }
   if (window._aoSensor) { try { window._aoSensor.stop(); } catch(e){} window._aoSensor = null; }
 
-  // Reset calibration tracking
+  // Reset calibration + smoothing tracking
   _alphaHistory = [];
   _calibrationWarned = false;
+  _smoothX = null; _smoothY = null;
+  _headingRank = 0; _headingRankTs = 0;
+  _compassUnavailable = false;
+
+  // Commit a heading reading coming from `rank`, applying smoothing.
+  function _applyHeading(h, rank, label) {
+    if (h === null || isNaN(h)) return;
+    if (!_acceptHeadingSource(rank)) return;
+    deviceHeading = _smoothHeading(((h % 360) + 360) % 360);
+    console.log(`[Compass] ${label}: raw ${h.toFixed(1)}° → smoothed ${deviceHeading.toFixed(1)}°`);
+    updateCompassUI();
+  }
+
+  // ── Preferred path on Android: AbsoluteOrientationSensor ────────────────
+  // Gives a fused, tilt-correct quaternion. Previously the code only ever
+  // *stopped* window._aoSensor — nothing ever created it, so this path was
+  // dead and the compass fell back to raw alpha.
+  if (typeof AbsoluteOrientationSensor === 'function') {
+    let sensor = null;
+    try {
+      sensor = new AbsoluteOrientationSensor({ frequency: 20, referenceFrame: 'device' });
+      let frozenCount = 0, lastQuat = '';
+      sensor.addEventListener('reading', () => {
+        const q = sensor.quaternion;
+        // Chrome sometimes keeps this sensor firing with a frozen quaternion. That
+        // would pin the source rank at BEST and lock out the live DOM event stream
+        // forever, so detect it and hand back over to deviceorientation*.
+        const sig = q ? q.map(n => n.toFixed(5)).join(',') : '';
+        if (sig && sig === lastQuat) {
+          if (++frozenCount === 40) {
+            console.warn('[Compass] AbsoluteOrientationSensor frozen – falling back to deviceorientation');
+            try { sensor.stop(); } catch(e2) {}
+            if (window._aoSensor === sensor) window._aoSensor = null;
+            _headingRank = 0; _headingRankTs = 0;
+          }
+          return;
+        }
+        frozenCount = 0; lastQuat = sig;
+
+        // Tilt from flat: the up-component of the device z-axis is R[2][2].
+        if (q && q.length >= 4) {
+          const r22 = 1 - 2 * (q[0] * q[0] + q[1] * q[1]);
+          deviceTilt = Math.acos(Math.max(-1, Math.min(1, r22))) * 180 / Math.PI;
+        }
+
+        const h = _headingFromQuaternion(q, _screenAngle());
+        if (h === null) return;
+        _applyHeading((h + MAGNETIC_DECLINATION) % 360, HSRC_BEST, 'AbsoluteOrientationSensor');
+      });
+      sensor.addEventListener('error', ev => {
+        console.warn('[Compass] AbsoluteOrientationSensor error:', ev.error?.name || ev.error);
+        try { sensor.stop(); } catch(e2) {}
+        if (window._aoSensor === sensor) window._aoSensor = null;
+        _headingRank = 0; _headingRankTs = 0;
+      });
+      // Publish BEFORE start(): if start() throws, the sensor may already be
+      // activated with its listener attached, and an unpublished handle can never
+      // be stopped — it would keep the magnetometer powered and hold rank at BEST.
+      window._aoSensor = sensor;
+      sensor.start();
+      console.log('[Compass] AbsoluteOrientationSensor started');
+    } catch(e) {
+      console.warn('[Compass] AbsoluteOrientationSensor unavailable:', e.message);
+      if (sensor) { try { sensor.stop(); } catch(e2) {} }
+      window._aoSensor = null;
+    }
+  }
 
   compassListener = (e) => {
-    let h = null;
-    deviceBeta = e.beta;
+    deviceBeta = (e.beta === undefined) ? null : e.beta;
+    // Total tilt from flat, from beta and gamma (0 = lying flat, screen up)
+    if (e.beta !== null && e.beta !== undefined && e.gamma !== null && e.gamma !== undefined) {
+      const d = Math.PI / 180;
+      const upZ = Math.cos(e.beta * d) * Math.cos(e.gamma * d);
+      deviceTilt = Math.acos(Math.max(-1, Math.min(1, upZ))) * 180 / Math.PI;
+    }
 
     if (typeof e.webkitCompassHeading === 'number' && e.webkitCompassHeading >= 0) {
-      // iOS: tilt-compensated by OS + Israel magnetic declination (~4.5°)
-      h = (e.webkitCompassHeading + 4.5) % 360;
-      console.log('[Compass] iOS webkit+decl:', h.toFixed(1));
-
-    } else if (e.absolute === true && e.alpha !== null) {
-      // Android absolute orientation sensor
-      const screenAngle = (window.screen?.orientation?.angle ?? window.orientation ?? 0);
-      h = (360 - e.alpha + screenAngle) % 360;
-      // Check calibration
-      _checkSensorCalibration(e.alpha);
-      // Show raw debug info
-      const rawEl = document.getElementById('qibla-raw-alpha');
-      if (rawEl) rawEl.textContent = `α=${e.alpha.toFixed(1)}° range=${Math.round(_lastAlphaRange)}°`;
-      console.log('[Compass] Android heading:', h.toFixed(1), 'α=', e.alpha.toFixed(1), 'screen=', screenAngle);
-
-    } else if (e.alpha !== null && e.absolute === false) {
-      // Relative orientation — less accurate but better than nothing
-      // Only use if no absolute reading ever came
-      if (deviceHeading === null) {
-        const screenAngle = (window.screen?.orientation?.angle ?? window.orientation ?? 0);
-        h = (360 - e.alpha + screenAngle) % 360;
-        console.log('[Compass] Android relative (fallback):', h.toFixed(1));
-        setQiblaStatus('⚠️ מצפן יחסי (פחות מדויק) – יש לכייל');
-      }
-      return;
-    } else {
+      // iOS: already tilt-compensated AND true-north referenced by CoreLocation
+      // (Location Services are on — initQibla requests GPS). Adding the magnetic
+      // declination here double-corrected the heading; do not add it.
+      _applyHeading(e.webkitCompassHeading, HSRC_BEST, 'iOS webkitCompassHeading');
       return;
     }
 
-    if (h !== null && !isNaN(h)) { deviceHeading = h; updateCompassUI(); }
+    if (e.alpha === null || e.alpha === undefined) return;
+
+    const screenAngle = _screenAngle();
+    const h = _headingFromEuler(e.alpha, e.beta, e.gamma, screenAngle);
+    if (h === null) return;   // screen edge-on to the ground: heading undefined
+
+    if (e.absolute === true) {
+      _checkSensorCalibration(e.alpha);
+      const rawEl = document.getElementById('qibla-raw-alpha');
+      if (rawEl) rawEl.textContent = `α=${e.alpha.toFixed(1)}° range=${Math.round(_lastAlphaRange)}°`;
+      _applyHeading((h + MAGNETIC_DECLINATION) % 360, HSRC_ABSOLUTE, 'deviceorientationabsolute');
+    } else {
+      // Relative orientation: arbitrary zero reference, so it drifts — but it is
+      // far better than a frozen arrow. Previously this branch computed a heading
+      // and then returned without ever assigning it, so the fallback was dead and
+      // devices with no absolute sensor showed a compass that never moved.
+      // No declination here: this reading is not referenced to magnetic north at
+      // all, so "converting" it to true north would be meaningless.
+      _applyHeading(h, HSRC_RELATIVE, 'deviceorientation (relative)');
+      if (_headingRank === HSRC_RELATIVE) {
+        setQiblaStatus('⚠️ מצפן יחסי (פחות מדויק) – יש לכייל');
+      }
+    }
   };
 
   window.addEventListener('deviceorientationabsolute', compassListener, true);
   window.addEventListener('deviceorientation',         compassListener, true);
   setQiblaStatus('🧭 מצפן פעיל');
+
+  // Watchdog: some devices (desktop, tablets with no magnetometer, denied sensor
+  // permission) never deliver a single orientation event. Say so explicitly.
+  if (_compassWatchdog) clearTimeout(_compassWatchdog);
+  _compassWatchdog = setTimeout(() => {
+    if (deviceHeading === null) {
+      _compassUnavailable = true;
+      console.warn('[Compass] no orientation reading after 4s – sensor unavailable');
+      setQiblaStatus('⚠️ אין חיישן מצפן זמין – הכיוון מוצג במעלות בלבד');
+      updateCompassUI();
+    }
+  }, 4000);
 }
 
 function _startDeviceOrientationFallback() {
@@ -240,9 +460,19 @@ function stopCompassListener() {
     compassListener = null;
     console.log('[Qibla] compass stopped');
   }
+  // Release the Generic Sensor too, otherwise it keeps the magnetometer powered
+  if (window._aoSensor) {
+    try { window._aoSensor.stop(); } catch(e) {}
+    window._aoSensor = null;
+    console.log('[Qibla] AbsoluteOrientationSensor stopped');
+  }
+  if (_compassWatchdog) { clearTimeout(_compassWatchdog); _compassWatchdog = null; }
 }
 
 function resumeQibla() {
+  // Keyed on compassListener only. Gating on window._aoSensor too would mean that
+  // if the two ever desync (the sensor is a window global, the listener is not),
+  // the DOM listeners never get re-attached and the compass freezes for good.
   if (qiblaInitDone && !compassListener) startCompassListener();
   else updateCompassUI();
 }

@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.109 (Jun 24, 2026)
+**Last updated:** v5.110 (Jun 24, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -107,10 +107,34 @@ js/
 - Format: halacha text → green block with 📚 שטיינזלץ label below it
 - Same pattern as Rashi in Daf Yomi
 
-### Compass/Qibla — v5.26
-- GPS spoofing detection: rejects if accuracy=0, >5000m, or lat/lon≈0
-- Falls back to saved city on spoofed/unavailable GPS
-- "🔄 רענון מיקום" button added to qibla info panel
+### Compass/Qibla — v5.110 (js/misc.js)
+Points at the Kotel (31.77668°N, 35.23444°E). Two independent angles are combined:
+1. **Qibla bearing** — `calcBearing(lat, lon, JERUSALEM_LAT, JERUSALEM_LON)`, a TRUE
+   geographic bearing. **Takes RADIANS** (the Jerusalem constants are pre-converted;
+   the call site converts the user's lat/lon). Petah Tikva → Kotel ≈ 136.1° (ד-מזרח).
+2. **Device heading** — azimuth the top of the screen points at.
+
+Heading sources, best first (`_acceptHeadingSource` keeps the best live one; a source
+that goes quiet for `HSRC_STALE_MS` = 3 s yields to a lower-ranked one):
+
+| Rank | Source | Reference | Declination |
+|---|---|---|---|
+| BEST | iOS `webkitCompassHeading` | true north (CoreLocation) | none |
+| BEST | `AbsoluteOrientationSensor` quaternion | magnetic | +4.5° |
+| ABSOLUTE | `deviceorientationabsolute` | magnetic | +4.5° |
+| RELATIVE | `deviceorientation` (`absolute:false`) | arbitrary zero, drifts | none |
+
+- `_headingFromEuler(a,b,g,screenAngle)` / `_headingFromQuaternion(q,screenAngle)` both
+  build R (device→ENU), rotate the screen-up axis `(sin s, cos s, 0)`, and return
+  `atan2(east, north)`. They agree to 1e-9. Reject when the horizontal projection is
+  below `HEADING_MIN_PROJ` (phone edge-on ⇒ azimuth is noise).
+- **Rendering:** `#compass-outer` gets `rotate(-heading)` (ring + cardinal letters),
+  `#compass-arrows` gets `rotate(qibla - heading)`. They are SIBLINGS in index.html —
+  do not nest them or the rotation applies twice.
+- **Turn guidance:** CSS `rotate()` is CLOCKWISE, so `normDiff > 0` ⇒ Kotel is to the
+  RIGHT ⇒ ימינה. (This was inverted before v5.110 and was the actual reported bug.)
+- GPS spoofing detection: rejects accuracy=0, >5000 m, or lat/lon≈0; falls back to the
+  saved city. "🔄 רענון מיקום" button in the qibla info panel.
 
 ### Tab Scroll Sync — v5.26
 - `initTabScrollSync()` restored with proportional scroll sync
@@ -133,6 +157,15 @@ js/
 ---
 
 ## Known Issues / Open Items
+
+### 🟡 Compass – iOS declination reference unverified (v5.110)
+`MAGNETIC_DECLINATION` (+4.5°E) is added to Android sources but NOT to iOS
+`webkitCompassHeading`, on the basis that WebKit surfaces `CLHeading.trueHeading`
+when Location Services are authorised (this app requests GPS on init). Not verified
+on a physical iPhone. If iOS turns out to report `magneticHeading`, the iOS branch in
+`startCompassListener` needs `+ MAGNETIC_DECLINATION` restored. Worst case is a 4.5°
+error — inside the ±8° "facing Jerusalem" tolerance, so it cannot by itself make the
+compass look wrong.
 
 ### 🟡 Compass – GPS Spoofing (partial fix in v5.26)
 GPS spoofing detection added, but if device returns plausible fake coords
@@ -172,6 +205,36 @@ could be more precise for edge cases.
 - ✅ תפילת הדרך added to Brachot tab (with תהילים קכא)
 - ✅ Siddur: 3rd floating button 📋 shows prayer status popup
 - ✅ Tehilim search: gematria support (פרק קל, כג, 130 etc.)
+
+### v5.110 (Aug 3, 2026) – Qibla compass
+- ✅ **Root cause of "compass points the wrong way": the turn guidance was inverted.**
+  CSS `rotate()` is clockwise for positive angles, so `normDiff > 0` means the Kotel is
+  to the RIGHT — but the label said `שמאלה` (left). The arrow was correct all along;
+  the text contradicted it. `updateCompassUI` now says ימינה/שמאלה to match the arrow.
+- ✅ Heading is now computed from the full W3C rotation matrix (`_headingFromEuler`)
+  instead of the `360 - alpha` shortcut. Identical when flat (verified numerically),
+  but correct when `cos(beta) < 0` — the old formula was 180° off with the screen
+  facing down. Near-vertical attitudes are now rejected (`HEADING_MIN_PROJ`) instead
+  of returning noise.
+- ✅ `AbsoluteOrientationSensor` path actually created. `window._aoSensor` was only ever
+  *stopped* — nothing constructed it, so the preferred Android path was dead code.
+  Includes a frozen-quaternion detector (a known Chrome failure) that hands back to
+  `deviceorientation*`. `_headingFromQuaternion` agrees with `_headingFromEuler` to 1e-9
+  across 360 attitudes.
+- ✅ Relative-orientation fallback un-broken: it computed a heading then `return`ed
+  before assigning it, so devices with no absolute sensor showed a permanently frozen
+  arrow. Heading-source ranking (`_acceptHeadingSource`) keeps the best live source and
+  resets smoothing on a source switch so readings with different zero references are
+  never blended.
+- ✅ Magnetic declination (+4.5°E) applied consistently: added to magnetic-referenced
+  Android sources, NOT to iOS `webkitCompassHeading` (CoreLocation already returns true
+  north with Location Services on), never to relative readings (no magnetic zero).
+- ✅ Devices with no orientation sensor at all now get an explicit Hebrew message and a
+  dimmed arrow after a 4 s watchdog, instead of an arrow frozen at screen-up sitting
+  next to a confident bearing.
+- ✅ Circular (unit-vector) smoothing so the needle does not jitter or glitch at 359°→0°.
+- ✅ Tilt warning now uses true tilt-from-flat (`deviceTilt`), computed on both the Euler
+  and quaternion paths; previously the sensor path never updated it.
 
 ### v5.109 (Jun 24, 2026)
 - ✅ Rashi: fixed verse mis-alignment in multi-chapter aliyot (e.g., Balak aliya 6, Numbers 23:27-24:13 showed Rashi 2 verses too early)

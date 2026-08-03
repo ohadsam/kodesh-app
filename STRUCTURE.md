@@ -178,11 +178,27 @@ Add `<button id="tf-{key}" class="aliya-tab" onclick="showTefila('{key}')">` in 
 | `showOmerNow()` | Display omer modal |
 
 ### js/misc.js
-| Function | Description |
+| Function / Const | Description |
 |---|---|
 | `updateDoneButton(tab, key)` | Mark content as read for today |
-| `initCompass()` | GPS + DeviceOrientation → Qibla direction |
+| `initQibla()` | GPS (with spoof detection) → `qiblaAngle`, then starts the compass |
+| `calcBearing(lat1,lon1,lat2,lon2)` | TRUE bearing, **arguments in RADIANS** |
+| `calcDistanceKm(...)` | Haversine distance, arguments in DEGREES |
+| `bearingToLabel(deg)` | Bearing → Hebrew label (צפון / ד-מזרח / …) |
+| `startCompassListener()` | Starts `AbsoluteOrientationSensor` + `deviceorientation*` |
+| `stopCompassListener()` | Removes listeners, stops the sensor, clears the watchdog |
+| `_headingFromEuler(a,b,g,screen)` | Tilt-correct heading from W3C alpha/beta/gamma |
+| `_headingFromQuaternion(q,screen)` | Same, from an AbsoluteOrientationSensor quaternion |
+| `_acceptHeadingSource(rank)` | Heading-source priority + smoothing reset on switch |
+| `_smoothHeading(h)` | Circular (unit-vector) EMA — wrap-safe at 359°→0° |
 | `_checkSensorCalibration(alpha)` | Detect uncalibrated magnetometer |
+| `updateCompassUI()` | Rotates `#compass-outer` / `#compass-arrows`, turn guidance |
+| `MAGNETIC_DECLINATION` | +4.5° Israel; magnetic→true. Android only — see AGENT.md |
+| `HEADING_MIN_PROJ` | Below this horizontal projection the azimuth is rejected |
+
+> Compass invariants live in **AGENT.md → Key Architecture → Compass/Qibla**.
+> The two that break silently: `calcBearing` takes radians, and `rotate()` is clockwise
+> so `normDiff > 0` means turn RIGHT.
 
 ### js/settings.js
 | Function/Const | Description |
