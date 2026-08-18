@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.111 (Jun 24, 2026)
+**Last updated:** v5.112 (Aug 3, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -158,6 +158,26 @@ that goes quiet for `HSRC_STALE_MS` = 3 s yields to a lower-ranked one):
 
 ## Known Issues / Open Items
 
+### 🟡 Rashi – exact-verse-coverage check not relaxed for chapter-end verses (v5.112)
+`loadRashiForRef`'s Strategy 1/2 require the fetched response to cover exactly
+up to the aliya's `endV`. If a chapter's true LAST verse legitimately has no
+Rashi of its own (common — Rashi sometimes covers a closing verse inside the
+previous verse's comment) AND the aliya's `endV` happens to BE that chapter's
+actual last verse, this still needlessly discards good data and cascades into
+slower strategies. A same-session fix for this was reverted after code review
+found it couldn't distinguish "aliya ends at the true chapter boundary" from
+"aliya ends mid-chapter" for single-chapter aliyot — `_torahChLengths` (which
+could tell them apart) is only populated when Sefaria returns a multi-chapter
+array-of-arrays response, never for a single-chapter aliya. A correct fix needs
+either: (a) the real per-chapter verse count from a source available even for
+single-chapter aliyot (e.g. compare against the NEXT aliya's start verse in
+`PARASHA_ALIYOT`, threaded into `loadRashiForRef`), or (b) live verification
+against Sefaria of whether its Rashi response is actually right-trimmed when a
+trailing verse has no comment (unverified — Sefaria API calls are blocked in
+this sandbox; see CLAUDE.md §1). The retry-skip fix from the same version
+(`s1WorthRetrying`/`s2WorthRetrying`) already cuts the cost of hitting this
+case substantially even though it isn't eliminated.
+
 ### 🟡 Compass – iOS declination reference unverified (v5.110)
 `MAGNETIC_DECLINATION` (+4.5°E) is added to Android sources but NOT to iOS
 `webkitCompassHeading`, on the basis that WebKit surfaces `CLHeading.trueHeading`
@@ -205,6 +225,51 @@ could be more precise for edge cases.
 - ✅ תפילת הדרך added to Brachot tab (with תהילים קכא)
 - ✅ Siddur: 3rd floating button 📋 shows prayer status popup
 - ✅ Tehilim search: gematria support (פרק קל, כג, 130 etc.)
+
+### v5.112 (Aug 3, 2026) – Parasha name matching, Rashi retry waste, Tehilim daily chip list
+- ✅ **Fixed:** current parasha not found for multi-word single parshiot (כי תצא, לך
+  לך, חיי שרה, אחרי מות, כי תשא, כי תבוא, וזאת הברכה). Root cause: Hebcal writes
+  these with a HYPHEN ("כי-תצא"), identical in form to genuinely combined parshiot
+  ("תזריע-מצורע"). `loadParasha()`'s matcher only tried the raw hyphenated string
+  (fails — `ALL_PARASHIOT` uses spaces) then fell into the combined-parasha
+  hyphen-SPLIT fallback, which cut "כי-תצא" into "כי" + "תצא" and fuzzy-matched
+  each half separately — able to land on the wrong parasha (all of כי תשא/כי
+  תצא/כי תבוא start with "כי") or nothing at all. Fixed by trying a
+  space-normalized `cleanSpaced` form against `ALL_PARASHIOT` BEFORE the
+  combined-split logic runs; verified against all 7 multi-word entries plus 3
+  genuinely-combined parshiot with a standalone script (not just read by eye).
+- ✅ **Fixed:** Strategy 3 in `loadRashiForRef` (the `commentary=1` fallback) used
+  to set `success = true` unconditionally after running once, even when it found
+  ZERO Rashi entries — a single bad/empty response was accepted as final with no
+  retry. This is the likely cause of "Rashi completely missing despite existing"
+  reported in Ki Teitzei. Now only accepts a zero-entry result once out of
+  attempts (`chEntries > 0 || attempt === 2`); otherwise the outer attempt loop
+  gets a real chance to retry.
+- ✅ **Fixed:** the significant slowness loading Rashi on aliyot 3-4 (reported
+  across multiple parshiot). Root cause: when Strategy 1 or 2 completed its fetch
+  (HTTP ok) but judged the DATA structurally insufficient, the outer retry loop
+  re-ran ALL strategies from scratch on the next attempt — repeating an identical,
+  deterministic (non-transient) failure up to 3 times. Worst case: 3 attempts ×
+  (S1 20s + S2 20s + S3 35s) ≈ 225s for one chapter before giving up. Added
+  `s1WorthRetrying`/`s2WorthRetrying` flags, reset per chapter: a strategy that
+  fails with an HTTP-ok-but-insufficient response is skipped on later attempts;
+  only a genuine exception (network error/timeout) leaves it eligible for retry.
+- 🟡 **Tried and reverted — see Known Issues below:** a same-session attempt to
+  also relax the exact-verse-coverage check by 1 verse (to tolerate a chapter's
+  last verse lacking its own Rashi, theorized for Ki Teitzei aliya 3 = Deut
+  22:8-22:29, since ch. 22 has exactly 29 verses) was caught by code review and
+  reverted before merge: the check only keys on `ch === endCh` (last chapter of
+  the REQUESTED range), which is true for every single-chapter aliya, not just
+  ones ending at a true chapter boundary. Most aliyot end MID-chapter (e.g.
+  Ki Teitzei aliya 1 = Deut 21:10-21:21, but ch. 21 actually has 23 verses) —
+  relaxing the check there would have silently accepted a response missing the
+  aliya's own actual last verse. `_torahChLengths` (which could tell the two
+  cases apart) is only populated for multi-chapter aliyot, so it can't gate this
+  for the single-chapter case that needed it most. Left unfixed; see Known Issues.
+- ✅ Added `_tehilimDayChapterRow()` / `_tehilimChipLabel()` in js/tehilim.js: a
+  horizontally-scrollable chip row listing every chapter/range learned on the
+  current Hebrew day (from `TEHILIM_SCHEDULE[nav.day]`), current chapter
+  highlighted gold, near both the top and bottom prev/next buttons.
 
 ### v5.111 (Aug 3, 2026) – Motzei Shabbat prayer text correction
 - ✅ Corrected the wording of `TEFILOT.motzash` (תפילה למוצאי שבת, ר' לוי יצחק

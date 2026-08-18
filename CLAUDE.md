@@ -147,8 +147,21 @@ Then confirm: `grep -c "5\.110" index.html js/utils.js sw.js` → 20, 1, 1.
   in and the parasha is a week off after a festival.
 - **Hebcal Hebrew spellings differ** from `ALL_PARASHIOT` (בהעלתך vs בהעלותך) — match
   through the `_stripVL` fallback chain.
+- **Hebcal writes multi-word single parasha names with a HYPHEN, not a space**
+  (`כי-תצא`, `לך-לך`) — visually identical to a genuinely combined pair
+  (`תזריע-מצורע`). Try a space-normalized match BEFORE any hyphen-split combined-
+  parasha logic, or a single 2-word name gets cut in half and mismatched.
+- **`ch === endCh` is NOT the same as "this aliya ends at its chapter's true last
+  verse."** Most aliyot end mid-chapter. `_torahChLengths` (the one reliable
+  source that could tell the two cases apart) is only populated for multi-chapter
+  aliyot — never for a single-chapter one, which is exactly when this distinction
+  matters most for Rashi's coverage checks in `loadRashiForRef`.
 - **Async loaders race.** `loadRashiForRef` / `loadOnkelosForRef` must re-check
   `_currentAliyaRef` **before** writing shared state, not after.
+- **A "strategy succeeded" flag must depend on actually finding data**, not just on
+  the fetch completing without an HTTP error. `loadRashiForRef`'s Strategy 3 once
+  set `success = true` after every run regardless of whether it found any Rashi —
+  a single empty response was silently accepted as final with no retry.
 - **The inline `<head>` script is the only version guard.** A second one anywhere causes
   an infinite reload loop.
 

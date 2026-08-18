@@ -529,12 +529,20 @@ async function loadParasha() {
     // Match to our ALL_PARASHIOT list
     // Handle combined parshiot like "תזריע-מצורע" / "תזריע-מצרע" (Hebcal spelling varies)
     const clean = heName.replace(/־/g, '-').replace(/פרשת\s*/,'').trim();
+    // Hebcal writes multi-word single-parasha names with a hyphen instead of a space
+    // (e.g. "כי-תצא", "לך-לך", "אחרי-מות"), while ALL_PARASHIOT stores them with a
+    // space ("כי תצא"). Try the space-normalized form BEFORE the combined-parshiot
+    // hyphen-split logic below, or every multi-word parasha gets mis-split into two
+    // bogus halves (e.g. "כי"+"תצא") and matched to the wrong entry or none at all.
+    const cleanSpaced = clean.replace(/-/g, ' ');
     // Strip medial vav/yod for vowel-letter-insensitive match (e.g. "בהעלתך" ↔ "בהעלותך")
     const _stripVL = s => s ? s.replace(/(?<=[א-ת])[וי](?=[א-ת])/g, '') : '';
     let matchP = ALL_PARASHIOT.find(p => clean === p.he)
+      || ALL_PARASHIOT.find(p => cleanSpaced === p.he)
       || ALL_PARASHIOT.find(p => heName === p.he || heName === 'פרשת ' + p.he)
       || ALL_PARASHIOT.find(p => clean.length >= 3 && p.he.startsWith(clean) && p.he.length <= clean.length + 2)
-      || ALL_PARASHIOT.find(p => _stripVL(clean) === _stripVL(p.he));
+      || ALL_PARASHIOT.find(p => _stripVL(clean) === _stripVL(p.he))
+      || ALL_PARASHIOT.find(p => _stripVL(cleanSpaced) === _stripVL(p.he));
 
     // Combined parsha fallback: "תזריע-מצרע" → match each part with fuzzy matching
     // Normalize Hebrew maqaf (U+05BE ־) to regular hyphen before splitting
@@ -894,6 +902,15 @@ async function loadRashiForRef(torahRef) {
   for (let ch = startCh; ch <= endCh; ch++) {
     setRashiProgress(ch - startCh, `רש"י פרק ${ch}...`);
     let success = false;
+    // A strategy that completed its fetch (HTTP ok) but judged the DATA structurally
+    // insufficient will judge it the same way again on a retry — that's deterministic,
+    // not transient. Retrying it 3 times just re-fetches the same result 3 times,
+    // which is where most of the reported "significant slowness" on aliyot 3-4 came
+    // from: up to 3 attempts x (S1 20s + S2 20s + S3 35s) = ~225s worst case for a
+    // single chapter before giving up. Skip re-fetching a strategy on later attempts
+    // once it has deterministically failed once; only genuine exceptions (network
+    // errors/timeouts, caught below) leave it eligible for retry.
+    let s1WorthRetrying = true, s2WorthRetrying = true;
     for (let attempt = 0; attempt < 3 && !success; attempt++) {
       try {
         if (attempt > 0) await new Promise(r => setTimeout(r, 2000 * attempt));
@@ -903,7 +920,7 @@ async function loadRashiForRef(torahRef) {
         // Sefaria: "Rashi on Genesis 1" returns just Rashi, not all commentaries
         const rashiRef = `Rashi on ${book} ${ch}`;
         let rashiData = null;
-        try {
+        if (s1WorthRetrying) try {
           const ctrl = new AbortController();
           const timer = setTimeout(() => ctrl.abort(), 20000); // 20s timeout
           const rashiUrl = `https://www.sefaria.org/api/texts/${encodeURI(rashiRef)}?lang=he&commentary=0&context=0`;
@@ -915,6 +932,8 @@ async function loadRashiForRef(torahRef) {
           }
         } catch(e2) {
           console.warn('[Rashi] direct endpoint failed for ch', ch, ':', e2.message);
+          // Genuine exception (network/timeout) — leave s1WorthRetrying true so the
+          // next attempt still gets a fair shot at this strategy.
         }
 
         if (rashiData && rashiData.he) {
@@ -948,7 +967,9 @@ async function loadRashiForRef(torahRef) {
           // If structure is not per-verse (too short or single string), fall to strategy 2
           if (!isPerVerse) {
             console.warn('[Rashi] ch', ch, 'chapLen too low (', chapLen, '), trying commentary=1 fallback');
-            // Don't set success - fall through to strategy 2
+            // HTTP succeeded and returned a definite (wrong) shape — retrying the same
+            // request will return the same shape again, so don't waste another attempt on S1.
+            s1WorthRetrying = false;
           } else {
             let chEntries = 0;
             for (let v = 0; v < chapLen; v++) {
@@ -978,6 +999,7 @@ async function loadRashiForRef(torahRef) {
               // Sefaria returned section-level data (e.g. 3 parasha sections instead of 27 verses)
               [...verseMap.keys()].filter(k => k.startsWith(ch+':')).forEach(k => verseMap.delete(k));
               console.warn('[Rashi] S1 section-level? chapLen', chapLen, '<', minRequiredChapLen, '| entries:', chEntries, '— discarded, trying S2');
+              s1WorthRetrying = false;
             }
           }
         }
@@ -987,7 +1009,7 @@ async function loadRashiForRef(torahRef) {
         const chEnd = ch === endCh ? endV : 60;
         const chStart = ch === startCh ? startV : 1;
         const rangeRef = `Rashi on ${book} ${ch}:${chStart}-${ch}:${chEnd}`;
-        try {
+        if (s2WorthRetrying) try {
           const ctrl2 = new AbortController();
           const timer2 = setTimeout(() => ctrl2.abort(), 20000);
           const url2 = `https://www.sefaria.org/api/texts/${encodeURI(rangeRef)}?lang=he&commentary=0&context=0`;
@@ -1033,11 +1055,16 @@ async function loadRashiForRef(torahRef) {
               } else {
                 [...verseMap.keys()].filter(k => k.startsWith(ch+':')).forEach(k => verseMap.delete(k));
                 console.warn('[Rashi] S2 insufficient: covered to', coveredThrough, '/', s2minRequired, '| entries:', chEntries, '— discarded, trying S3');
+                s2WorthRetrying = false;
               }
+            } else {
+              // HTTP ok but no usable array — same request will return the same thing.
+              s2WorthRetrying = false;
             }
           }
         } catch(e2) {
           console.warn('[Rashi] range ref failed for ch', ch, ':', e2.message);
+          // Genuine exception — leave s2WorthRetrying true for a fair retry.
         }
         if (success) continue;
 
@@ -1074,7 +1101,17 @@ async function loadRashiForRef(torahRef) {
           });
         const chEntries = [...verseMap.keys()].filter(k => k.startsWith(ch+':')).length;
         console.log('[Rashi] ch', ch, 'len:', chapLen, '| entries this ch:', chEntries, '| total:', verseMap.size);
-        success = true;
+        // BUG FIX: this used to unconditionally set success = true here, even when
+        // chEntries was 0. That meant a single bad/empty response (a transient hiccup,
+        // or the collectiveTitle/ref filter above not matching) was accepted as final
+        // and the outer attempt loop never got a chance to retry — the exact "Rashi
+        // completely missing despite existing" failure that was reported. Only accept
+        // a zero-entry result once we're out of attempts; otherwise let it retry.
+        if (chEntries > 0 || attempt === 2) {
+          success = true;
+        } else {
+          console.warn('[Rashi] ch', ch, 'S3 found 0 entries on attempt', attempt + 1, '— retrying');
+        }
       } catch(e) {
         console.warn('[Rashi] ch', ch, 'attempt', attempt+1, e.message);
       }

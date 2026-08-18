@@ -143,8 +143,9 @@ Add `<button id="tf-{key}" class="aliya-tab" onclick="showTefila('{key}')">` in 
 ### js/content.js
 | Function | Description |
 |---|---|
-| `loadParasha()` | Fetch parasha from Hebcal + Sefaria aliyot |
+| `loadParasha()` | Fetch parasha from Hebcal + Sefaria aliyot. Matches Hebcal's Hebrew name against `ALL_PARASHIOT` — tries `cleanSpaced` (hyphen→space) BEFORE the combined-parshiot hyphen-split fallback, since Hebcal writes multi-word single names like "כי-תצא" with a hyphen too |
 | `loadAliyaText(ref)` | Load aliya text from Sefaria, scroll to top |
+| `loadRashiForRef(ref)` | 3-strategy Rashi loader. Per-chapter `s1WorthRetrying`/`s2WorthRetrying` flags skip re-fetching a strategy on retry once it deterministically fails (HTTP ok, insufficient data) — only genuine exceptions stay retryable. Strategy 3 only accepts a zero-entry result on the final attempt |
 | `loadDafYomi()` | Fetch daily Daf from Sefaria calendar |
 | `switchDafView(mode)` | Toggle Rashi inline view |
 | `loadMishnaYomi()` | Fetch Mishna Yomit |
@@ -167,6 +168,8 @@ Add `<button id="tf-{key}" class="aliya-tab" onclick="showTefila('{key}')">` in 
 | `initTehilim()` | Bootstrap tehilim tab |
 | `loadTehilim(chapter)` | Fetch + render Psalm, scroll to top |
 | `TEHILIM_SCHEDULE` | Map: Hebrew day-of-month → chapter list |
+| `getTehilimNavInfo(chapterOrRange)` | Prev/next chapter + day-boundary nav info |
+| `_tehilimDayChapterRow(nav, currentKeyStr)` | Chip row of the day's chapters, current one highlighted; rendered near both top and bottom nav buttons |
 | `parseTehilimSearch(q)` | Parse number or Hebrew gematria |
 | `hebrewToNumber(str)` | Convert Hebrew letters to numeric value |
 

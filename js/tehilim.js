@@ -237,6 +237,34 @@ function getTehilimNavInfo(chapterOrRange) {
   return { prevLabel, prevAction, nextLabel, nextAction, day, isLastInDay, isFirstInDay };
 }
 
+// Short label for the daily chapter-list chips (compact form of _tehilimLabel)
+function _tehilimChipLabel(ch) {
+  if (typeof ch === 'string' && ch.includes(':')) {
+    const [, vRange] = ch.split(':');
+    return `קי"ט ${vRange.replace('-','–')}`;
+  }
+  return String(ch);
+}
+
+// Row of chips for every chapter learned on the current Hebrew day, with the
+// active chapter highlighted. Shared by both the top and bottom nav rows.
+function _tehilimDayChapterRow(nav, currentKeyStr) {
+  if (!nav) return '';
+  const dayChapters = TEHILIM_SCHEDULE[nav.day] || [];
+  if (dayChapters.length <= 1) return '';
+  const chips = dayChapters.map(ch => {
+    const isCurrent = String(ch) === currentKeyStr;
+    const style = isCurrent
+      ? `background:var(--gold);color:#000;border:1px solid var(--gold);font-weight:700`
+      : `background:var(--surface);color:var(--gold);border:1px solid var(--border)`;
+    return `<button onclick="scrollTehilimTop();${_tehilimAction(ch)}" ` +
+      `style="${style};padding:4px 11px;border-radius:14px;font-size:11.5px;cursor:pointer;` +
+      `font-family:'Heebo',sans-serif;white-space:nowrap;flex:none">${_tehilimChipLabel(ch)}</button>`;
+  }).join('');
+  return `<div style="display:flex;gap:6px;overflow-x:auto;padding:2px 2px 10px;` +
+    `-webkit-overflow-scrolling:touch;scrollbar-width:none">${chips}</div>`;
+}
+
 let currentTehilimChapter = 1;
 
 function scrollTehilimTop() {
@@ -295,16 +323,20 @@ async function loadTehilim(chapterOrRange) {
     const wrapAction = action => `scrollTehilimTop();${action}`;
     const prevBtn = nav ? `<button onclick="${wrapAction(nav.prevAction)}" style="${nav.isFirstInDay ? dayBtnStyle : btnStyle}">${nav.prevLabel}</button>` : '<span></span>';
     const nextBtn = nav ? `<button onclick="${wrapAction(nav.nextAction)}" style="${nav.isLastInDay  ? dayBtnStyle : btnStyle}">${nav.nextLabel}</button>` : '<span></span>';
-    const navRow  = `<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:14px">${prevBtn}${nextBtn}</div>`;
+    const navRow  = `<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:8px">${prevBtn}${nextBtn}</div>`;
 
-    const dayInfo = nav ? `<div style="text-align:center;font-size:11px;color:var(--muted);margin-bottom:10px">יום ${nav.day} בחודש${isRange ? ` | ${rangeLabel}` : ''}</div>` : '';
+    const dayInfo = nav ? `<div style="text-align:center;font-size:11px;color:var(--muted);margin-bottom:6px">יום ${nav.day} בחודש${isRange ? ` | ${rangeLabel}` : ''}</div>` : '';
+    // Chapter chips for today's learning, current chapter highlighted — shown near
+    // both the top and bottom prev/next buttons.
+    const dayChapterRow = _tehilimDayChapterRow(nav, String(isRange ? chapterOrRange : chapter));
 
     // Show verse numbers relative to the full chapter (offset by verseFrom)
     const offset = isRange ? (verseFrom - 1) : 0;
     el.className = 'content-text';
-    el.innerHTML = navRow + dayInfo +
+    el.innerHTML = navRow + dayInfo + dayChapterRow +
       flat.map((v,i) => `<div style="margin-bottom:6px"><span style="color:var(--gold-dim);font-size:11px">${i+1+offset} </span>${v}</div>`).join('') +
-      `<div style="display:flex;justify-content:space-between;gap:8px;margin-top:16px">${prevBtn}${nextBtn}</div>`;
+      `<div style="display:flex;justify-content:space-between;gap:8px;margin-top:16px">${prevBtn}${nextBtn}</div>` +
+      dayChapterRow;
 
     sub.textContent = `${flat.length} פסוקים${isRange ? ` (${rangeLabel})` : ''}`;
     updateDoneButton('tehilim', chapter);
