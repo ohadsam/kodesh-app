@@ -89,6 +89,7 @@ js/init.js          → init() – called on DOMContentLoaded
 | `buildParagraphs(flat)` | Break verse array into display paragraphs |
 | `sefariaText(ref, max)` | Fetch + cache Sefaria text by ref |
 | `formatHebrewDate(d)` | Hebrew date string from JS Date |
+| `escapeHtml(s)` | Escape `&<>"'` — use for any USER-typed text (favorite names etc.) going into an `innerHTML` template. Sefaria/Hebcal text is trusted and rendered as-is elsewhere; text typed on the device is not |
 
 ### js/app.js
 | Function | Description |
@@ -172,10 +173,18 @@ Add `<button id="tf-{key}" class="aliya-tab" onclick="showTefila('{key}')">` in 
 | `initTehilim()` | Bootstrap tehilim tab |
 | `loadTehilim(chapter)` | Fetch + render Psalm, scroll to top |
 | `TEHILIM_SCHEDULE` | Map: Hebrew day-of-month → chapter list |
-| `getTehilimNavInfo(chapterOrRange)` | Prev/next chapter + day-boundary nav info |
-| `_tehilimDayChapterRow(nav, currentKeyStr)` | Chip row of the day's chapters, current one highlighted; rendered near both top and bottom nav buttons |
+| `getTehilimNavInfo(chapterOrRange)` | Prev/next chapter + day-boundary nav info. Branches on `tehilimContext` — day-mode (default, unchanged) or favorite-mode |
+| `_tehilimDayChapterRow(nav, currentKeyStr)` | Chip row of the active context's chapters (day or favorite), current one highlighted; rendered near both top and bottom nav buttons |
 | `parseTehilimSearch(q)` | Parse number or Hebrew gematria |
 | `hebrewToNumber(str)` | Convert Hebrew letters to numeric value |
+| **Favorites** | Individual chapters or custom ranges, saved to `appState.tehilimFavorites` |
+| `tehilimContext` | `{type:'day'}` (default) or `{type:'favorite', id}` — which chapter list drives nav/chips |
+| `addTehilimFavorite(name, from, to)` / `updateTehilimFavorite(id, name, from, to)` / `deleteTehilimFavorite(id)` | CRUD; range is expanded to a plain chapter-number array at save time (mirrors `TEHILIM_SCHEDULE`'s shape so nav code doesn't need to special-case it) |
+| `toggleTehilimFavoriteChapter(ch)` / `isChapterFavorited(ch)` | The ⭐ star button next to the chapter title — single-chapter favorites only |
+| `viewTehilimFavorite(favId, idx)` | Enters favorite-mode and loads `chapters[idx]` |
+| `openTehilimFavForm(editId?)` / `closeTehilimFavForm()` / `saveTehilimFavForm()` | Add/edit form in the Favorites card |
+| `renderTehilimFavoritesList()` | Populates `#tehilim-fav-list`; active favorite highlighted via `tehilimContext` |
+| `confirmDeleteTehilimFavorite(id)` | Looks the name up itself rather than taking it as a param — see the XSS note in js/utils.js `escapeHtml` |
 
 ### js/omer.js
 | Function | Description |
@@ -213,6 +222,8 @@ Add `<button id="tf-{key}" class="aliya-tab" onclick="showTefila('{key}')">` in 
 | `ALL_TABS` | Array of all tab names in order |
 | `initSettings()` | Load settings panel, tab visibility toggles |
 | `nuclearReset()` | Clear all state + caches + reload |
+| `setTheme(mode)` | `'dark'`\|`'light'` — sets/removes `data-theme` on `<html>`, persists to `localStorage.theme`, updates the `theme-color` meta tag, highlights the settings button. The actual FIRST-PAINT theme application is a separate, earlier inline `<script>` in index.html's `<head>` (before `styles.css` loads) reading the same key — see the comment above `setTheme` for why |
+| `initThemeUI()` | Called from `loadSettingsState()` — syncs the settings buttons to whatever the HEAD script already applied; does not re-apply the theme itself |
 
 ---
 

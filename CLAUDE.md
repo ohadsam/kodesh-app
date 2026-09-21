@@ -85,7 +85,7 @@ After every user-visible change:
 - Network-dependent tests (Sefaria API, Hebcal API) may fail in offline environments — this is expected. Focus on the local logic tests.
 - The following suites must always pass: `test_siddur_seasonal`, `test_omer`, `test_html_structure` (for the non-network checks).
 - **Before a merge to main, run `python3 release-checklist.py`** — it runs the full
-  test suite plus every other check in this file (version consistency across all 7
+  test suite plus every other check in this file (version consistency across all 8
   places it appears, AGENT.md currency, what's-new content, JS syntax) as one gate,
   auto-classifying network failures as non-blocking warnings. `--verbose` shows
   passing checks too. Exit code 1 means something in THIS file's rules was violated.
@@ -170,6 +170,28 @@ Then confirm: `grep -c "5\.110" index.html js/utils.js sw.js` → 20, 1, 1.
   a single empty response was silently accepted as final with no retry.
 - **The inline `<head>` script is the only version guard.** A second one anywhere causes
   an infinite reload loop.
+- **Theme (dark/light) must be applied in the HEAD, before the stylesheet `<link>`,
+  not from a script/module loaded later.** Applying it any later paints one frame
+  of the wrong theme first — a visible flash on every reload.
+- **A conditional nav value (`prevAction`/`nextAction` can be `null`) must be
+  checked before being interpolated into a rendered `onclick="..."` string**, or
+  you get a literal broken `<button onclick="...;null">null</button>`. Bit both
+  the Tehilim daily nav (fixed in v5.112) and the favorites feature (same bug,
+  different context — a favorite's first/last chapter has no prev/next by design).
+- **Free-text the user typed (not Sefaria/Hebcal text) must go through
+  `escapeHtml()` before landing in an `innerHTML` template.** Passing it through an
+  `onclick="fn('...')"` attribute instead of a data-`id` lookup is a second,
+  harder-to-escape injection context (attribute breakout) — avoid it rather than
+  trying to escape for it.
+- **A stale test is not proof of a real bug, and a passing test is not proof of a
+  real fix.** Three tests in this repo (`test_html_structure`'s DOM-id list and
+  div-balance check, `test_zmanim`'s Kotel-coords check, `test_business_logic`'s
+  `is_winter('Nisan',15)`) were all asserting something that stopped being true
+  long before any AI agent touched this repo, and nobody had noticed because
+  CLAUDE.md's "network tests may fail offline" carve-out was being applied too
+  broadly to non-network failures too. Read what a failing test actually checks
+  before either "fixing the code to satisfy it" or writing it off as a network
+  artifact.
 
 ## Quick Reference
 

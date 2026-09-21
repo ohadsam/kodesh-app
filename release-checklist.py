@@ -81,6 +81,7 @@ def check_versions(r: Report):
     v_footer = re.findall(r'גרסה\s+([\d.]+)\s*·', html)
     v_whatsnew = re.findall(r'מה חדש בגרסה\s+([\d.]+)', html)
     v_script_tags = re.findall(r'<script src="js/[^"]+\?v=([\d.]+)"', html)
+    v_styles = re.findall(r'<link rel="stylesheet" href="styles\.css\?v=([\d.]+)"', html)
     v_utils = re.findall(r"APP_VERSION\s*=\s*'([\d.]+)'", utils_js)
     v_sw = re.findall(r"APP_VERSION\s*=\s*'([\d.]+)'", sw_js)
     v_agent = re.findall(r'\*\*Last updated:\*\*\s*v([\d.]+)', agent_md)
@@ -91,6 +92,7 @@ def check_versions(r: Report):
         'index.html footer גרסה': v_footer,
         "index.html what's-new modal title": v_whatsnew,
         'index.html script ?v= tags': v_script_tags,
+        'index.html styles.css ?v= tag': v_styles,
         'js/utils.js APP_VERSION': v_utils,
         'sw.js APP_VERSION': v_sw,
     }

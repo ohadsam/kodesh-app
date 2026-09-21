@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.112 (Aug 3, 2026)
+**Last updated:** v5.113 (Aug 3, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -148,11 +148,63 @@ that goes quiet for `HSRC_STALE_MS` = 3 s yields to a lower-ranked one):
 - `initTabScrollSync()` restored with proportional scroll sync
 - Uses `_syncLock` flag + `requestAnimationFrame` to prevent bounce loops
 
+### Theme (dark / light) — styles.css, js/settings.js
+- All colors are CSS custom properties on `:root` (styles.css) — `--bg`, `--surface`,
+  `--card`, `--border`, `--gold`, `--gold-dim`, `--cream`, `--text`, `--muted`,
+  `--accent`, `--red`, `--green`, `--addition*`. Light mode is a second value set
+  under `:root[data-theme="light"]`, same warm gold/cream Judaica palette inverted,
+  not a generic gray theme. Every light-mode text color was checked for WCAG AA
+  contrast (≥4.5:1) against BOTH `--bg` and `--surface` with a standalone script
+  before being chosen — see git history for the exact ratios if retuning it.
+- **Applied in two places, deliberately:** an inline `<script>` at the very top of
+  `<head>` in index.html (before `<link rel="stylesheet" href="styles.css">`) sets
+  `data-theme="light"` on `<html>` synchronously from `localStorage.theme`, so the
+  correct theme paints on the FIRST frame with no flash. `setTheme()` in
+  `js/settings.js` is what actually changes it at runtime (toggle in settings),
+  and re-persists to the same `localStorage` key. If you only wire up the settings
+  button without touching the HEAD script, reloading will flash dark-then-light
+  (or vice versa) for one frame every time.
+- `styles.css` itself is only inline-`<link>`'d from index.html — there is no
+  `js/styles.css`. Its `?v=` cache-buster (currently tracked separately in
+  index.html) must be bumped on ANY styles.css change or the CDN/browser cache
+  can serve the old stylesheet. `release-checklist.py` now checks this too.
+- Almost the entire app (styles.css + all inline `style="..."` in index.html) uses
+  `var(--x)`, so it reacts to the theme automatically. A handful of hardcoded hex
+  colors were audited and left as-is deliberately: the compass SVG's decorative
+  gradients/text (self-contained jewel/arrow graphics, theme-independent by
+  design) and semantic status colors (success green, error/warning red) that are
+  mid-saturation enough to read on both a very light and a very dark background.
+  The PWA `<meta name="theme-color">` tag IS theme-reactive — both the HEAD script
+  and `setTheme()` update its `content` to match.
+
 ### Parasha / Haftara
 - **PARASHA_ALIYOT** – static table of all 54 parshiot
 - **HAFTARA_REFS** – static table of 54 haftara refs (Ashkenaz Israel)
 - Hebcal `leyning` primary; HAFTARA_REFS as fallback
 - `_kickoffHaftara`: multi-chapter fallback
+
+### Tehilim Favorites — js/tehilim.js
+- Individual chapters or custom ranges, stored in `appState.tehilimFavorites`
+  (persisted the same way as every other preference — `saveState()`). A range is
+  expanded to a plain array of chapter numbers at save time, deliberately mirroring
+  `TEHILIM_SCHEDULE[day]`'s own shape, so `getTehilimNavInfo` / `_tehilimDayChapterRow`
+  (prev/next + the chip row) can drive BOTH the daily schedule and a favorite
+  without duplicating that logic — see `tehilimContext` (`{type:'day'}` vs
+  `{type:'favorite', id}`).
+- Day-mode navigation is 100% unchanged by this feature — verified with a
+  standalone Node harness that loads the real tehilim.js and asserts the
+  wraparound-to-adjacent-day behavior is byte-identical to before.
+- A favorite's first/last chapter has no prev/next (no day-style month-wraparound
+  for a user-defined list — doesn't make sense the same way). `loadTehilim`'s
+  button rendering was fixed to render nothing rather than a literal broken
+  `null` button/onclick in that case — that fix was needed and is not optional
+  boilerplate; removing it re-breaks favorites at their boundary chapters.
+- `escapeHtml()` (js/utils.js) is applied to every favorite name interpolated into
+  `innerHTML`. The delete confirmation deliberately takes only an `id` and looks
+  the name up itself, rather than threading free-text through an `onclick="..."`
+  attribute — that's a second, harder-to-escape injection context (attribute
+  breakout) on top of plain `innerHTML` text, not worth it for a confirm-dialog
+  label. Do not "simplify" this back to passing the name as a parameter.
 
 ### Omer (omer.js)
 - `getOmerDay()`: computed from Hebrew date
@@ -247,39 +299,75 @@ could be more precise for edge cases.
 - ✅ Siddur: 3rd floating button 📋 shows prayer status popup
 - ✅ Tehilim search: gematria support (פרק קל, כג, 130 etc.)
 
-### Tooling (Sep 21, 2026, still v5.112) – release-checklist.py + test suite corrections
-Dev-tooling / test-only changes — no user-facing behavior changed, so no `APP_VERSION`
-bump. Folded into the next real release's entry once one ships.
+### v5.113 (Sep 21, 2026) – release-checklist.py, Tehilim favorites, light/dark theme
 - ✅ Added `release-checklist.py`: a single command that gates a merge to main —
-  version consistency across all 7 places it must match, AGENT.md currency, what's-new
-  content, the full test suite (network failures auto-downgraded to warnings,
-  `test_siddur_seasonal`/`test_omer`/`test_html_structure` required to be 100% clean
-  per CLAUDE.md §10), and `node --check` on every `js/*.js` file. Exit code 1 = not
-  ready. `--verbose` shows passing checks too.
+  version consistency across all 8 places it must match (now including
+  `styles.css`'s own `?v=`, previously frozen at `5.2` and never bumped — see
+  below), AGENT.md currency, what's-new content, the full test suite (network
+  failures auto-downgraded to warnings, `test_siddur_seasonal`/`test_omer`/
+  `test_html_structure` required 100% clean per CLAUDE.md §10), and `node --check`
+  on every `js/*.js` file. Exit code 1 = not ready. `--verbose` shows passing
+  checks too.
 - ✅ **Fixed 3 stale tests found while building the checklist** (all were failing
-  before any of today's app changes — verified with `git stash`):
+  before any change in this or the prior session — verified with `git stash`):
   - `test_html_structure.py`: required DOM ids were from a pre-refactor HTML layout
     (`main-content`, `tab-calendar` etc.) that no longer exists — the app now uses
     per-tab `#page-X` containers. Updated to the current ids.
   - `test_html_structure.py`: the whats-new-modal div-balance check anchored its
     start position on `id="whats-new-modal"` (inside the tag) but its end position
-    included the tag's own closing `</div>` — an unconditional off-by-one that failed
-    for every version's modal content, not a real markup bug. Anchored on the full
-    `<div id="whats-new-modal"` instead.
-  - `test_zmanim.py`: "calendar.js references Kotel coords" checked the wrong file —
-    Kotel/Qibla coordinates are a compass concern (fixed Jerusalem target, `js/misc.js`
-    since v5.110's compass rewrite) not a zmanim concern (user's own location,
-    `js/calendar.js`). Moved the check to `js/misc.js`.
-  - `test_business_logic.py`: asserted `is_winter('Nisan', 15) == True`, contradicting
-    both the test's own `is_winter()` implementation (`Nisan >= 15 → False`) and the
-    real app's `_isWinterSeason()` in `js/siddur-inserts.js:127` — both correctly treat
-    Nisan 15 (Mussaf of the first day of Pesach) as the start of summer. The assertion
-    was simply backwards; fixed and added the missing "Summer: Nisan 15" boundary case.
-- 🟡 **Found, not fixed (out of scope, flagged in Known Issues):** every root-level
-  `.js`/`.css` file (e.g. root `tefilot.js`) is dead code from a pre-`js/`-folder
-  layout — confirmed unreferenced by `index.html` and untouched since a much older
-  commit. STRUCTURE.md previously (incorrectly) documented root `tefilot.js` as
-  needing to stay in sync with `js/tefilot.js`; that note is now corrected.
+    included the tag's own closing `</div>` — an unconditional off-by-one that
+    failed for every version's modal content, not a real markup bug. Anchored on
+    the full `<div id="whats-new-modal"` instead.
+  - `test_zmanim.py`: "calendar.js references Kotel coords" checked the wrong
+    file — Kotel/Qibla coordinates are a compass concern (fixed Jerusalem target,
+    `js/misc.js` since v5.110's compass rewrite) not a zmanim concern (user's own
+    location, `js/calendar.js`). Moved the check to `js/misc.js`.
+  - `test_business_logic.py`: asserted `is_winter('Nisan', 15) == True`,
+    contradicting both the test's own `is_winter()` implementation
+    (`Nisan >= 15 → False`) and the real app's `_isWinterSeason()` in
+    `js/siddur-inserts.js:127` — both correctly treat Nisan 15 (Mussaf of the
+    first day of Pesach) as the start of summer. The assertion was simply
+    backwards; fixed and added the missing "Summer: Nisan 15" boundary case.
+- 🟡 Found, not fixed (out of scope, flagged in Known Issues below): every
+  root-level `.js`/`.css` file (e.g. root `tefilot.js`) is dead code from a
+  pre-`js/`-folder layout — confirmed unreferenced by `index.html`. A stale
+  STRUCTURE.md note that told future sessions to keep root `tefilot.js` in sync
+  is corrected.
+- ✅ **Tehilim favorites** (js/tehilim.js): save individual chapters (⭐ toggle
+  next to the chapter title) or custom ranges (named, via the new "+ הוסף" form
+  in a dedicated Favorites card). Viewing a favorite drives the SAME prev/next
+  nav + chip-row UI the daily schedule already used — see `tehilimContext` in
+  AGENT.md → Key Architecture → Tehilim Favorites. Edit/rename/delete supported;
+  editing a range that no longer contains the chapter you're viewing, or
+  deleting the favorite you're viewing, correctly drops back to day-mode instead
+  of leaving stale navigation state (verified with a Node harness that loads the
+  real tehilim.js, not just read by eye).
+  - Found + fixed during this work: `loadTehilim`'s prev/next button rendering
+    unconditionally interpolated `nav.prevAction`/`nextAction` into an
+    `onclick="..."` string — harmless for day-mode (always had a wraparound
+    fallback, never null) but produced a literal broken `onclick="...;null"`
+    button at a favorite's first/last chapter, where there's deliberately no
+    wraparound. Now renders nothing there instead.
+  - Security: favorite names are free-text user input rendered via `innerHTML`.
+    Added `escapeHtml()` (js/utils.js, reusable) and applied it everywhere a name
+    is interpolated. The delete-confirmation button was changed to take only the
+    favorite's `id` and look the name up itself, rather than threading raw text
+    through a SECOND injection context (an `onclick="fn('...')"` attribute,
+    where a `"` in the name would break out of the attribute — escaping for
+    single quotes alone, which the first draft did, does not cover this).
+- ✅ **Light/dark theme** (styles.css, js/settings.js): a `מצב תצוגה` toggle in
+  Settings. All colors are CSS custom properties; light mode is a second value
+  set under `:root[data-theme="light"]`, same warm gold/cream palette inverted.
+  Every light-mode text color was verified for WCAG AA contrast (≥4.5:1) against
+  both `--bg` and `--surface` with a standalone script before being chosen, not
+  eyeballed. Applied in two places on purpose — an inline `<head>` script
+  (before `styles.css` loads, avoiding a flash of the wrong theme) sets the
+  attribute from `localStorage.theme` on first paint, and `setTheme()` handles
+  the runtime toggle + persists to the same key. See AGENT.md → Key Architecture
+  → Theme for why both are needed and what was deliberately left un-themed
+  (compass SVG decorative colors, semantic status colors — reasoned through, not
+  overlooked).
+
 
 ### v5.112 (Aug 3, 2026) – Parasha name matching, Rashi retry waste, Tehilim daily chip list
 - ✅ **Fixed:** current parasha not found for multi-word single parshiot (כי תצא, לך

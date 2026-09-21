@@ -88,6 +88,7 @@ function searchTehilimChapter() {
     return;
   }
   if (errEl) errEl.textContent = '';
+  _exitFavoriteContext();
   loadTehilim(chapter);
 }
 
@@ -119,6 +120,7 @@ function initTehilim() {
     }
   }
 
+  renderTehilimFavoritesList();
   loadTodayTehilim();
 }
 
@@ -144,6 +146,7 @@ function selectTehilimDay(day) {
   const chapters = getTehilimChapters(day);
   const infoEl = document.getElementById('tehilim-day-info');
   if (infoEl) infoEl.textContent = `יום ${day} בחודש | פרקים: ${chapters.map(c => typeof c === 'string' ? `קיט (${c.split(':')[1]})` : c).join(', ')}`;
+  _exitFavoriteContext();
   loadTehilim(chapters[0]);
 }
 
@@ -195,8 +198,240 @@ function _tehilimAction(ch) {
   return `loadTehilim(${ch})`;
 }
 
+// ═══════════════════════════════════════════
+// FAVORITES (single chapters or custom ranges)
+// ═══════════════════════════════════════════
+// Stored in appState.tehilimFavorites (persisted via saveState(), same as every
+// other user preference in this app — see js/settings.js setFont for the pattern).
+// Each favorite: { id, name, chapters: [23] | [1,2,3,...] } — `chapters` deliberately
+// mirrors TEHILIM_SCHEDULE's day-list shape (array of chapter numbers) so the exact
+// same nav/chip-row machinery below can drive both, instead of duplicating it.
+function getTehilimFavorites() {
+  return appState.tehilimFavorites || [];
+}
+function _favoriteById(id) {
+  return getTehilimFavorites().find(f => f.id === id) || null;
+}
+function _saveFavorites(list) {
+  appState.tehilimFavorites = list;
+  saveState();
+}
+
+function addTehilimFavorite(name, fromCh, toCh) {
+  fromCh = parseInt(fromCh); toCh = parseInt(toCh) || fromCh;
+  if (!fromCh || fromCh < 1 || fromCh > 150) return { ok: false, error: 'פרק התחלה לא תקין (1-150)' };
+  if (toCh < 1 || toCh > 150) return { ok: false, error: 'פרק סיום לא תקין (1-150)' };
+  if (toCh < fromCh) return { ok: false, error: 'פרק הסיום חייב להיות אחרי פרק ההתחלה' };
+  if (toCh - fromCh > 150) return { ok: false, error: 'טווח גדול מדי' };
+  name = (name || '').trim() || (fromCh === toCh ? `פרק ${fromCh}` : `פרקים ${fromCh}-${toCh}`);
+
+  const chapters = [];
+  for (let c = fromCh; c <= toCh; c++) chapters.push(c);
+
+  const fav = { id: 'fav_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), name, chapters };
+  const list = getTehilimFavorites();
+  list.push(fav);
+  _saveFavorites(list);
+  return { ok: true, favorite: fav };
+}
+
+function updateTehilimFavorite(id, name, fromCh, toCh) {
+  const list = getTehilimFavorites();
+  const fav = list.find(f => f.id === id);
+  if (!fav) return { ok: false, error: 'המועדף לא נמצא' };
+  fromCh = parseInt(fromCh); toCh = parseInt(toCh) || fromCh;
+  if (!fromCh || fromCh < 1 || fromCh > 150) return { ok: false, error: 'פרק התחלה לא תקין (1-150)' };
+  if (toCh < 1 || toCh > 150) return { ok: false, error: 'פרק סיום לא תקין (1-150)' };
+  if (toCh < fromCh) return { ok: false, error: 'פרק הסיום חייב להיות אחרי פרק ההתחלה' };
+  fav.name = (name || '').trim() || (fromCh === toCh ? `פרק ${fromCh}` : `פרקים ${fromCh}-${toCh}`);
+  fav.chapters = [];
+  for (let c = fromCh; c <= toCh; c++) fav.chapters.push(c);
+  _saveFavorites(list);
+  // If the currently-viewed chapter is no longer in the edited favorite's range,
+  // drop out of favorite-context so nav/chips don't point at stale indices.
+  if (tehilimContext.type === 'favorite' && tehilimContext.id === id &&
+      !fav.chapters.includes(currentTehilimChapter)) {
+    _exitFavoriteContext();
+  }
+  return { ok: true, favorite: fav };
+}
+
+function deleteTehilimFavorite(id) {
+  _saveFavorites(getTehilimFavorites().filter(f => f.id !== id));
+  if (tehilimContext.type === 'favorite' && tehilimContext.id === id) _exitFavoriteContext();
+}
+
+function isChapterFavorited(chapter) {
+  // True if `chapter` is favorited as a standalone single-chapter favorite
+  // (used for the ⭐ toggle button on a chapter — a range favorite containing
+  // this chapter does not count, that's a different concept from "starred").
+  return getTehilimFavorites().some(f => f.chapters.length === 1 && f.chapters[0] === chapter);
+}
+
+function toggleTehilimFavoriteChapter(chapter) {
+  const existing = getTehilimFavorites().find(f => f.chapters.length === 1 && f.chapters[0] === chapter);
+  if (existing) {
+    deleteTehilimFavorite(existing.id);
+  } else {
+    addTehilimFavorite(`פרק ${chapter}`, chapter, chapter);
+  }
+  renderTehilimFavoriteStar();
+  if (typeof renderTehilimFavoritesList === 'function') renderTehilimFavoritesList();
+}
+
+function renderTehilimFavoriteStar() {
+  const btn = document.getElementById('tehilim-fav-star');
+  if (!btn) return;
+  const starred = isChapterFavorited(currentTehilimChapter);
+  btn.textContent = starred ? '⭐' : '☆';
+  btn.title = starred ? 'הסר ממועדפים' : 'הוסף למועדפים';
+  btn.setAttribute('aria-pressed', starred ? 'true' : 'false');
+}
+
+// ── Favorites management UI (add/edit form + list) ──────────────────────
+function openTehilimFavForm(editId) {
+  const form = document.getElementById('tehilim-fav-form');
+  if (!form) return;
+  const titleEl = document.getElementById('tehilim-fav-form-title');
+  const idEl    = document.getElementById('tehilim-fav-edit-id');
+  const nameEl  = document.getElementById('tehilim-fav-name');
+  const fromEl  = document.getElementById('tehilim-fav-from');
+  const toEl    = document.getElementById('tehilim-fav-to');
+  const errEl   = document.getElementById('tehilim-fav-form-error');
+  if (errEl) errEl.textContent = '';
+
+  if (editId) {
+    const fav = _favoriteById(editId);
+    if (!fav) return;
+    if (titleEl) titleEl.textContent = 'עריכת מועדף';
+    if (idEl) idEl.value = editId;
+    if (nameEl) nameEl.value = fav.name;
+    if (fromEl) fromEl.value = fav.chapters[0];
+    if (toEl) toEl.value = fav.chapters[fav.chapters.length - 1];
+  } else {
+    if (titleEl) titleEl.textContent = 'מועדף חדש';
+    if (idEl) idEl.value = '';
+    if (nameEl) nameEl.value = '';
+    if (fromEl) fromEl.value = '';
+    if (toEl) toEl.value = '';
+  }
+  form.style.display = 'block';
+  form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  if (nameEl) nameEl.focus();
+}
+
+function closeTehilimFavForm() {
+  const form = document.getElementById('tehilim-fav-form');
+  if (form) form.style.display = 'none';
+}
+
+function saveTehilimFavForm() {
+  const id     = document.getElementById('tehilim-fav-edit-id')?.value;
+  const name   = document.getElementById('tehilim-fav-name')?.value || '';
+  const fromV  = document.getElementById('tehilim-fav-from')?.value;
+  const toV    = document.getElementById('tehilim-fav-to')?.value || fromV;
+  const errEl  = document.getElementById('tehilim-fav-form-error');
+
+  const result = id
+    ? updateTehilimFavorite(id, name, fromV, toV)
+    : addTehilimFavorite(name, fromV, toV);
+
+  if (!result.ok) {
+    if (errEl) errEl.textContent = result.error;
+    return;
+  }
+  closeTehilimFavForm();
+  renderTehilimFavoritesList();
+  renderTehilimFavoriteStar();
+}
+
+function confirmDeleteTehilimFavorite(id) {
+  const fav = _favoriteById(id);
+  if (!fav) return;
+  // Look the name up fresh here rather than taking it as a parameter — passing
+  // free-text user input through an onclick="..." HTML attribute is a second,
+  // harder-to-escape injection context (attribute-breakout, not just innerHTML
+  // text) on top of the innerHTML rendering below. Not worth the risk for what
+  // is just a confirmation-dialog label.
+  if (!confirm(`למחוק את "${fav.name}"?`)) return;
+  deleteTehilimFavorite(id);
+  renderTehilimFavoritesList();
+  renderTehilimFavoriteStar();
+}
+
+function renderTehilimFavoritesList() {
+  const listEl  = document.getElementById('tehilim-fav-list');
+  const emptyEl = document.getElementById('tehilim-fav-empty');
+  if (!listEl) return;
+  const favs = getTehilimFavorites();
+
+  if (emptyEl) emptyEl.style.display = favs.length ? 'none' : 'block';
+
+  listEl.innerHTML = favs.map(fav => {
+    const isSingle = fav.chapters.length === 1;
+    const rangeLabel = isSingle
+      ? `פרק ${fav.chapters[0]}`
+      : `פרקים ${fav.chapters[0]}–${fav.chapters[fav.chapters.length - 1]} (${fav.chapters.length})`;
+    const isActive = tehilimContext.type === 'favorite' && tehilimContext.id === fav.id;
+    const safeName = escapeHtml(fav.name);
+    return `
+      <div style="display:flex;align-items:center;gap:8px;background:${isActive ? 'rgba(201,165,74,.1)' : 'var(--surface)'};
+        border:1px solid ${isActive ? 'var(--gold)' : 'var(--border)'};border-radius:10px;padding:8px 10px">
+        <button onclick="scrollTehilimTop();viewTehilimFavorite('${fav.id}', 0)"
+          style="flex:1;text-align:right;background:none;border:none;cursor:pointer;
+          font-family:'Heebo',sans-serif;padding:2px" aria-label="צפה ב${safeName}">
+          <div style="font-size:13px;color:var(--cream);font-weight:600">${safeName}</div>
+          <div style="font-size:11px;color:var(--muted)">${rangeLabel}</div>
+        </button>
+        <button onclick="openTehilimFavForm('${fav.id}')" aria-label="ערוך את ${safeName}"
+          style="background:none;border:none;cursor:pointer;font-size:15px;padding:6px">✏️</button>
+        <button onclick="confirmDeleteTehilimFavorite('${fav.id}')"
+          aria-label="מחק את ${safeName}"
+          style="background:none;border:none;cursor:pointer;font-size:15px;padding:6px">🗑️</button>
+      </div>`;
+  }).join('');
+}
+
+// ── Navigation context ──────────────────────────────────────────────────
+// { type: 'day' } (default) – prev/next/chip-row driven by the natural daily
+//   schedule, day auto-derived per chapter via CHAPTER_TO_DAY (unchanged from
+//   before favorites existed — this branch's behavior is byte-for-byte the same).
+// { type: 'favorite', id } – driven by that favorite's own chapter list instead.
+let tehilimContext = { type: 'day' };
+function _exitFavoriteContext() { tehilimContext = { type: 'day' }; }
+
+function viewTehilimFavorite(favId, idx) {
+  const fav = _favoriteById(favId);
+  if (!fav || !fav.chapters[idx]) return;
+  tehilimContext = { type: 'favorite', id: favId };
+  loadTehilim(fav.chapters[idx]);
+}
+
 function getTehilimNavInfo(chapterOrRange) {
   const key = String(chapterOrRange);
+
+  if (tehilimContext.type === 'favorite') {
+    const fav = _favoriteById(tehilimContext.id);
+    if (!fav) { _exitFavoriteContext(); }
+    else {
+      const idx = fav.chapters.findIndex(c => String(c) === key);
+      if (idx === -1) { _exitFavoriteContext(); }
+      else {
+        const total = fav.chapters.length;
+        const isFirstInDay = idx === 0;
+        const isLastInDay  = idx === total - 1;
+        return {
+          prevLabel:  isFirstInDay ? null : `→ ${_tehilimLabel(fav.chapters[idx-1])}`,
+          prevAction: isFirstInDay ? null : `viewTehilimFavorite('${fav.id}', ${idx-1})`,
+          nextLabel:  isLastInDay  ? null : `${_tehilimLabel(fav.chapters[idx+1])} ←`,
+          nextAction: isLastInDay  ? null : `viewTehilimFavorite('${fav.id}', ${idx+1})`,
+          day: null, isLastInDay, isFirstInDay,
+          isFavorite: true, favId: fav.id, favName: fav.name,
+        };
+      }
+    }
+  }
+
   // For plain chapter number, also try string range variants
   const info = CHAPTER_TO_DAY[key] || CHAPTER_TO_DAY[parseInt(chapterOrRange)];
   if (!info) return null;
@@ -234,7 +469,7 @@ function getTehilimNavInfo(chapterOrRange) {
     }
   }
 
-  return { prevLabel, prevAction, nextLabel, nextAction, day, isLastInDay, isFirstInDay };
+  return { prevLabel, prevAction, nextLabel, nextAction, day, isLastInDay, isFirstInDay, isFavorite: false };
 }
 
 // Short label for the daily chapter-list chips (compact form of _tehilimLabel)
@@ -246,18 +481,20 @@ function _tehilimChipLabel(ch) {
   return String(ch);
 }
 
-// Row of chips for every chapter learned on the current Hebrew day, with the
-// active chapter highlighted. Shared by both the top and bottom nav rows.
+// Row of chips for every chapter in the active context (the day's schedule, or a
+// favorite's own list), with the active chapter highlighted. Shared by both the
+// top and bottom nav rows, and by both day-mode and favorite-mode.
 function _tehilimDayChapterRow(nav, currentKeyStr) {
   if (!nav) return '';
-  const dayChapters = TEHILIM_SCHEDULE[nav.day] || [];
-  if (dayChapters.length <= 1) return '';
-  const chips = dayChapters.map(ch => {
+  const chapters = nav.isFavorite ? (_favoriteById(nav.favId)?.chapters || []) : (TEHILIM_SCHEDULE[nav.day] || []);
+  if (chapters.length <= 1) return '';
+  const chips = chapters.map((ch, idx) => {
     const isCurrent = String(ch) === currentKeyStr;
     const style = isCurrent
       ? `background:var(--gold);color:#000;border:1px solid var(--gold);font-weight:700`
       : `background:var(--surface);color:var(--gold);border:1px solid var(--border)`;
-    return `<button onclick="scrollTehilimTop();${_tehilimAction(ch)}" ` +
+    const action = nav.isFavorite ? `viewTehilimFavorite('${nav.favId}', ${idx})` : _tehilimAction(ch);
+    return `<button onclick="scrollTehilimTop();${action}" ` +
       `style="${style};padding:4px 11px;border-radius:14px;font-size:11.5px;cursor:pointer;` +
       `font-family:'Heebo',sans-serif;white-space:nowrap;flex:none">${_tehilimChipLabel(ch)}</button>`;
   }).join('');
@@ -321,11 +558,20 @@ async function loadTehilim(chapterOrRange) {
     const dayBtnStyle = `background:rgba(201,165,74,.12);border:1px solid var(--gold-dim);color:var(--gold);padding:6px 12px;border-radius:20px;font-size:12px;cursor:pointer;font-family:'Heebo',sans-serif;max-width:48%`;
 
     const wrapAction = action => `scrollTehilimTop();${action}`;
-    const prevBtn = nav ? `<button onclick="${wrapAction(nav.prevAction)}" style="${nav.isFirstInDay ? dayBtnStyle : btnStyle}">${nav.prevLabel}</button>` : '<span></span>';
-    const nextBtn = nav ? `<button onclick="${wrapAction(nav.nextAction)}" style="${nav.isLastInDay  ? dayBtnStyle : btnStyle}">${nav.nextLabel}</button>` : '<span></span>';
+    // A favorite's first/last chapter has no prev/next (no day-style wraparound for
+    // favorites — nav.prevAction/nextAction are null there). Render nothing rather
+    // than a broken "null" button, which is what unconditionally rendering used to do.
+    const prevBtn = (nav && nav.prevAction)
+      ? `<button onclick="${wrapAction(nav.prevAction)}" style="${nav.isFirstInDay ? dayBtnStyle : btnStyle}">${nav.prevLabel}</button>`
+      : '<span></span>';
+    const nextBtn = (nav && nav.nextAction)
+      ? `<button onclick="${wrapAction(nav.nextAction)}" style="${nav.isLastInDay  ? dayBtnStyle : btnStyle}">${nav.nextLabel}</button>`
+      : '<span></span>';
     const navRow  = `<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:8px">${prevBtn}${nextBtn}</div>`;
 
-    const dayInfo = nav ? `<div style="text-align:center;font-size:11px;color:var(--muted);margin-bottom:6px">יום ${nav.day} בחודש${isRange ? ` | ${rangeLabel}` : ''}</div>` : '';
+    const dayInfo = !nav ? '' : nav.isFavorite
+      ? `<div style="text-align:center;font-size:11px;color:var(--muted);margin-bottom:6px">⭐ ${escapeHtml(nav.favName)}${isRange ? ` | ${rangeLabel}` : ''}</div>`
+      : `<div style="text-align:center;font-size:11px;color:var(--muted);margin-bottom:6px">יום ${nav.day} בחודש${isRange ? ` | ${rangeLabel}` : ''}</div>`;
     // Chapter chips for today's learning, current chapter highlighted — shown near
     // both the top and bottom prev/next buttons.
     const dayChapterRow = _tehilimDayChapterRow(nav, String(isRange ? chapterOrRange : chapter));
@@ -340,6 +586,8 @@ async function loadTehilim(chapterOrRange) {
 
     sub.textContent = `${flat.length} פסוקים${isRange ? ` (${rangeLabel})` : ''}`;
     updateDoneButton('tehilim', chapter);
+    renderTehilimFavoriteStar();
+    renderTehilimFavoritesList();
     const ttsWrap = document.getElementById('tehilim-tts-wrap');
     if (ttsWrap) ttsWrap.innerHTML = '';
     scrollTehilimTop();

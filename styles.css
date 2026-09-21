@@ -22,6 +22,31 @@
   --font-size: 16px;
 }
 
+/* ─── LIGHT THEME ────────────────────────────
+   Toggled via <html data-theme="light">, set from settings (js/settings.js,
+   persisted to localStorage). Every color below was picked and verified for
+   WCAG AA text contrast (>=4.5:1) against BOTH --bg and --surface with a
+   standalone script — see AGENT.md for the exact ratios. Same warm gold/cream
+   Judaica palette as dark mode, inverted, not a generic light gray theme. */
+:root[data-theme="light"] {
+  --bg:       #faf6ee;
+  --surface:  #ffffff;
+  --card:     #fdfaf3;
+  --border:   #e3d5b8;
+  --gold:     #8f6a28;
+  --addition: #2f6b45;
+  --addition-bg: rgba(47,107,69,.08);
+  --addition-border: rgba(47,107,69,.35);
+  --gold-dim: #7a6128;
+  --cream:    #2b2015;
+  --text:     #3a2c1a;
+  --muted:    #71603f;
+  --accent:   #7d5c08;
+  --red:      #b03030;
+  --green:    #2f6b45;
+}
+
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {

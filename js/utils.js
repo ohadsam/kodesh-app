@@ -108,7 +108,7 @@ let currentAliya = 'all';
 let rashiLoaded = false;
 let rashiVisible = false;
 
-const APP_VERSION  = '5.112';
+const APP_VERSION  = '5.113';
 const STORAGE_KEY  = 'kodesh_app_v1';
 const SIDDUR_CACHE_KEY = 'siddur_cache_v';
 
@@ -163,6 +163,18 @@ function deepFlat(arr) {
     }
   }
   return result;
+}
+
+// ── HTML escaping ────────────────────────────────────────────────────
+// Use whenever free-text USER INPUT (favorite names, custom labels, anything
+// typed into a form) is interpolated into an innerHTML template string.
+// Sefaria/Hebcal text is trusted (rendered as-is elsewhere in this app), but
+// text a person types on their own device is not.
+function escapeHtml(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
 }
 
 // ── Gematria (Hebrew numerals) ────────────────────────────────────────

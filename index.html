@@ -14,13 +14,28 @@
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@300;400;500;700;900&family=Heebo:wght@300;400;500;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=5.2" />
+  <!-- INLINE theme guard – runs SYNCHRONOUSLY, BEFORE the stylesheet link below,
+       so the correct data-theme attribute is on <html> before styles.css is even
+       applied. Placing this after the stylesheet <link> (or in a deferred script)
+       would paint one dark/light frame first and then flip — a visible flash. -->
+  <script>
+    (function() {
+      try {
+        if (localStorage.getItem('theme') === 'light') {
+          document.documentElement.setAttribute('data-theme', 'light');
+          var mc = document.querySelector('meta[name="theme-color"]');
+          if (mc) mc.setAttribute('content', '#faf6ee');
+        }
+      } catch (e) { /* localStorage unavailable (private mode etc.) — default dark */ }
+    })();
+  </script>
+  <link rel="stylesheet" href="styles.css?v=5.113" />
   <!-- INLINE version guard – runs SYNCHRONOUSLY before any SW can intercept.
        Kills any cached service worker and forces a fresh load when version changes.
        NOTE: this is the ONLY version check. utils.js must NOT have another one. -->
   <script>
     (function() {
-      var V = '5.112';
+      var V = '5.113';
       // Show version in splash immediately
       var sv = document.getElementById('splash-version');
       if (sv) sv.textContent = 'גרסה ' + V;
@@ -109,7 +124,7 @@
   <div style="font-family:'Frank Ruhl Libre',serif;font-size:26px;color:var(--cream);font-weight:700">עיתים</div>
   <div class="spinner"></div>
   <p id="splash-status" style="font-size:12px;color:var(--gold);margin:4px 0 0;min-height:18px">טוען...</p>
-  <p id="splash-version" style="font-size:11px;color:var(--muted);margin-top:2px">גרסה 5.112</p>
+  <p id="splash-version" style="font-size:11px;color:var(--muted);margin-top:2px">גרסה 5.113</p>
   <div id="splash-retry" style="display:none;margin-top:20px">
     <button onclick="localStorage.clear();sessionStorage.clear();location.reload(true)"
       style="background:var(--gold);color:#000;border:none;border-radius:10px;padding:10px 24px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Heebo',sans-serif">🔄 איפוס וטעינה מחדש</button>
@@ -146,6 +161,15 @@
         <button class="font-btn active" onclick="setFont(16)" id="fs16" style="font-size:15px">א</button>
         <button class="font-btn" onclick="setFont(19)" id="fs19" style="font-size:18px">א</button>
         <button class="font-btn" onclick="setFont(22)" id="fs22" style="font-size:21px">א</button>
+      </div>
+    </div>
+
+    <!-- Theme (dark / light) -->
+    <div class="settings-row">
+      <label>מצב תצוגה</label>
+      <div class="font-buttons">
+        <button class="font-btn active" onclick="setTheme('dark')" id="theme-btn-dark">🌙 כהה</button>
+        <button class="font-btn" onclick="setTheme('light')" id="theme-btn-light">☀️ בהיר</button>
       </div>
     </div>
 
@@ -239,7 +263,7 @@
     <!-- Version & Copyright -->
     <div style="text-align:center;padding:18px 0 8px;border-top:1px solid var(--border);margin-top:8px">
       <div style="font-size:13px;font-weight:600;color:var(--gold-dim);margin-bottom:4px">📖 עיתים</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">גרסה 5.112</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">גרסה 5.113</div>
       <button onclick="showWhatsNew()" style="background:var(--card);border:1px solid var(--gold-dim);color:var(--gold);padding:6px 16px;border-radius:8px;font-size:11px;cursor:pointer;font-family:'Heebo',sans-serif;margin-bottom:6px">🆕 מה חדש?</button>
       <div style="font-size:11px;color:var(--muted)">© כל הזכויות שמורות לאוהד סמט</div>
     </div>
@@ -251,14 +275,15 @@
 <div id="whats-new-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
   width:88%;max-width:400px;max-height:80vh;overflow-y:auto;
   background:var(--surface);border:1px solid var(--gold-dim);border-radius:16px;z-index:10001;padding:20px;direction:rtl">
-  <div style="font-size:16px;font-weight:700;color:var(--gold);margin-bottom:12px;text-align:center">🆕 מה חדש בגרסה 5.112</div>
+  <div style="font-size:16px;font-weight:700;color:var(--gold);margin-bottom:12px;text-align:center">🆕 מה חדש בגרסה 5.113</div>
   <div style="font-size:13px;color:var(--cream);line-height:1.7" id="whats-new-content">
-    <div style="margin-bottom:10px"><b>📅 תיקון פרשת השבוע לפרשות דו-מילוליות</b></div>
-    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• תוקנה שגיאה שגרמה לפרשות כמו כי תצא, לך לך, חיי שרה ואחרי מות לא להימצא</div>
-    <div style="margin-bottom:10px"><b>📖 שיפור טעינת רש"י בפרשת השבוע</b></div>
-    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• תוקנה איטיות בטעינת רש"י בעליות מסוימות, ותוקן מקרה שבו רש"י לא נטען כלל</div>
-    <div style="margin-bottom:10px"><b>📜 רשימת פרקי תהילים יומית</b></div>
-    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• נוספה רשימת כל פרקי היום ליד כפתורי הפרק הבא/הקודם בתהילים, עם הדגשת הפרק הנוכחי</div>
+    <div style="margin-bottom:10px"><b>⭐ מועדפים בתהילים</b></div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• אפשר לשמור פרקים בודדים (⭐ ליד כותרת הפרק) או טווחים מותאמים אישית עם שם משלכם</div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• צפייה במועדף מאפשרת דפדוף בין פרקיו, עם הדגשת הפרק הנוכחי — בדיוק כמו בתהילים היומי</div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• ניהול מלא: עריכה, שינוי שם, שינוי טווח ומחיקה</div>
+    <div style="margin-bottom:10px"><b>🌙 מצב תצוגה כהה / בהיר</b></div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• נוסף מתג בהגדרות למעבר בין תצוגה כהה (ברירת מחדל) לתצוגה בהירה ונוחה</div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• הבחירה נשמרת אוטומטית ותישאר גם בפעם הבאה</div>
   </div>
   <button onclick="closeWhatsNew()" style="display:block;width:100%;margin-top:14px;background:var(--gold);color:#000;border:none;border-radius:10px;padding:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Heebo',sans-serif">👍 הבנתי</button>
 </div>
@@ -612,7 +637,7 @@
     </div>
     <!-- Chapter selector -->
     <div class="tehilim-nav">
-      <select id="tehilim-select" onchange="loadTehilim(this.value)">
+      <select id="tehilim-select" onchange="_exitFavoriteContext();loadTehilim(this.value)">
         <option value="">-- בחר פרק ספציפי --</option>
       </select>
     </div>
@@ -634,10 +659,70 @@
     </div>
   </div>
 
+  <!-- Favorites: individual chapters or custom ranges, with their own nav -->
+  <div class="card">
+    <div class="card-header" style="margin-bottom:8px">
+      <div class="card-title"><span class="emoji">⭐</span>מועדפים</div>
+      <button onclick="openTehilimFavForm()" aria-label="הוסף מועדף חדש"
+        style="background:rgba(201,165,74,.12);border:1px solid var(--gold);color:var(--gold);
+        padding:6px 12px;border-radius:10px;cursor:pointer;font-family:'Heebo',sans-serif;
+        font-size:13px;white-space:nowrap">+ הוסף</button>
+    </div>
+
+    <!-- Add/edit form, hidden until "+ הוסף" or an edit (✏️) is pressed -->
+    <div id="tehilim-fav-form" style="display:none;background:var(--surface);border:1px solid var(--border);
+      border-radius:10px;padding:12px;margin-bottom:12px">
+      <input type="hidden" id="tehilim-fav-edit-id" value="">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px" id="tehilim-fav-form-title">מועדף חדש</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <input id="tehilim-fav-name" type="text" placeholder="שם (לא חובה — למשל: לימוד לרפואה)"
+          maxlength="60" aria-label="שם המועדף"
+          style="padding:8px 12px;border-radius:8px;border:1px solid var(--border);
+          background:var(--card);color:var(--cream);font-family:'Heebo',sans-serif;
+          font-size:13px;direction:rtl;outline:none">
+        <div style="display:flex;gap:8px;align-items:center">
+          <label style="font-size:12px;color:var(--muted);white-space:nowrap" for="tehilim-fav-from">מפרק</label>
+          <input id="tehilim-fav-from" type="number" min="1" max="150" inputmode="numeric"
+            aria-label="פרק התחלה"
+            style="width:70px;padding:8px;border-radius:8px;border:1px solid var(--border);
+            background:var(--card);color:var(--cream);font-family:'Heebo',sans-serif;
+            font-size:13px;text-align:center;outline:none">
+          <label style="font-size:12px;color:var(--muted);white-space:nowrap" for="tehilim-fav-to">עד פרק</label>
+          <input id="tehilim-fav-to" type="number" min="1" max="150" inputmode="numeric"
+            aria-label="פרק סיום (השאר ריק לפרק בודד)"
+            style="width:70px;padding:8px;border-radius:8px;border:1px solid var(--border);
+            background:var(--card);color:var(--cream);font-family:'Heebo',sans-serif;
+            font-size:13px;text-align:center;outline:none">
+          <span style="font-size:11px;color:var(--muted)">(אפשר להשאיר ריק לפרק בודד)</span>
+        </div>
+        <div id="tehilim-fav-form-error" style="font-size:11px;color:#c87060"></div>
+        <div style="display:flex;gap:8px;margin-top:2px">
+          <button onclick="saveTehilimFavForm()"
+            style="flex:1;background:var(--gold);color:#000;border:none;padding:9px;border-radius:8px;
+            cursor:pointer;font-family:'Heebo',sans-serif;font-size:13px;font-weight:700">שמור</button>
+          <button onclick="closeTehilimFavForm()"
+            style="flex:1;background:var(--card);border:1px solid var(--border);color:var(--muted);
+            padding:9px;border-radius:8px;cursor:pointer;font-family:'Heebo',sans-serif;font-size:13px">ביטול</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="tehilim-fav-list" style="display:flex;flex-direction:column;gap:8px"></div>
+    <div id="tehilim-fav-empty" style="font-size:12px;color:var(--muted);text-align:center;padding:8px 0;display:none">
+      אין עדיין מועדפים. לחצו ⭐ ליד פרק, או "+ הוסף" לטווח פרקים.
+    </div>
+  </div>
+
   <div class="card">
     <div class="card-header">
       <div>
-        <div class="card-title"><span class="emoji">📖</span>תהילים <span id="tehilim-num-title"></span></div>
+        <div class="card-title">
+          <span class="emoji">📖</span>תהילים <span id="tehilim-num-title"></span>
+          <button id="tehilim-fav-star" onclick="toggleTehilimFavoriteChapter(currentTehilimChapter)"
+            aria-pressed="false" aria-label="הוסף/הסר ממועדפים"
+            style="background:none;border:none;cursor:pointer;font-size:18px;line-height:1;
+            vertical-align:middle;margin-inline-start:4px;padding:2px">☆</button>
+        </div>
         <div class="card-subtitle" id="tehilim-subtitle"></div>
       </div>
       <div id="done-tehilim"></div>
@@ -1250,7 +1335,7 @@
     💡 לכיול המצפן: הזז את הטלפון בתנועת ∞ (שמונה שוכב) מספר פעמים
   </div>
   <div style="text-align:center;color:var(--muted);font-size:11px;padding:12px 0 4px">
-    גרסה 5.112 · עיתים · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
+    גרסה 5.113 · עיתים · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
   </div>
 </div>
 
@@ -1309,20 +1394,20 @@
      JavaScript modules (load order matters)
      v4.3 – querystring busts browser/SW cache
      ═══════════════════════════════════════ -->
-<script src="js/network-log.js?v=5.112"></script>
-<script src="js/utils.js?v=5.112"></script>
-<script src="js/settings.js?v=5.112"></script>
-<script src="js/app.js?v=5.112"></script>
-<script src="js/tehilim.js?v=5.112"></script>
-<script src="js/calendar.js?v=5.112"></script>
-<script src="js/content.js?v=5.112"></script>
-<script src="js/tefilot.js?v=5.112"></script>
-<script src="js/siddur-inserts.js?v=5.112"></script>
-<script src="js/siddur.js?v=5.112"></script>
-<script src="js/omer.js?v=5.112"></script>
-<script src="js/brachot.js?v=5.112"></script>
-<script src="js/misc.js?v=5.112"></script>
-  <script src="js/emuna.js?v=5.112"></script>
-  <script src="js/init.js?v=5.112"></script>
+<script src="js/network-log.js?v=5.113"></script>
+<script src="js/utils.js?v=5.113"></script>
+<script src="js/settings.js?v=5.113"></script>
+<script src="js/app.js?v=5.113"></script>
+<script src="js/tehilim.js?v=5.113"></script>
+<script src="js/calendar.js?v=5.113"></script>
+<script src="js/content.js?v=5.113"></script>
+<script src="js/tefilot.js?v=5.113"></script>
+<script src="js/siddur-inserts.js?v=5.113"></script>
+<script src="js/siddur.js?v=5.113"></script>
+<script src="js/omer.js?v=5.113"></script>
+<script src="js/brachot.js?v=5.113"></script>
+<script src="js/misc.js?v=5.113"></script>
+  <script src="js/emuna.js?v=5.113"></script>
+  <script src="js/init.js?v=5.113"></script>
 </body>
 </html>

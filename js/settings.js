@@ -96,8 +96,49 @@ function setFont(size) {
     document.getElementById('fs'+s)?.classList.toggle('active', s===size);
   });
 }
+
+// ═══════════════════════════════════════════
+// THEME (dark / light)
+// ═══════════════════════════════════════════
+// The actual data-theme attribute is applied by an inline <script> at the very
+// top of <head> in index.html — BEFORE styles.css loads — so the correct theme
+// paints on the very first frame with no flash. That script reads the same
+// localStorage 'theme' key this function writes. Do not move theme-application
+// logic here only; a script running this late would still flash the wrong
+// theme for one frame on every page load.
+const THEME_COLOR = { dark: '#1a0e05', light: '#faf6ee' };
+
+function setTheme(mode) {
+  const isLight = mode === 'light';
+  if (isLight) document.documentElement.setAttribute('data-theme', 'light');
+  else document.documentElement.removeAttribute('data-theme');
+
+  try { localStorage.setItem('theme', mode); } catch(e) { console.warn('[Theme] localStorage unavailable:', e.message); }
+  appState.theme = mode; saveState();
+
+  const mc = document.querySelector('meta[name="theme-color"]');
+  if (mc) mc.setAttribute('content', THEME_COLOR[mode] || THEME_COLOR.dark);
+
+  ['dark','light'].forEach(m => {
+    document.getElementById('theme-btn-'+m)?.classList.toggle('active', m === mode);
+  });
+}
+
+// Called from loadSettingsState() on app init. The data-theme attribute itself
+// was already set (or left absent) by the inline HEAD script before any of this
+// ran — this only syncs appState + highlights the correct settings button.
+function initThemeUI() {
+  let saved = 'dark';
+  try { saved = localStorage.getItem('theme') || 'dark'; } catch(e) {}
+  appState.theme = saved;
+  ['dark','light'].forEach(m => {
+    document.getElementById('theme-btn-'+m)?.classList.toggle('active', m === saved);
+  });
+}
+
 function loadSettingsState() {
   if (appState.fontSize) setFont(appState.fontSize);
+  initThemeUI();
   const reminders = appState.reminders || {};
 
   // Restore standard reminder toggles (halacha, tehilim, lashon, parasha, igeret, omer)
