@@ -7,6 +7,11 @@ function showTab(name) {
   if (currentTab === 'qibla' && name !== 'qibla') {
     stopCompassListener();
   }
+  // Tehilim's "manual selection" reading-progress history is scoped to a single
+  // stay on the tab, not persisted — clear it the moment the user leaves.
+  if (currentTab === 'tehilim' && name !== 'tehilim') {
+    resetTehilimManualHistory();
+  }
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.bnav-btn').forEach(b => b.classList.remove('active'));

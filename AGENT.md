@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.113 (Aug 3, 2026)
+**Last updated:** v5.114 (Sep 21, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -206,6 +206,28 @@ that goes quiet for `HSRC_STALE_MS` = 3 s yields to a lower-ranked one):
   breakout) on top of plain `innerHTML` text, not worth it for a confirm-dialog
   label. Do not "simplify" this back to passing the name as a parameter.
 
+### Tehilim Manual-Selection History — js/tehilim.js (v5.114)
+- Picking a chapter from the `#tehilim-select` dropdown or via search
+  (`searchTehilimChapter`) now enters a THIRD `tehilimContext` mode,
+  `{type:'manual'}`, via the shared entry point `viewTehilimManual(chapter)`.
+  Gets the same prev/next buttons and chip row as day/favorite mode (same
+  `getTehilimNavInfo` / `_tehilimDayChapterRow` machinery), but prev/next is
+  simple `chapter±1` (bounded 1..150) — there's no schedule/favorite list to
+  derive "next" from for a one-off manual pick.
+- `tehilimManualHistory`: every DISTINCT chapter visited this way, kept sorted
+  ascending (a reading-progress view: "what have I already said", not a visit
+  log). **Deliberately in-memory only — never written to `appState`/
+  `localStorage`.** Scope is explicit per the feature request: persists across
+  switching between day/favorite/manual navigation WITHIN a single stay on the
+  Tehilim tab, but is wiped the moment the user leaves the tab (hook in
+  `showTab()`, app.js — mirrors the existing "stop compass on leaving qibla
+  tab" pattern), and naturally wiped by any full page reload anyway. Do not
+  add persistence here without re-confirming that's actually wanted — the
+  request was explicit that it should NOT survive a tab switch.
+- The null-prevAction/nextAction button-rendering fix from the Favorites work
+  above is what makes this safe at the chapter-1/chapter-150 boundaries too —
+  same mechanism, same reason it's needed.
+
 ### Omer (omer.js)
 - `getOmerDay()`: computed from Hebrew date
 - Full text: לשם יחוד, ברכה, ספירה, הרחמן, למנצח, אנא בכח, יהי רצון, עלינו
@@ -298,6 +320,30 @@ could be more precise for edge cases.
 - ✅ תפילת הדרך added to Brachot tab (with תהילים קכא)
 - ✅ Siddur: 3rd floating button 📋 shows prayer status popup
 - ✅ Tehilim search: gematria support (פרק קל, כג, 130 etc.)
+
+### v5.114 (Sep 21, 2026) – Tehilim manual-selection nav + reading-progress history
+- ✅ Picking a chapter from the `#tehilim-select` dropdown or via search now gets
+  the same prev/next navigation buttons day-mode and favorites already had, via
+  a new `tehilimContext = {type:'manual'}` (third mode alongside `day`/`favorite`)
+  and its shared entry point `viewTehilimManual(chapter)`. Unlike day/favorite
+  mode, next/prev here is simple `chapter±1` bounded at 1/150 — there's no
+  schedule or favorite list to derive "next" from for a one-off manual pick.
+- ✅ Every distinct chapter visited this way is tracked in `tehilimManualHistory`
+  and shown as a chip row above and below the content (reusing
+  `_tehilimDayChapterRow`), current chapter highlighted — "מה כבר קראתי הפעם".
+  Sorted ascending by chapter number (a reading-progress view), not click order.
+- ✅ Scope, exactly as requested: in-memory only, never written to
+  `appState`/`localStorage`. Survives switching between day/favorite/manual
+  navigation while remaining on the Tehilim tab, but is cleared the instant the
+  user leaves the tab (`resetTehilimManualHistory()`, hooked into `showTab()` in
+  app.js — mirrors the existing "stop compass on leaving qibla tab" pattern) —
+  and naturally cleared by any full app reload too. Verified with a Node
+  harness that awaits the real (async) `loadTehilim` calls and asserts the
+  history grows/dedupes/sorts correctly, survives an in-tab mode switch, and is
+  wiped on the tab-away hook — not just read by eye.
+- ✅ Reused the null-prevAction/nextAction button-rendering fix from the
+  Favorites feature (v5.113) for the chapter-1/chapter-150 boundaries here too
+  — same failure mode, same fix, no new bug class introduced.
 
 ### v5.113 (Sep 21, 2026) – release-checklist.py, Tehilim favorites, light/dark theme
 - ✅ Added `release-checklist.py`: a single command that gates a merge to main —

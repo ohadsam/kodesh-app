@@ -88,8 +88,9 @@ function searchTehilimChapter() {
     return;
   }
   if (errEl) errEl.textContent = '';
-  _exitFavoriteContext();
-  loadTehilim(chapter);
+  // Search is another "manual" chapter pick, same as the dropdown — gets nav
+  // buttons + is tracked in the session reading-progress chip row.
+  viewTehilimManual(chapter);
 }
 
 function initTehilim() {
@@ -146,7 +147,7 @@ function selectTehilimDay(day) {
   const chapters = getTehilimChapters(day);
   const infoEl = document.getElementById('tehilim-day-info');
   if (infoEl) infoEl.textContent = `יום ${day} בחודש | פרקים: ${chapters.map(c => typeof c === 'string' ? `קיט (${c.split(':')[1]})` : c).join(', ')}`;
-  _exitFavoriteContext();
+  _resetTehilimContext();
   loadTehilim(chapters[0]);
 }
 
@@ -251,14 +252,14 @@ function updateTehilimFavorite(id, name, fromCh, toCh) {
   // drop out of favorite-context so nav/chips don't point at stale indices.
   if (tehilimContext.type === 'favorite' && tehilimContext.id === id &&
       !fav.chapters.includes(currentTehilimChapter)) {
-    _exitFavoriteContext();
+    _resetTehilimContext();
   }
   return { ok: true, favorite: fav };
 }
 
 function deleteTehilimFavorite(id) {
   _saveFavorites(getTehilimFavorites().filter(f => f.id !== id));
-  if (tehilimContext.type === 'favorite' && tehilimContext.id === id) _exitFavoriteContext();
+  if (tehilimContext.type === 'favorite' && tehilimContext.id === id) _resetTehilimContext();
 }
 
 function isChapterFavorited(chapter) {
@@ -397,8 +398,39 @@ function renderTehilimFavoritesList() {
 //   schedule, day auto-derived per chapter via CHAPTER_TO_DAY (unchanged from
 //   before favorites existed — this branch's behavior is byte-for-byte the same).
 // { type: 'favorite', id } – driven by that favorite's own chapter list instead.
+// { type: 'manual' } – driven by tehilimManualHistory (below): simple chapter±1
+//   nav, chip row = every distinct chapter visited this way this tab-visit.
 let tehilimContext = { type: 'day' };
-function _exitFavoriteContext() { tehilimContext = { type: 'day' }; }
+function _resetTehilimContext() { tehilimContext = { type: 'day' }; }
+
+// ── Manual-selection history (dropdown / search) ─────────────────────────
+// In-memory only — deliberately NOT persisted to appState/localStorage. Reset
+// on tab-away (see resetTehilimManualHistory(), called from app.js showTab()),
+// and naturally reset by a full page reload anyway. Sorted ascending by
+// chapter number (reading-progress view), not visit order.
+let tehilimManualHistory = [];
+
+function _recordManualVisit(chapter) {
+  if (!tehilimManualHistory.includes(chapter)) {
+    tehilimManualHistory.push(chapter);
+    tehilimManualHistory.sort((a, b) => a - b);
+  }
+}
+
+// Called from app.js showTab() when leaving the Tehilim tab — NOT when merely
+// switching between day/favorite/manual navigation within the tab, where the
+// history must keep accumulating per the spec ("as long as he's in the tab").
+function resetTehilimManualHistory() {
+  tehilimManualHistory = [];
+  if (tehilimContext.type === 'manual') tehilimContext = { type: 'day' };
+}
+
+function viewTehilimManual(chapter) {
+  chapter = parseInt(chapter);
+  if (!chapter || chapter < 1 || chapter > 150) return;
+  tehilimContext = { type: 'manual' };
+  loadTehilim(chapter);
+}
 
 function viewTehilimFavorite(favId, idx) {
   const fav = _favoriteById(favId);
@@ -412,10 +444,10 @@ function getTehilimNavInfo(chapterOrRange) {
 
   if (tehilimContext.type === 'favorite') {
     const fav = _favoriteById(tehilimContext.id);
-    if (!fav) { _exitFavoriteContext(); }
+    if (!fav) { _resetTehilimContext(); }
     else {
       const idx = fav.chapters.findIndex(c => String(c) === key);
-      if (idx === -1) { _exitFavoriteContext(); }
+      if (idx === -1) { _resetTehilimContext(); }
       else {
         const total = fav.chapters.length;
         const isFirstInDay = idx === 0;
@@ -430,6 +462,22 @@ function getTehilimNavInfo(chapterOrRange) {
         };
       }
     }
+  }
+
+  if (tehilimContext.type === 'manual') {
+    const chNum = parseInt(chapterOrRange);
+    if (chNum >= 1 && chNum <= 150) {
+      _recordManualVisit(chNum);
+      return {
+        prevLabel:  chNum > 1   ? `→ פרק ${chNum - 1}` : null,
+        prevAction: chNum > 1   ? `viewTehilimManual(${chNum - 1})` : null,
+        nextLabel:  chNum < 150 ? `פרק ${chNum + 1} ←` : null,
+        nextAction: chNum < 150 ? `viewTehilimManual(${chNum + 1})` : null,
+        day: null, isLastInDay: chNum >= 150, isFirstInDay: chNum <= 1,
+        isFavorite: false, isManual: true,
+      };
+    }
+    _resetTehilimContext();
   }
 
   // For plain chapter number, also try string range variants
@@ -469,7 +517,7 @@ function getTehilimNavInfo(chapterOrRange) {
     }
   }
 
-  return { prevLabel, prevAction, nextLabel, nextAction, day, isLastInDay, isFirstInDay, isFavorite: false };
+  return { prevLabel, prevAction, nextLabel, nextAction, day, isLastInDay, isFirstInDay, isFavorite: false, isManual: false };
 }
 
 // Short label for the daily chapter-list chips (compact form of _tehilimLabel)
@@ -481,19 +529,23 @@ function _tehilimChipLabel(ch) {
   return String(ch);
 }
 
-// Row of chips for every chapter in the active context (the day's schedule, or a
-// favorite's own list), with the active chapter highlighted. Shared by both the
-// top and bottom nav rows, and by both day-mode and favorite-mode.
+// Row of chips for every chapter in the active context (the day's schedule, a
+// favorite's own list, or the manual-selection history), with the active chapter
+// highlighted. Shared by both the top and bottom nav rows, and by all three modes.
 function _tehilimDayChapterRow(nav, currentKeyStr) {
   if (!nav) return '';
-  const chapters = nav.isFavorite ? (_favoriteById(nav.favId)?.chapters || []) : (TEHILIM_SCHEDULE[nav.day] || []);
+  const chapters = nav.isFavorite ? (_favoriteById(nav.favId)?.chapters || [])
+    : nav.isManual ? tehilimManualHistory
+    : (TEHILIM_SCHEDULE[nav.day] || []);
   if (chapters.length <= 1) return '';
   const chips = chapters.map((ch, idx) => {
     const isCurrent = String(ch) === currentKeyStr;
     const style = isCurrent
       ? `background:var(--gold);color:#000;border:1px solid var(--gold);font-weight:700`
       : `background:var(--surface);color:var(--gold);border:1px solid var(--border)`;
-    const action = nav.isFavorite ? `viewTehilimFavorite('${nav.favId}', ${idx})` : _tehilimAction(ch);
+    const action = nav.isFavorite ? `viewTehilimFavorite('${nav.favId}', ${idx})`
+      : nav.isManual ? `viewTehilimManual(${ch})`
+      : _tehilimAction(ch);
     return `<button onclick="scrollTehilimTop();${action}" ` +
       `style="${style};padding:4px 11px;border-radius:14px;font-size:11.5px;cursor:pointer;` +
       `font-family:'Heebo',sans-serif;white-space:nowrap;flex:none">${_tehilimChipLabel(ch)}</button>`;
@@ -571,6 +623,8 @@ async function loadTehilim(chapterOrRange) {
 
     const dayInfo = !nav ? '' : nav.isFavorite
       ? `<div style="text-align:center;font-size:11px;color:var(--muted);margin-bottom:6px">⭐ ${escapeHtml(nav.favName)}${isRange ? ` | ${rangeLabel}` : ''}</div>`
+      : nav.isManual
+      ? `<div style="text-align:center;font-size:11px;color:var(--muted);margin-bottom:6px">📖 פרקים שקראת הפעם: ${tehilimManualHistory.length}</div>`
       : `<div style="text-align:center;font-size:11px;color:var(--muted);margin-bottom:6px">יום ${nav.day} בחודש${isRange ? ` | ${rangeLabel}` : ''}</div>`;
     // Chapter chips for today's learning, current chapter highlighted — shown near
     // both the top and bottom prev/next buttons.

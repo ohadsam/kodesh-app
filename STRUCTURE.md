@@ -173,18 +173,23 @@ Add `<button id="tf-{key}" class="aliya-tab" onclick="showTefila('{key}')">` in 
 | `initTehilim()` | Bootstrap tehilim tab |
 | `loadTehilim(chapter)` | Fetch + render Psalm, scroll to top |
 | `TEHILIM_SCHEDULE` | Map: Hebrew day-of-month → chapter list |
-| `getTehilimNavInfo(chapterOrRange)` | Prev/next chapter + day-boundary nav info. Branches on `tehilimContext` — day-mode (default, unchanged) or favorite-mode |
-| `_tehilimDayChapterRow(nav, currentKeyStr)` | Chip row of the active context's chapters (day or favorite), current one highlighted; rendered near both top and bottom nav buttons |
+| `getTehilimNavInfo(chapterOrRange)` | Prev/next chapter + day-boundary nav info. Branches on `tehilimContext` — day-mode (default, unchanged), favorite-mode, or manual-mode |
+| `_tehilimDayChapterRow(nav, currentKeyStr)` | Chip row of the active context's chapters (day, favorite, or manual-history), current one highlighted; rendered near both top and bottom nav buttons |
 | `parseTehilimSearch(q)` | Parse number or Hebrew gematria |
 | `hebrewToNumber(str)` | Convert Hebrew letters to numeric value |
 | **Favorites** | Individual chapters or custom ranges, saved to `appState.tehilimFavorites` |
-| `tehilimContext` | `{type:'day'}` (default) or `{type:'favorite', id}` — which chapter list drives nav/chips |
+| `tehilimContext` | `{type:'day'}` (default) / `{type:'favorite', id}` / `{type:'manual'}` — which chapter list drives nav/chips |
 | `addTehilimFavorite(name, from, to)` / `updateTehilimFavorite(id, name, from, to)` / `deleteTehilimFavorite(id)` | CRUD; range is expanded to a plain chapter-number array at save time (mirrors `TEHILIM_SCHEDULE`'s shape so nav code doesn't need to special-case it) |
 | `toggleTehilimFavoriteChapter(ch)` / `isChapterFavorited(ch)` | The ⭐ star button next to the chapter title — single-chapter favorites only |
 | `viewTehilimFavorite(favId, idx)` | Enters favorite-mode and loads `chapters[idx]` |
 | `openTehilimFavForm(editId?)` / `closeTehilimFavForm()` / `saveTehilimFavForm()` | Add/edit form in the Favorites card |
 | `renderTehilimFavoritesList()` | Populates `#tehilim-fav-list`; active favorite highlighted via `tehilimContext` |
 | `confirmDeleteTehilimFavorite(id)` | Looks the name up itself rather than taking it as a param — see the XSS note in js/utils.js `escapeHtml` |
+| **Manual-selection history** | Dropdown (`#tehilim-select`) / search (`searchTehilimChapter`) picks — in-memory only, never persisted |
+| `tehilimManualHistory` | Array of distinct chapter numbers visited via manual/search selection this tab-visit, kept SORTED ascending (reading-progress view, not click order) |
+| `viewTehilimManual(chapter)` | Sets `tehilimContext = {type:'manual'}` and loads it — entry point for BOTH the dropdown `onchange` and `searchTehilimChapter()`. Prev/next = simple chapter±1 (no schedule/favorite list to derive from), bounded at 1/150 |
+| `_recordManualVisit(chapter)` | De-dupes + re-sorts into `tehilimManualHistory`; called from `getTehilimNavInfo`'s manual branch, so any path that renders a manual-mode chapter records it |
+| `resetTehilimManualHistory()` | Clears the array (and drops `tehilimContext` back to `{type:'day'}` if it was manual) — called from `showTab()` in app.js on leaving the Tehilim tab, NOT on switching between day/favorite/manual navigation while still in the tab (history must survive that, per spec) |
 
 ### js/omer.js
 | Function | Description |
