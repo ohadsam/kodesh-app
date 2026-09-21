@@ -137,7 +137,11 @@ Add a `<button id="bb-{key}" class="aliya-tab bracha-btn" onclick="showBracha('{
 | `showTefila(key)` | Display prayer, render text with header/targum styling |
 | `initTefilot()` | Init: show first prayer (motzash) |
 
-**Adding a tefila:** Add entry to `TEFILOT` in `js/tefilot.js` AND root `tefilot.js`.
+**Adding a tefila:** Add entry to `TEFILOT` in `js/tefilot.js` only — the root-level
+`tefilot.js` (and every other root-level `.js`/`.css` file alongside `js/`) is a dead
+pre-reorg leftover, not loaded by `index.html` (verified: only `js/*.js` is
+`<script src>`'d) and last touched at a much older commit. A previous session's
+"keep both in sync" note here was wrong and wasted real effort — do not resurrect it.
 Add `<button id="tf-{key}" class="aliya-tab" onclick="showTefila('{key}')">` in `index.html` inside `#tefila-buttons`.
 
 ### js/content.js
@@ -236,8 +240,12 @@ Update ALL of these when bumping version:
 2. `sw.js` → `APP_VERSION`
 3. `index.html` → `var V = 'X.X'` (inline HEAD script)
 4. `index.html` → `גרסה X.X` in splash screen
-5. `index.html` → `?v=X.X` on all `<script src>` tags
-6. `index.html` → `מה חדש בגרסה X.X` in whats-new-modal title
+5. `index.html` → `גרסה X.X` in the footer (`· עיתים ·`)
+6. `index.html` → `?v=X.X` on all `<script src>` tags
+7. `index.html` → `מה חדש בגרסה X.X` in whats-new-modal title
+
+Run `python3 release-checklist.py` to verify all of the above automatically instead
+of grepping for each one by hand.
 
 ---
 

@@ -29,11 +29,15 @@ def run() -> TestSuite:
             versions[0] if versions else 'MISSING')
 
     # ── Required DOM elements ─────────────────────────────────────────
+    # NOTE: IDs below match the current page-based tab architecture (each tab
+    # is a standalone <div class="page" id="page-X">, toggled by showTab() —
+    # there is no single #main-content wrapper). Keep in sync with app.js/
+    # index.html if the tab structure changes again.
     required_ids = [
         # Core layout
-        'topbar', 'splash', 'main-content',
-        # Navigation tabs
-        'tab-calendar', 'tab-siddur', 'tab-parasha', 'tab-tehilim',
+        'topbar', 'splash',
+        # Navigation tabs (content containers, not the nav buttons t-X)
+        'page-calendar', 'page-siddur', 'page-parasha', 'page-tehilim',
         # Siddur
         'siddur-content', 'siddur-status-banner',
         'tefila-type-buttons', 'nusach-buttons',
@@ -42,7 +46,7 @@ def run() -> TestSuite:
         # Tehilim
         'tehilim-content', 'tehilim-num-title', 'tehilim-select',
         # Calendar / Zmanim
-        'zmanim-container',
+        'zmanim-grid',
         # Omer
         'omer-modal',
         # Reminders
@@ -62,7 +66,11 @@ def run() -> TestSuite:
         s.check(f'Zmanim toggle tog-{key}-auto exists', find_id(f'tog-{key}-auto'))
 
     # ── Whats-new modal nesting ───────────────────────────────────────
-    modal_start = HTML.find('id="whats-new-modal"')
+    # NOTE: search for the opening tag itself (not just the id= attribute),
+    # so modal_block includes the modal's own <div>...</div> pair. Anchoring on
+    # 'id="whats-new-modal"' alone starts the slice AFTER the tag's own '<div',
+    # which undercounts opens by exactly 1 relative to closes every time.
+    modal_start = HTML.find('<div id="whats-new-modal"')
     modal_end   = HTML.find('<!-- TOP BAR -->', modal_start)
     if modal_start > 0 and modal_end > 0:
         modal_block = HTML[modal_start:modal_end]

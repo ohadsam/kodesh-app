@@ -7,6 +7,11 @@
 ---
 
 ## Deploy Checklist
+Run `python3 release-checklist.py` first — it verifies steps 1-4 below automatically
+(version consistency, AGENT.md currency, what's-new content, full test suite with
+network-only failures downgraded to warnings, `node --check` on every js file) and
+exits non-zero if anything blocking is wrong. Use `--verbose` to see passing checks too.
+
 1. Bump `APP_VERSION` in **utils.js** AND **sw.js** (must match)
 2. Update `?v=X.X` on ALL script tags in index.html
 3. Update `גרסה X.X` in splash HTML in index.html
@@ -15,6 +20,9 @@
 6. Hard reload on device OR press **"💥 איפוס מוחלט"** in settings
 
 **Important:** The inline HEAD script is the ONLY version guard. Do NOT add another in utils.js — causes infinite reload loop.
+
+**Note:** `release-checklist.py` cannot verify halachic accuracy or on-device UI/UX —
+those still need human review (step 6 above + a real-device spot-check).
 
 ---
 
@@ -158,6 +166,19 @@ that goes quiet for `HSRC_STALE_MS` = 3 s yields to a lower-ranked one):
 
 ## Known Issues / Open Items
 
+### 🟡 Dead root-level duplicate .js/.css files (found Sep 21, 2026)
+Every file that exists in `js/*.js` also has a same-named copy sitting at the repo
+root (e.g. root `tefilot.js`, `content.js`, `styles.css`, plus `manifest.json`,
+`reset.html`, `PROJECT_SUMMARY.md`). Confirmed: `index.html` only `<script src>`'s
+from `js/*.js` — the root copies are unreferenced anywhere, out of sync with their
+`js/` counterparts, and last touched at a much older commit (pre-`js/`-folder reorg).
+STRUCTURE.md previously (incorrectly) instructed keeping root `tefilot.js` in sync —
+that caused real wasted effort in an earlier session and has been corrected. Not
+deleted here (out of scope for the task that found this) — a future session could
+safely `git rm` the root-level duplicates after a final confirm-nothing-references-
+them pass, but should NOT touch `manifest.json`/`reset.html` without checking those
+specifically (didn't audit them as thoroughly as the `.js` files).
+
 ### 🟡 Rashi – exact-verse-coverage check not relaxed for chapter-end verses (v5.112)
 `loadRashiForRef`'s Strategy 1/2 require the fetched response to cover exactly
 up to the aliya's `endV`. If a chapter's true LAST verse legitimately has no
@@ -225,6 +246,40 @@ could be more precise for edge cases.
 - ✅ תפילת הדרך added to Brachot tab (with תהילים קכא)
 - ✅ Siddur: 3rd floating button 📋 shows prayer status popup
 - ✅ Tehilim search: gematria support (פרק קל, כג, 130 etc.)
+
+### Tooling (Sep 21, 2026, still v5.112) – release-checklist.py + test suite corrections
+Dev-tooling / test-only changes — no user-facing behavior changed, so no `APP_VERSION`
+bump. Folded into the next real release's entry once one ships.
+- ✅ Added `release-checklist.py`: a single command that gates a merge to main —
+  version consistency across all 7 places it must match, AGENT.md currency, what's-new
+  content, the full test suite (network failures auto-downgraded to warnings,
+  `test_siddur_seasonal`/`test_omer`/`test_html_structure` required to be 100% clean
+  per CLAUDE.md §10), and `node --check` on every `js/*.js` file. Exit code 1 = not
+  ready. `--verbose` shows passing checks too.
+- ✅ **Fixed 3 stale tests found while building the checklist** (all were failing
+  before any of today's app changes — verified with `git stash`):
+  - `test_html_structure.py`: required DOM ids were from a pre-refactor HTML layout
+    (`main-content`, `tab-calendar` etc.) that no longer exists — the app now uses
+    per-tab `#page-X` containers. Updated to the current ids.
+  - `test_html_structure.py`: the whats-new-modal div-balance check anchored its
+    start position on `id="whats-new-modal"` (inside the tag) but its end position
+    included the tag's own closing `</div>` — an unconditional off-by-one that failed
+    for every version's modal content, not a real markup bug. Anchored on the full
+    `<div id="whats-new-modal"` instead.
+  - `test_zmanim.py`: "calendar.js references Kotel coords" checked the wrong file —
+    Kotel/Qibla coordinates are a compass concern (fixed Jerusalem target, `js/misc.js`
+    since v5.110's compass rewrite) not a zmanim concern (user's own location,
+    `js/calendar.js`). Moved the check to `js/misc.js`.
+  - `test_business_logic.py`: asserted `is_winter('Nisan', 15) == True`, contradicting
+    both the test's own `is_winter()` implementation (`Nisan >= 15 → False`) and the
+    real app's `_isWinterSeason()` in `js/siddur-inserts.js:127` — both correctly treat
+    Nisan 15 (Mussaf of the first day of Pesach) as the start of summer. The assertion
+    was simply backwards; fixed and added the missing "Summer: Nisan 15" boundary case.
+- 🟡 **Found, not fixed (out of scope, flagged in Known Issues):** every root-level
+  `.js`/`.css` file (e.g. root `tefilot.js`) is dead code from a pre-`js/`-folder
+  layout — confirmed unreferenced by `index.html` and untouched since a much older
+  commit. STRUCTURE.md previously (incorrectly) documented root `tefilot.js` as
+  needing to stay in sync with `js/tefilot.js`; that note is now corrected.
 
 ### v5.112 (Aug 3, 2026) – Parasha name matching, Rashi retry waste, Tehilim daily chip list
 - ✅ **Fixed:** current parasha not found for multi-word single parshiot (כי תצא, לך

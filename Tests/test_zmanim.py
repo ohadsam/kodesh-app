@@ -132,8 +132,11 @@ def run() -> TestSuite:
     s.check('calendar.js uses sofZmanTfilla', 'sofZmanTfilla' in calendar_js)
     s.check('calendar.js uses sunset',         'sunset'        in calendar_js)
     s.check('calendar.js uses elevation',      'elevation'     in calendar_js)
-    s.check('calendar.js references Kotel coords',
-            '35.2345' in calendar_js or '31.7767' in calendar_js)
+    # Qibla/Kotel coords are a compass concern (fixed Jerusalem target), not a
+    # zmanim concern (user's own location) — they live in misc.js, not calendar.js.
+    misc_js = (Path(__file__).parent.parent / 'js/misc.js').read_text()
+    s.check('misc.js references Kotel coords',
+            '35.2345' in misc_js or '31.7767' in misc_js)
 
     # ── Reminder toggles persist in JS code ──────────────────────────
     settings_js = (Path(__file__).parent.parent / 'js/settings.js').read_text()

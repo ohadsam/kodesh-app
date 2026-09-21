@@ -116,7 +116,8 @@ def run() -> TestSuite:
                 result[:40])
 
     # ── Seasonal logic ────────────────────────────────────────────────
-    # Summer: Nisan 16 through Tishrei 22
+    # Summer: Nisan 15 (Mussaf of the first day of Pesach) through Tishrei 22
+    s.check('Summer: Nisan 15',   not is_winter('Nisan', 15))
     s.check('Summer: Nisan 16',   not is_winter('Nisan', 16))
     s.check('Summer: Iyar 1',     not is_winter('Iyar', 1))
     s.check('Summer: Tishrei 22', not is_winter('Tishrei', 22))
@@ -124,7 +125,6 @@ def run() -> TestSuite:
     s.check('Winter: Tishrei 23', is_winter('Tishrei', 23))
     s.check('Winter: Cheshvan 1', is_winter('Cheshvan', 1))
     s.check('Winter: Nisan 14',   is_winter('Nisan', 14))
-    s.check('Winter: Nisan 15',   is_winter('Nisan', 15))  # Pesach first day
 
     # ── Tachanun skip logic ───────────────────────────────────────────
     s.check('Skip tachanun: Nisan 1',       skip_tachanun('Nisan', 1))

@@ -84,6 +84,11 @@ After every user-visible change:
 - If a test needs to change because of a legitimate code change, update the test and note it explicitly in the commit message and PR description: `[test updated: <test name> – reason]`.
 - Network-dependent tests (Sefaria API, Hebcal API) may fail in offline environments — this is expected. Focus on the local logic tests.
 - The following suites must always pass: `test_siddur_seasonal`, `test_omer`, `test_html_structure` (for the non-network checks).
+- **Before a merge to main, run `python3 release-checklist.py`** — it runs the full
+  test suite plus every other check in this file (version consistency across all 7
+  places it appears, AGENT.md currency, what's-new content, JS syntax) as one gate,
+  auto-classifying network failures as non-blocking warnings. `--verbose` shows
+  passing checks too. Exit code 1 means something in THIS file's rules was violated.
 
 ---
 
@@ -122,6 +127,7 @@ Tabs: לוח שנה (zmanim), סידור, פרשת שבוע, תהילים, דף 
 5. Bump the version everywhere (see §2 above and AGENT.md → Deploy Checklist).
 6. Rewrite the what's-new modal (§9) — delete the old bullets, don't append.
 7. Update AGENT.md / STRUCTURE.md in the same commit.
+8. `python3 release-checklist.py` — final gate before merging to main.
 
 ### Version bumping — use Python, not sed
 `sed` has corrupted the version string in this repo (`5.109` → `5.100`). Use:
@@ -174,6 +180,7 @@ Then confirm: `grep -c "5\.110" index.html js/utils.js sw.js` → 20, 1, 1.
 | Agent rules (this file) | `CLAUDE.md` |
 | Deploy checklist | `AGENT.md` → Deploy Checklist |
 | Run tests | `python3 Tests/test_runner.py` |
+| Run the merge gate | `python3 release-checklist.py` |
 | Prayer texts | `js/tefilot.js`, `js/brachot.js` |
 | Siddur pipeline | `js/siddur.js`, `js/siddur-inserts.js` |
 | Parasha / Rashi / daily study | `js/content.js` |
