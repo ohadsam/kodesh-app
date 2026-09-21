@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.114 (Sep 21, 2026)
+**Last updated:** v5.115 (Sep 21, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -320,6 +320,39 @@ could be more precise for edge cases.
 - ✅ תפילת הדרך added to Brachot tab (with תהילים קכא)
 - ✅ Siddur: 3rd floating button 📋 shows prayer status popup
 - ✅ Tehilim search: gematria support (פרק קל, כג, 130 etc.)
+
+### v5.115 (Sep 21, 2026) – Post-release deep audit fixes (Tehilim + theme)
+Three real, minor bugs found by 3 parallel independent code-review agents doing a
+deep cross-feature regression audit of v5.113/v5.114 (requested explicitly: "no
+regression, everything works as expected"), all fixed and re-verified:
+- ✅ **State desync on a failed fetch during a mode switch.** `loadTehilim`'s
+  `catch` block only showed an error message — it never refreshed the favorites
+  sidebar/star. Repro: view a favorite, go offline, search for another chapter.
+  `tehilimContext` correctly switches to `'manual'` internally, but the old
+  favorite stayed highlighted and the star still reflected the old chapter until
+  the next successful load, because `currentTehilimChapter` (set synchronously,
+  before the fetch) had already moved on but nothing re-rendered. Now
+  `renderTehilimFavoriteStar()`/`renderTehilimFavoritesList()` are also called
+  from the `catch` block.
+- ✅ **Theme toggle buttons had no `aria-pressed`.** `#theme-btn-dark`/
+  `#theme-btn-light` are toggle buttons but only ever got a `.active` CSS class,
+  giving screen-reader users no toggle-state feedback (unlike the Favorites ⭐
+  star, which already did this correctly). Added `aria-pressed` in the HTML and
+  kept it in sync in both `setTheme()` and `initThemeUI()`.
+- ✅ **Favorite name length relied entirely on the HTML `maxlength="60"`.**
+  `addTehilimFavorite`/`updateTehilimFavorite` are callable directly (e.g. from
+  the browser console), bypassing the input's `maxlength`. Added
+  `.slice(0, 60)` in both functions — defense in depth, not a live exploit
+  (output was already `escapeHtml()`-safe either way).
+- Confirmed clean by the same 3-agent audit, no fix needed: `currentTehilimChapter`
+  staleness across manual→day→star was a false alarm (set synchronously before
+  any `await`); editing an unrelated favorite while in manual mode correctly
+  leaves the manual session alone; `tehilimManualHistory` can never accumulate an
+  out-of-range/stale chapter (only ever written through the validated
+  `viewTehilimManual` → `_recordManualVisit` path); no XSS path bypasses
+  `escapeHtml()`; no RTL `margin-left`/`margin-right` regressions; all new UI
+  (Favorites card, theme toggle, manual-mode chip row) is `var(--x)`-consistent
+  from when it was first written, not retrofitted.
 
 ### v5.114 (Sep 21, 2026) – Tehilim manual-selection nav + reading-progress history
 - ✅ Picking a chapter from the `#tehilim-select` dropdown or via search now gets

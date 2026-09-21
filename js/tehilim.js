@@ -224,7 +224,7 @@ function addTehilimFavorite(name, fromCh, toCh) {
   if (toCh < 1 || toCh > 150) return { ok: false, error: 'פרק סיום לא תקין (1-150)' };
   if (toCh < fromCh) return { ok: false, error: 'פרק הסיום חייב להיות אחרי פרק ההתחלה' };
   if (toCh - fromCh > 150) return { ok: false, error: 'טווח גדול מדי' };
-  name = (name || '').trim() || (fromCh === toCh ? `פרק ${fromCh}` : `פרקים ${fromCh}-${toCh}`);
+  name = (name || '').trim().slice(0, 60) || (fromCh === toCh ? `פרק ${fromCh}` : `פרקים ${fromCh}-${toCh}`);
 
   const chapters = [];
   for (let c = fromCh; c <= toCh; c++) chapters.push(c);
@@ -244,7 +244,7 @@ function updateTehilimFavorite(id, name, fromCh, toCh) {
   if (!fromCh || fromCh < 1 || fromCh > 150) return { ok: false, error: 'פרק התחלה לא תקין (1-150)' };
   if (toCh < 1 || toCh > 150) return { ok: false, error: 'פרק סיום לא תקין (1-150)' };
   if (toCh < fromCh) return { ok: false, error: 'פרק הסיום חייב להיות אחרי פרק ההתחלה' };
-  fav.name = (name || '').trim() || (fromCh === toCh ? `פרק ${fromCh}` : `פרקים ${fromCh}-${toCh}`);
+  fav.name = (name || '').trim().slice(0, 60) || (fromCh === toCh ? `פרק ${fromCh}` : `פרקים ${fromCh}-${toCh}`);
   fav.chapters = [];
   for (let c = fromCh; c <= toCh; c++) fav.chapters.push(c);
   _saveFavorites(list);
@@ -649,5 +649,11 @@ async function loadTehilim(chapterOrRange) {
   } catch(e) {
     console.error('[Tehilim] error:', e);
     el.textContent = 'שגיאה בטעינה: ' + e.message;
+    // currentTehilimChapter/tehilimContext were already updated above (and by the
+    // caller) before this fetch failed — refresh these two even on failure, or a
+    // mode switch during a network error leaves the favorites sidebar/star
+    // showing the PREVIOUS chapter's state until the next successful load.
+    renderTehilimFavoriteStar();
+    renderTehilimFavoritesList();
   }
 }
