@@ -90,6 +90,8 @@ js/init.js          → init() – called on DOMContentLoaded
 | `sefariaText(ref, max)` | Fetch + cache Sefaria text by ref |
 | `formatHebrewDate(d)` | Hebrew date string from JS Date |
 | `escapeHtml(s)` | Escape `&<>"'` — use for any USER-typed text (favorite names etc.) going into an `innerHTML` template. Sefaria/Hebcal text is trusted and rendered as-is elsewhere; text typed on the device is not |
+| `toggleCollapsibleSection(id)` | Toggle a `{id}-header`/`{id}-body` pair (see markup contract in the code comment), persists collapsed state to `appState.collapsedSections[id]` (only `true` stored — default is expanded) |
+| `applyCollapsedSection(id)` | Call once after a collapsible section's markup exists in the DOM (e.g. from a tab's init function) to restore last session's collapsed state |
 
 ### js/app.js
 | Function | Description |
@@ -179,7 +181,9 @@ Add `<button id="tf-{key}" class="aliya-tab" onclick="showTefila('{key}')">` in 
 | `hebrewToNumber(str)` | Convert Hebrew letters to numeric value |
 | **Favorites** | Individual chapters or custom ranges, saved to `appState.tehilimFavorites` |
 | `tehilimContext` | `{type:'day'}` (default) / `{type:'favorite', id}` / `{type:'manual'}` — which chapter list drives nav/chips |
-| `addTehilimFavorite(name, from, to)` / `updateTehilimFavorite(id, name, from, to)` / `deleteTehilimFavorite(id)` | CRUD; range is expanded to a plain chapter-number array at save time (mirrors `TEHILIM_SCHEDULE`'s shape so nav code doesn't need to special-case it) |
+| `addTehilimFavorite(name, from, to, reminder?)` / `updateTehilimFavorite(id, name, from, to, reminder?)` / `deleteTehilimFavorite(id)` | CRUD; range is expanded to a plain chapter-number array at save time (mirrors `TEHILIM_SCHEDULE`'s shape so nav code doesn't need to special-case it). `reminder` is `{enabled, time, recurring}`, stored as `fav.reminder` (deleting the favorite drops it automatically) |
+| `_normalizeReminder(r)` | Validates/defaults a raw reminder object before storing — rejects a malformed `time` rather than storing something `_getPendingReminders` can't parse |
+| `scheduleTehilimFavoriteReminder(favId)` | Best-effort OS `Notification`, one-shot `setTimeout` — mirrors `scheduleReminder(key)` in js/settings.js exactly, same limitation (only fires if the tab stays open past the target time, never re-armed on reload). The reliable path is `checkRemindersOnOpen()` via `_allReminderItems()` below |
 | `toggleTehilimFavoriteChapter(ch)` / `isChapterFavorited(ch)` | The ⭐ star button next to the chapter title — single-chapter favorites only |
 | `viewTehilimFavorite(favId, idx)` | Enters favorite-mode and loads `chapters[idx]` |
 | `openTehilimFavForm(editId?)` / `closeTehilimFavForm()` / `saveTehilimFavForm()` | Add/edit form in the Favorites card |
@@ -231,6 +235,11 @@ Add `<button id="tf-{key}" class="aliya-tab" onclick="showTefila('{key}')">` in 
 | `shareAppWhatsApp()` / `shareAppEmail()` | Settings → "שתפו את האפליקציה". `wa.me/?text=` (no phone number → opens WhatsApp's own contact picker) and `mailto:?subject=&body=` (CRLF line breaks, each field separately `encodeURIComponent`'d) |
 | `setTheme(mode)` | `'dark'`\|`'light'` — sets/removes `data-theme` on `<html>`, persists to `localStorage.theme`, updates the `theme-color` meta tag, highlights the settings button + `aria-pressed`. The actual FIRST-PAINT theme application is a separate, earlier inline `<script>` in index.html's `<head>` (before `styles.css` loads) reading the same key — see the comment above `setTheme` for why |
 | `initThemeUI()` | Called from `loadSettingsState()` — syncs the settings buttons to whatever the HEAD script already applied; does not re-apply the theme itself |
+| `REMINDER_ITEMS` | Static array of the 8 built-in daily reminder items (omer, halacha, tehilim, lashon, daf, mishna, rambam, parasha) |
+| `_allReminderItems()` | `REMINDER_ITEMS` plus one synthetic item (`key: favrem_<id>`) per Tehilim favorite with an enabled reminder (js/tehilim.js). Every reminder consumer (`_getPendingReminders`, `_updateNotifBadge`, `_buildReminderList`, `openReminderModal`) iterates this, not the raw const |
+| `_reminderSettingsFor(item)` | Reads `{time, enabled}` regardless of source — `fav.reminder` for a favorite item, `appState.reminders[key]` for a static one |
+| `_autoDisableIfOneTime(item)` | A one-time (non-recurring) favorite reminder disables itself once marked done, so it never resurfaces; daily favorites and all static items are unaffected (they recur naturally via the daily `_remindersDone` reset) — hooked into `toggleReminderDone`/`markAllRemindersDone` |
+| `_reminderNav(key)` | Routes "פתח עכשיו" — `favrem_<id>` keys go to `viewTehilimFavorite`, everything else uses the static `REMINDER_NAV` map |
 
 ---
 

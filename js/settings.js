@@ -344,6 +344,13 @@ const REMINDER_NAV = {
 
 // Expose nav actions globally so onclick strings can call them
 function _reminderNav(key) {
+  if (key.startsWith('favrem_')) {
+    const favId = key.slice('favrem_'.length);
+    closeReminderModal();
+    showTab('tehilim');
+    if (typeof viewTehilimFavorite === 'function') viewTehilimFavorite(favId, 0);
+    return;
+  }
   const nav = REMINDER_NAV[key];
   if (nav) nav.action();
 }
@@ -364,6 +371,49 @@ const REMINDER_ITEMS = [
   { key: 'parasha',  name: '📜 פרשת השבוע',      weekly: true },
 ];
 
+// Every reminder-eligible item: the static REMINDER_ITEMS above, plus one per
+// Tehilim favorite that has a reminder configured (js/tehilim.js). Every
+// consumer below iterates THIS instead of the raw REMINDER_ITEMS const, so a
+// favorite's reminder gets the exact same bell badge / pending-modal /
+// "mark done" treatment as the built-in daily reminders, for free — see
+// CLAUDE.md rule 4 (reuse existing helpers, don't duplicate this logic).
+function _allReminderItems() {
+  if (typeof getTehilimFavorites !== 'function') return REMINDER_ITEMS;
+  const favItems = getTehilimFavorites()
+    .filter(f => f.reminder?.enabled)
+    .map(f => ({
+      key: `favrem_${f.id}`,
+      name: `🙏 ${f.name}`,
+      daily: !!f.reminder.recurring,
+      favId: f.id,
+    }));
+  return [...REMINDER_ITEMS, ...favItems];
+}
+
+// Reads the {time, enabled} pair for an item regardless of whether it's a
+// static REMINDER_ITEMS entry (stored in appState.reminders[key]) or a
+// Tehilim-favorite item (stored on the favorite itself, fav.reminder).
+function _reminderSettingsFor(item) {
+  if (item.favId) {
+    return (typeof _favoriteById === 'function' ? _favoriteById(item.favId) : null)?.reminder || {};
+  }
+  return appState?.reminders?.[item.key] || {};
+}
+
+// A non-recurring (one-time) favorite reminder should not come back the next
+// day once it's been shown and marked done — the static REMINDER_ITEMS have
+// no such concept (all are daily/weekly/event-conditional), so this only
+// applies to favorite items. See toggleReminderDone below.
+function _autoDisableIfOneTime(item) {
+  if (!item.favId || item.daily) return; // daily favorites recur like any other
+  const fav = typeof _favoriteById === 'function' ? _favoriteById(item.favId) : null;
+  if (fav?.reminder) {
+    fav.reminder.enabled = false;
+    saveState(); // fav is the same object reference inside appState.tehilimFavorites
+    if (typeof renderTehilimFavoritesList === 'function') renderTehilimFavoritesList();
+  }
+}
+
 // Update topbar notification bell
 function _updateNotifBadge() {
   // Show bell for ALL enabled+applicable reminders regardless of scheduled time
@@ -374,8 +424,8 @@ function _updateNotifBadge() {
   const today = formatDate(new Date());
   const todayDone = (appState._remindersDone || {})[today] || {};
   let count = 0;
-  for (const item of REMINDER_ITEMS) {
-    const r = appState?.reminders?.[item.key];
+  for (const item of _allReminderItems()) {
+    const r = _reminderSettingsFor(item);
     if (!r?.enabled) continue;
     if (item.checkFn && !item.checkFn()) continue;
     if (!todayDone[item.key]) count++;
@@ -395,8 +445,8 @@ function _getPendingReminders() {
   const today = formatDate(new Date());
   const todayDone = (appState._remindersDone || {})[today] || {};
   const pending = [];
-  for (const item of REMINDER_ITEMS) {
-    const r = appState?.reminders?.[item.key];
+  for (const item of _allReminderItems()) {
+    const r = _reminderSettingsFor(item);
     if (!r?.enabled) continue;
     if (item.checkFn && !item.checkFn()) continue;
     if (todayDone[item.key]) continue;
@@ -416,7 +466,14 @@ function _buildReminderList(pending) {
 
   listEl.innerHTML = pending.map(item => {
     const isDone = !!todayDone[item.key];
-    const navBtn = REMINDER_NAV[item.key]
+    const navBtn = item.favId
+      ? `<button onclick="_reminderNav('${item.key}')"
+           style="background:var(--gold);color:#000;border:none;border-radius:8px;
+                  padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;
+                  font-family:'Heebo',sans-serif;white-space:nowrap;flex-shrink:0">
+           פתח עכשיו ▶
+         </button>`
+      : REMINDER_NAV[item.key]
       ? `<button onclick="_reminderNav('${item.key}')"
            style="background:var(--gold);color:#000;border:none;border-radius:8px;
                   padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;
@@ -432,7 +489,7 @@ function _buildReminderList(pending) {
           onchange="toggleReminderDone('${item.key}', this.checked)"
           style="width:20px;height:20px;accent-color:var(--gold);flex-shrink:0">
         <span style="font-family:'Frank Ruhl Libre',serif;font-size:15px;flex:1;
-                     ${isDone ? 'text-decoration:line-through;color:var(--muted)' : ''}">${item.name}</span>
+                     ${isDone ? 'text-decoration:line-through;color:var(--muted)' : ''}">${escapeHtml(item.name)}</span>
         ${navBtn}
       </label>`;
   }).join('') +
@@ -449,8 +506,8 @@ function openReminderModal() {
   // Show ALL enabled reminders (not just pending) when opened manually
   const today = formatDate(new Date());
   const todayDone = (appState._remindersDone || {})[today] || {};
-  const allEnabled = REMINDER_ITEMS.filter(item => {
-    const r = appState?.reminders?.[item.key];
+  const allEnabled = _allReminderItems().filter(item => {
+    const r = _reminderSettingsFor(item);
     if (!r?.enabled) return false;
     if (item.checkFn && !item.checkFn()) return false;
     return true;
@@ -491,6 +548,10 @@ function toggleReminderDone(key, done) {
   if (!appState._remindersDone[today]) appState._remindersDone[today] = {};
   appState._remindersDone[today][key] = done;
   saveState();
+  if (done) {
+    const item = _allReminderItems().find(i => i.key === key);
+    if (item) _autoDisableIfOneTime(item);
+  }
   _updateNotifBadge();
 }
 
@@ -502,6 +563,7 @@ function markAllRemindersDone() {
     appState._remindersDone[today][item.key] = true;
     const chk = document.getElementById('rem-chk-' + item.key);
     if (chk) chk.checked = true;
+    _autoDisableIfOneTime(item);
   }
   saveState();
   _updateNotifBadge();

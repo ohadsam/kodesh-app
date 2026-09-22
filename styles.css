@@ -156,6 +156,41 @@ body {
   line-height: 1.5;
 }
 
+/* Generic collapsible-section header — a real <button> (keyboard-accessible,
+   focusable) styled to look like a plain .card-title, with a chevron that
+   rotates via aria-expanded so no JS is needed just to flip an icon.
+   Apply alongside .card-title: class="card-title collapsible-header".
+   State is toggled by toggleCollapsibleSection(id) and restored on load by
+   applyCollapsedSection(id) — both in js/utils.js — persisted to
+   appState.collapsedSections[id]. */
+.collapsible-header {
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  justify-content: space-between;
+  padding: 0;
+  text-align: inherit;
+}
+/* Inside .card-header the button shares the row with another button (e.g.
+   Tehilim favorites' "+ הוסף") — width:100% there would push the sibling
+   off the row entirely. Shrink to a flex item instead; .card-header's own
+   justify-content:space-between still pins the sibling to the far edge. */
+.card-header .collapsible-header {
+  width: auto;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.collapsible-chevron {
+  font-size: 12px;
+  color: var(--muted);
+  transition: transform .2s;
+  flex-shrink: 0;
+}
+.collapsible-header[aria-expanded="false"] .collapsible-chevron {
+  transform: rotate(-90deg);
+}
+
 /* ─── PAGES ──────────────────────────────── */
 .page { display: none; padding: 16px; padding-bottom: 90px; animation: fadeIn .3s ease; }
 .page.active { display: block; }

@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.117 (Sep 22, 2026)
+**Last updated:** v5.118 (Sep 22, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -228,6 +228,54 @@ that goes quiet for `HSRC_STALE_MS` = 3 s yields to a lower-ranked one):
   above is what makes this safe at the chapter-1/chapter-150 boundaries too —
   same mechanism, same reason it's needed.
 
+### Collapsible Sections — js/utils.js (v5.118)
+- Generic, reusable anywhere in the app — not Tehilim-specific, currently used
+  by the Tehilim day-selector and Favorites cards. Markup contract: a real
+  `<button id="{id}-header" class="card-title collapsible-header"
+  onclick="toggleCollapsibleSection('{id}')" aria-expanded="true"
+  aria-controls="{id}-body">` plus a `<div id="{id}-body">` wrapping the
+  collapsible content. A real `<button>`, not a div+onclick, so it stays
+  keyboard-focusable; the chevron rotates purely via CSS
+  (`[aria-expanded="false"] .collapsible-chevron`) — no JS needed to flip it.
+- State persists to `appState.collapsedSections[id]`, only storing `true`
+  (default is expanded, so a user who never collapses anything gets no new
+  key). Call `applyCollapsedSection(id)` once after the section's markup
+  exists in the DOM (e.g. from the tab's init function) to restore it.
+- If you add a collapsible header inside a `.card-header` that already has a
+  sibling button (like Favorites' "+ הוסף"), you need the scoped
+  `.card-header .collapsible-header { width:auto; flex:1 1 auto; min-width:0 }`
+  override in styles.css — the base rule is `width:100%`, correct for a
+  header alone in a card but it pushes a flex-sibling off the row otherwise.
+
+### Reminder System — js/settings.js (+ favorite reminders, v5.118)
+- Two kinds of reminder-eligible item now feed the same pipeline: the static
+  `REMINDER_ITEMS` (omer, halacha, tehilim, lashon, daf, mishna, rambam,
+  parasha — settings stored in `appState.reminders[key]`) and, since v5.118,
+  one per Tehilim favorite that has `fav.reminder.enabled` (settings stored
+  ON the favorite itself, `fav.reminder = {enabled, time, recurring}`, so
+  deleting the favorite drops its reminder with no separate cleanup).
+  `_allReminderItems()` merges both; `_reminderSettingsFor(item)` reads the
+  right place. Every existing consumer (`_getPendingReminders`,
+  `_updateNotifBadge`, `_buildReminderList`, `openReminderModal`) iterates
+  `_allReminderItems()` now instead of the raw const — do not add a favorite-
+  specific parallel code path, extend this one.
+- **The OS `Notification` + `setTimeout` path (`scheduleReminder`/
+  `scheduleTehilimFavoriteReminder`) is best-effort only** — it only fires if
+  the browser tab happens to stay open past the target time, and is NEVER
+  re-armed on reload (nothing outside settings.js calls `scheduleReminder`,
+  and no init hook re-arms it). **The reliable mechanism for every reminder,
+  static or favorite, is `checkRemindersOnOpen()`**, called on every app
+  init, which re-evaluates pending reminders fresh against the current time
+  and `appState._remindersDone[today]` (which auto-resets daily). Don't let a
+  future "fix" for a missed OS notification try to make the `setTimeout` path
+  itself more reliable — the fix belongs in the pending-reminder check.
+- Recurring vs one-time: a recurring favorite reminder behaves exactly like
+  an existing `daily:true` item — it naturally resurfaces via the daily
+  `_remindersDone` reset, no new logic needed. A one-time favorite needed
+  `_autoDisableIfOneTime(item)`, hooked into `toggleReminderDone` and
+  `markAllRemindersDone`, since nothing in the static item set ever
+  auto-disables itself.
+
 ### Omer (omer.js)
 - `getOmerDay()`: computed from Hebrew date
 - Full text: לשם יחוד, ברכה, ספירה, הרחמן, למנצח, אנא בכח, יהי רצון, עלינו
@@ -318,6 +366,79 @@ could be more precise for edge cases.
 ---
 
 ## Recently Fixed
+
+### v5.118 (Sep 22, 2026) – Collapsible Tehilim sections + favorite reminders
+- ✅ **Collapsible/expandable sections.** The Tehilim tab's "תהילים לפי תאריך
+  עברי" (day/chapter selector) card and "מועדפים" (Favorites) card can now each
+  be collapsed independently via a chevron-button header, so the favorites list
+  doesn't force the day-selector off-screen on a long list. New reusable
+  primitive (not Tehilim-specific): `toggleCollapsibleSection(id)` /
+  `applyCollapsedSection(id)` in `js/utils.js`. Markup contract: a real
+  `<button id="{id}-header" class="card-title collapsible-header" ...
+  aria-expanded aria-controls="{id}-body">` plus a `<div id="{id}-body">`
+  wrapping the collapsible content — a real `<button>` (not a div+onclick) so
+  it's keyboard-focusable, with the chevron rotated purely via CSS
+  (`[aria-expanded="false"] .collapsible-chevron`), no JS needed to flip the
+  icon. State persists to `appState.collapsedSections[id]` (only `true` is
+  ever stored — default is expanded, so a user who never touches this sees no
+  new localStorage key).
+  - CSS gotcha found and fixed during implementation, not after: the
+    Favorites card's collapsible header button is a flex-SIBLING of the
+    pre-existing "+ הוסף" button inside `.card-header` (`display:flex`). The
+    initial `.collapsible-header { width:100% }` rule (fine standalone in the
+    day-selector card) would have pushed "+ הוסף" off the row there. Fixed
+    with a scoped override, `.card-header .collapsible-header { width:auto;
+    flex:1 1 auto; min-width:0 }`, verified against `.card-header`'s actual
+    flex CSS before writing the fix.
+- ✅ **Tehilim favorite reminders**, including a daily-recurring option. The
+  favorite add/edit form (`#tehilim-fav-form`) gained a reminder block (time +
+  "חזרה יומית" checkbox); saved as `fav.reminder = {enabled, time, recurring}`
+  on the favorite itself (`js/tehilim.js`), not in the generic
+  `appState.reminders` map — chosen so deleting the favorite automatically
+  drops its reminder with no separate cleanup step.
+  - Reused, rather than duplicated, the ENTIRE existing reminder subsystem
+    (`js/settings.js`: `_getPendingReminders`, `_updateNotifBadge`,
+    `_buildReminderList`, `openReminderModal`, `checkRemindersOnOpen`) per
+    CLAUDE.md §4. New `_allReminderItems()` returns the static
+    `REMINDER_ITEMS` plus one synthetic item per favorite with an enabled
+    reminder (`key: favrem_<id>`); every consumer above now iterates this
+    instead of the raw const. New `_reminderSettingsFor(item)` reads
+    `fav.reminder` for a favorite item or `appState.reminders[key]` for a
+    static one, so the rest of the pipeline doesn't need to know which kind
+    of item it has.
+  - **Recurring vs one-time semantics.** A recurring favorite behaves exactly
+    like the existing `daily:true` items (naturally resurfaces because
+    `appState._remindersDone` resets every day — no new code needed). A
+    one-time favorite needed new logic, since nothing in the static item set
+    ever auto-disables: `_autoDisableIfOneTime(item)`, hooked into both
+    `toggleReminderDone` (single item) and `markAllRemindersDone` (bulk), sets
+    `fav.reminder.enabled = false` so it never resurfaces after being shown
+    and dismissed once.
+  - **Honesty about the OS-notification limitation, in both code and UI
+    text.** `scheduleTehilimFavoriteReminder()` mirrors the pre-existing
+    `scheduleReminder(key)` in `js/settings.js` exactly — `Notification` +
+    one-shot `setTimeout` — which only fires if the tab happens to stay open
+    past the target time and is never re-armed on reload (confirmed via grep:
+    nothing outside `settings.js` calls `scheduleReminder`, and `init.js`
+    never re-arms it). The RELIABLE mechanism, for both static and favorite
+    reminders alike, is the existing `checkRemindersOnOpen()` call on every
+    app load, which re-evaluates pending reminders fresh against the current
+    time. The in-app copy under the reminder toggle says this explicitly
+    rather than implying a real push notification.
+  - Security: favorite names are free-text and now also flow into
+    `_buildReminderList`'s `innerHTML` via the synthetic item's `name`
+    (`🙏 ${f.name}`) — wrapped in `escapeHtml()` there, consistent with the
+    v5.113 favorites-list fix, before this ever shipped.
+- Verified numerically, not by eye: two Node `vm` harnesses loading the real
+  `js/utils.js` (+ `js/settings.js` + `js/tehilim.js` for the reminder one)
+  into a shared sandbox — 10 assertions for collapse/expand/persist/restore,
+  15 for the reminder integration (add recurring + one-time, both appear in
+  `_allReminderItems`/pending list/badge count, one-time auto-disables on
+  completion while recurring stays enabled, `_reminderNav` routes to the
+  correct favorite, deleting a favorite removes its reminder, and a
+  regression check that the pre-existing static `halacha` reminder is
+  unaffected). Full suite: 270/288 (all 18 failures are the expected sandbox
+  network 403s — see CLAUDE.md §1/§10).
 
 ### v5.26 (April 9, 2026)
 - ✅ Tab scroll sync restored (proportional sync, lock prevents bounce)

@@ -121,6 +121,8 @@ function initTehilim() {
     }
   }
 
+  applyCollapsedSection('tehilim-day-section');
+  applyCollapsedSection('tehilim-fav-section');
   renderTehilimFavoritesList();
   loadTodayTehilim();
 }
@@ -218,7 +220,7 @@ function _saveFavorites(list) {
   saveState();
 }
 
-function addTehilimFavorite(name, fromCh, toCh) {
+function addTehilimFavorite(name, fromCh, toCh, reminder) {
   fromCh = parseInt(fromCh); toCh = parseInt(toCh) || fromCh;
   if (!fromCh || fromCh < 1 || fromCh > 150) return { ok: false, error: 'פרק התחלה לא תקין (1-150)' };
   if (toCh < 1 || toCh > 150) return { ok: false, error: 'פרק סיום לא תקין (1-150)' };
@@ -230,13 +232,14 @@ function addTehilimFavorite(name, fromCh, toCh) {
   for (let c = fromCh; c <= toCh; c++) chapters.push(c);
 
   const fav = { id: 'fav_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), name, chapters };
+  if (reminder) fav.reminder = _normalizeReminder(reminder);
   const list = getTehilimFavorites();
   list.push(fav);
   _saveFavorites(list);
   return { ok: true, favorite: fav };
 }
 
-function updateTehilimFavorite(id, name, fromCh, toCh) {
+function updateTehilimFavorite(id, name, fromCh, toCh, reminder) {
   const list = getTehilimFavorites();
   const fav = list.find(f => f.id === id);
   if (!fav) return { ok: false, error: 'המועדף לא נמצא' };
@@ -247,6 +250,8 @@ function updateTehilimFavorite(id, name, fromCh, toCh) {
   fav.name = (name || '').trim().slice(0, 60) || (fromCh === toCh ? `פרק ${fromCh}` : `פרקים ${fromCh}-${toCh}`);
   fav.chapters = [];
   for (let c = fromCh; c <= toCh; c++) fav.chapters.push(c);
+  if (reminder) fav.reminder = _normalizeReminder(reminder);
+  else delete fav.reminder;
   _saveFavorites(list);
   // If the currently-viewed chapter is no longer in the edited favorite's range,
   // drop out of favorite-context so nav/chips don't point at stale indices.
@@ -255,6 +260,13 @@ function updateTehilimFavorite(id, name, fromCh, toCh) {
     _resetTehilimContext();
   }
   return { ok: true, favorite: fav };
+}
+
+// { enabled, time: 'HH:MM', recurring } — reject a malformed time rather than
+// storing something _getPendingReminders' `.split(':').map(Number)` can't parse.
+function _normalizeReminder(r) {
+  const time = /^\d{2}:\d{2}$/.test(r.time) ? r.time : '08:00';
+  return { enabled: !!r.enabled, time, recurring: !!r.recurring };
 }
 
 function deleteTehilimFavorite(id) {
@@ -293,17 +305,22 @@ function renderTehilimFavoriteStar() {
 function openTehilimFavForm(editId) {
   const form = document.getElementById('tehilim-fav-form');
   if (!form) return;
-  const titleEl = document.getElementById('tehilim-fav-form-title');
-  const idEl    = document.getElementById('tehilim-fav-edit-id');
-  const nameEl  = document.getElementById('tehilim-fav-name');
-  const fromEl  = document.getElementById('tehilim-fav-from');
-  const toEl    = document.getElementById('tehilim-fav-to');
-  const errEl   = document.getElementById('tehilim-fav-form-error');
+  const titleEl    = document.getElementById('tehilim-fav-form-title');
+  const idEl       = document.getElementById('tehilim-fav-edit-id');
+  const nameEl     = document.getElementById('tehilim-fav-name');
+  const fromEl     = document.getElementById('tehilim-fav-from');
+  const toEl       = document.getElementById('tehilim-fav-to');
+  const errEl      = document.getElementById('tehilim-fav-form-error');
+  const remEnEl    = document.getElementById('tehilim-fav-reminder-enabled');
+  const remTimeEl  = document.getElementById('tehilim-fav-reminder-time');
+  const remRecurEl = document.getElementById('tehilim-fav-reminder-recurring');
+  const remFieldsEl = document.getElementById('tehilim-fav-reminder-fields');
   if (errEl) errEl.textContent = '';
 
-  if (editId) {
-    const fav = _favoriteById(editId);
-    if (!fav) return;
+  const fav = editId ? _favoriteById(editId) : null;
+  if (editId && !fav) return;
+
+  if (fav) {
     if (titleEl) titleEl.textContent = 'עריכת מועדף';
     if (idEl) idEl.value = editId;
     if (nameEl) nameEl.value = fav.name;
@@ -316,6 +333,12 @@ function openTehilimFavForm(editId) {
     if (fromEl) fromEl.value = '';
     if (toEl) toEl.value = '';
   }
+  const r = fav?.reminder;
+  if (remEnEl)    remEnEl.checked = !!r?.enabled;
+  if (remTimeEl)  remTimeEl.value = r?.time || '08:00';
+  if (remRecurEl) remRecurEl.checked = r ? !!r.recurring : true; // default ON for a new reminder
+  if (remFieldsEl) remFieldsEl.style.display = r?.enabled ? 'flex' : 'none';
+
   form.style.display = 'block';
   form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   if (nameEl) nameEl.focus();
@@ -332,10 +355,15 @@ function saveTehilimFavForm() {
   const fromV  = document.getElementById('tehilim-fav-from')?.value;
   const toV    = document.getElementById('tehilim-fav-to')?.value || fromV;
   const errEl  = document.getElementById('tehilim-fav-form-error');
+  const reminder = {
+    enabled:   !!document.getElementById('tehilim-fav-reminder-enabled')?.checked,
+    time:      document.getElementById('tehilim-fav-reminder-time')?.value || '08:00',
+    recurring: !!document.getElementById('tehilim-fav-reminder-recurring')?.checked,
+  };
 
   const result = id
-    ? updateTehilimFavorite(id, name, fromV, toV)
-    : addTehilimFavorite(name, fromV, toV);
+    ? updateTehilimFavorite(id, name, fromV, toV, reminder)
+    : addTehilimFavorite(name, fromV, toV, reminder);
 
   if (!result.ok) {
     if (errEl) errEl.textContent = result.error;
@@ -344,6 +372,8 @@ function saveTehilimFavForm() {
   closeTehilimFavForm();
   renderTehilimFavoritesList();
   renderTehilimFavoriteStar();
+  if (reminder.enabled) scheduleTehilimFavoriteReminder(result.favorite.id);
+  if (typeof _updateNotifBadge === 'function') _updateNotifBadge();
 }
 
 function confirmDeleteTehilimFavorite(id) {
@@ -358,6 +388,7 @@ function confirmDeleteTehilimFavorite(id) {
   deleteTehilimFavorite(id);
   renderTehilimFavoritesList();
   renderTehilimFavoriteStar();
+  if (typeof _updateNotifBadge === 'function') _updateNotifBadge();
 }
 
 function renderTehilimFavoritesList() {
@@ -375,6 +406,9 @@ function renderTehilimFavoritesList() {
       : `פרקים ${fav.chapters[0]}–${fav.chapters[fav.chapters.length - 1]} (${fav.chapters.length})`;
     const isActive = tehilimContext.type === 'favorite' && tehilimContext.id === fav.id;
     const safeName = escapeHtml(fav.name);
+    const reminderLabel = fav.reminder?.enabled
+      ? ` · 🔔 ${fav.reminder.time}${fav.reminder.recurring ? ' (יומי)' : ''}`
+      : '';
     return `
       <div style="display:flex;align-items:center;gap:8px;background:${isActive ? 'rgba(201,165,74,.1)' : 'var(--surface)'};
         border:1px solid ${isActive ? 'var(--gold)' : 'var(--border)'};border-radius:10px;padding:8px 10px">
@@ -382,7 +416,7 @@ function renderTehilimFavoritesList() {
           style="flex:1;text-align:right;background:none;border:none;cursor:pointer;
           font-family:'Heebo',sans-serif;padding:2px" aria-label="צפה ב${safeName}">
           <div style="font-size:13px;color:var(--cream);font-weight:600">${safeName}</div>
-          <div style="font-size:11px;color:var(--muted)">${rangeLabel}</div>
+          <div style="font-size:11px;color:var(--muted)">${rangeLabel}${reminderLabel}</div>
         </button>
         <button onclick="openTehilimFavForm('${fav.id}')" aria-label="ערוך את ${safeName}"
           style="background:none;border:none;cursor:pointer;font-size:15px;padding:6px">✏️</button>
@@ -391,6 +425,31 @@ function renderTehilimFavoritesList() {
           style="background:none;border:none;cursor:pointer;font-size:15px;padding:6px">🗑️</button>
       </div>`;
   }).join('');
+}
+
+// Best-effort OS notification for a favorite's reminder — mirrors
+// scheduleReminder(key) in js/settings.js exactly (same Notification API,
+// same one-shot setTimeout limitation: only fires if this tab stays open
+// past the target time; does NOT survive a reload or the tab being closed).
+// The reliable part of "reminder" for this app is the in-app pending-reminder
+// modal on every app open (checkRemindersOnOpen -> _allReminderItems), not this.
+function scheduleTehilimFavoriteReminder(favId) {
+  if (!('Notification' in window)) return;
+  Notification.requestPermission().then(perm => {
+    if (perm !== 'granted') return;
+    const fav = _favoriteById(favId);
+    if (!fav?.reminder?.enabled) return;
+    const [h, m] = (fav.reminder.time || '08:00').split(':').map(Number);
+    const now = new Date(), target = new Date();
+    target.setHours(h, m, 0, 0);
+    if (target <= now) target.setDate(target.getDate() + 1);
+    const delay = target - now;
+    console.log(`[Reminder] scheduled favorite "${fav.name}" in ${Math.round(delay / 60000)} min`);
+    setTimeout(() => new Notification('תהילים 🙏', {
+      body: 'הגיע זמן: ' + fav.name,
+      icon: 'icons/icon-192.png',
+    }), delay);
+  });
 }
 
 // ── Navigation context ──────────────────────────────────────────────────

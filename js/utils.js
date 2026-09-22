@@ -108,7 +108,7 @@ let currentAliya = 'all';
 let rashiLoaded = false;
 let rashiVisible = false;
 
-const APP_VERSION  = '5.117';
+const APP_VERSION  = '5.118';
 const STORAGE_KEY  = 'kodesh_app_v1';
 const SIDDUR_CACHE_KEY = 'siddur_cache_v';
 
@@ -175,6 +175,38 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[c]));
+}
+
+// ── Collapsible sections ────────────────────────────────────────────────
+// Generic, reusable anywhere in the app. Markup contract for a given `id`:
+//   <button id="{id}-header" class="card-title collapsible-header"
+//     onclick="toggleCollapsibleSection('{id}')" aria-expanded="true"
+//     aria-controls="{id}-body">...title...<span class="collapsible-chevron"
+//     aria-hidden="true">▾</span></button>
+//   <div id="{id}-body">...collapsible content...</div>
+// State persists to appState.collapsedSections[id] (default = expanded, so
+// only "collapsed" ever needs to be recorded).
+function toggleCollapsibleSection(id) {
+  const body   = document.getElementById(id + '-body');
+  const header = document.getElementById(id + '-header');
+  if (!body || !header) return;
+  const willCollapse = body.style.display !== 'none';
+  body.style.display = willCollapse ? 'none' : '';
+  header.setAttribute('aria-expanded', willCollapse ? 'false' : 'true');
+  if (!appState.collapsedSections) appState.collapsedSections = {};
+  if (willCollapse) appState.collapsedSections[id] = true;
+  else delete appState.collapsedSections[id];
+  saveState();
+}
+
+// Call once, after a section's markup exists in the DOM (e.g. from a tab's
+// init function), to restore whatever collapse state was saved last session.
+function applyCollapsedSection(id) {
+  if (!(appState.collapsedSections || {})[id]) return; // default: expanded
+  const body   = document.getElementById(id + '-body');
+  const header = document.getElementById(id + '-header');
+  if (body)   body.style.display = 'none';
+  if (header) header.setAttribute('aria-expanded', 'false');
 }
 
 // ── Gematria (Hebrew numerals) ────────────────────────────────────────
