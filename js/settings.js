@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════
 const ALL_TABS = [
   { id: 'calendar', label: '📅 לוח שנה עברי',    fixed: true  },
-  { id: 'siddur',   label: '📕 סידור'                          },
+  { id: 'siddur',   label: '📕 סידור', defaultHidden: true, beta: true },
   { id: 'halacha',  label: '📖 הלכה יומית'                    },
   { id: 'lashon',   label: '🗣 הלכות לשון הרע'                },
   { id: 'tehilim',  label: '🙏 תהילים יומי'                   },
@@ -66,9 +66,11 @@ function renderTabVisibilityRows() {
     const disabled = (tab.fixed || isAutoNow) ? 'disabled' : '';
     const autoNote = isAutoNow
       ? ` <span style="font-size:10px;color:var(--gold)">★ אוטומטי</span>` : '';
+    const betaNote = tab.beta
+      ? ` <span class="beta-badge">BETA</span>` : '';
     return `<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0">
       <label style="font-size:13px;color:${(tab.fixed||isAutoNow) ? 'var(--muted)' : 'var(--cream)'}">
-        ${tab.label}${autoNote}
+        ${tab.label}${autoNote}${betaNote}
       </label>
       <label class="toggle" style="opacity:${(tab.fixed||isAutoNow) ? 0.4 : 1}">
         <input type="checkbox" ${checked ? 'checked' : ''} ${disabled}
@@ -89,6 +91,31 @@ function openSettings() {
 function closeSettings() {
   document.getElementById('settings-panel').classList.remove('open');
 }
+
+// ═══════════════════════════════════════════
+// SHARE THE APP
+// ═══════════════════════════════════════════
+const APP_SHARE_URL  = 'https://ohadsam.github.io/kodesh-app/';
+const APP_SHARE_TEXT = 'עיתים – אפליקציית לימוד יומי ותפילה 📖\n' +
+  'לוח שנה עברי, הלכה יומית, תהילים, דף יומי, משנה יומי, פרשת השבוע, ברכות ועוד — הכל במקום אחד.';
+
+function shareAppWhatsApp() {
+  const text = `${APP_SHARE_TEXT}\n${APP_SHARE_URL}`;
+  // No recipient — wa.me with just ?text opens WhatsApp's own contact picker.
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+}
+
+function shareAppEmail() {
+  const subject = 'עיתים – אפליקציית לימוד יומי ותפילה';
+  // mailto bodies are conventionally CRLF (RFC 6068); a bare \n renders fine in
+  // WhatsApp/modern browsers but some older/desktop mail clients mishandle it.
+  const body = `${APP_SHARE_TEXT}\n\n${APP_SHARE_URL}`.replace(/\n/g, '\r\n');
+  // mailto via location.href, not window.open — a mailto: URL has no page to
+  // open in a new tab; setting location.href just hands it to the OS mail app
+  // and leaves this page exactly where it was.
+  window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
 function setFont(size) {
   document.documentElement.style.setProperty('--font-size', size+'px');
   appState.fontSize = size; saveState();

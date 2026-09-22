@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.115 (Sep 21, 2026)
+**Last updated:** v5.116 (Sep 22, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -240,6 +240,19 @@ that goes quiet for `HSRC_STALE_MS` = 3 s yields to a lower-ranked one):
 
 ## Known Issues / Open Items
 
+### 🟡 Siddur tab is BETA and hidden by default (Sep 22, 2026)
+Owner-reported: the siddur pipeline's logic doesn't always behave as expected —
+no specific repro captured yet. Made `siddur` `defaultHidden: true` in
+`ALL_TABS` (js/settings.js) so new/existing users don't see it unless they
+explicitly enable it in Settings → טאבים מוצגים, and tagged it `beta: true`,
+which shows a `.beta-badge` pill on both the top and bottom nav tab buttons
+plus a note in the visibility list. **This hides the tab, it does not fix
+whatever the underlying siddur bug is** — the siddur pipeline itself (see
+"Siddur Text Pipeline" below) is unchanged. Next session investigating this
+should ask the owner for the specific failure mode before touching
+`js/siddur.js`/`js/siddur-inserts.js`, since "doesn't always work as expected"
+isn't a reproducible bug report on its own.
+
 ### 🟡 Dead root-level duplicate .js/.css files (found Sep 21, 2026)
 Every file that exists in `js/*.js` also has a same-named copy sitting at the repo
 root (e.g. root `tefilot.js`, `content.js`, `styles.css`, plus `manifest.json`,
@@ -320,6 +333,30 @@ could be more precise for edge cases.
 - ✅ תפילת הדרך added to Brachot tab (with תהילים קכא)
 - ✅ Siddur: 3rd floating button 📋 shows prayer status popup
 - ✅ Tehilim search: gematria support (פרק קל, כג, 130 etc.)
+
+### v5.116 (Sep 22, 2026) – Share the app, Siddur → BETA + hidden by default
+- ✅ **Share the app** (Settings, top section): `shareAppWhatsApp()` opens
+  `wa.me/?text=...` with no phone number (WhatsApp's own contact/chat picker,
+  not a fixed recipient); `shareAppEmail()` sets `location.href` to a
+  `mailto:?subject=&body=` with CRLF line breaks for mail-client compatibility.
+  Both fields are `encodeURIComponent`'d separately, not the whole URL as one
+  blob (would double-encode the `?`/`&` separators).
+- ✅ **Siddur tab hidden by default, tagged BETA.** Owner reported the siddur
+  pipeline's logic doesn't always work as expected (no specific repro yet —
+  see Known Issues below). `ALL_TABS`'s `siddur` entry (js/settings.js) gained
+  `defaultHidden: true, beta: true`, reusing the exact mechanism `logs`/
+  `network` already used — confirmed via `isTabVisible()`'s `id in vis` check
+  that this hides it for BOTH brand-new users and existing users who never
+  explicitly toggled it, not just new installs. A `.beta-badge` pill (new CSS
+  class, styles.css) now shows on both the top and bottom nav Siddur tab
+  buttons and in the Settings visibility list. Users can still turn it on
+  themselves in Settings → טאבים מוצגים.
+- 2 independent code reviews found no bugs in either change; confirmed the
+  `.bnav-btn` badge placement specifically (its `flex-direction:column`
+  treats each direct child as a separate row — the badge had to be wrapped
+  inside the SAME span as the label text, not added as a sibling, or it would
+  stack onto its own 3rd row and misalign the button height against sibling
+  nav buttons).
 
 ### v5.115 (Sep 21, 2026) – Post-release deep audit fixes (Tehilim + theme)
 Three real, minor bugs found by 3 parallel independent code-review agents doing a

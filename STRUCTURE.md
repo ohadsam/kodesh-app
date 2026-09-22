@@ -224,10 +224,12 @@ Add `<button id="tf-{key}" class="aliya-tab" onclick="showTefila('{key}')">` in 
 ### js/settings.js
 | Function/Const | Description |
 |---|---|
-| `ALL_TABS` | Array of all tab names in order |
+| `ALL_TABS` | Array of all tab names in order. Each entry can carry `fixed` (always visible, e.g. calendar), `defaultHidden` (hidden unless the user explicitly opts in — used by `logs`/`network`/`siddur`), `autoShowFn` (force-visible when it returns true), `beta` (shows a `.beta-badge` pill on the tab button + in the Settings visibility list) |
+| `isTabVisible(id)` / `setTabVisible(id, v)` / `applyTabVisibility()` | Visibility logic — `defaultHidden` tabs stay hidden for any user with no explicit `appState.tabVisibility[id]` entry, including existing users who never toggled it |
 | `initSettings()` | Load settings panel, tab visibility toggles |
 | `nuclearReset()` | Clear all state + caches + reload |
-| `setTheme(mode)` | `'dark'`\|`'light'` — sets/removes `data-theme` on `<html>`, persists to `localStorage.theme`, updates the `theme-color` meta tag, highlights the settings button. The actual FIRST-PAINT theme application is a separate, earlier inline `<script>` in index.html's `<head>` (before `styles.css` loads) reading the same key — see the comment above `setTheme` for why |
+| `shareAppWhatsApp()` / `shareAppEmail()` | Settings → "שתפו את האפליקציה". `wa.me/?text=` (no phone number → opens WhatsApp's own contact picker) and `mailto:?subject=&body=` (CRLF line breaks, each field separately `encodeURIComponent`'d) |
+| `setTheme(mode)` | `'dark'`\|`'light'` — sets/removes `data-theme` on `<html>`, persists to `localStorage.theme`, updates the `theme-color` meta tag, highlights the settings button + `aria-pressed`. The actual FIRST-PAINT theme application is a separate, earlier inline `<script>` in index.html's `<head>` (before `styles.css` loads) reading the same key — see the comment above `setTheme` for why |
 | `initThemeUI()` | Called from `loadSettingsState()` — syncs the settings buttons to whatever the HEAD script already applied; does not re-apply the theme itself |
 
 ---
