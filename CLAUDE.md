@@ -183,6 +183,15 @@ Then confirm: `grep -c "5\.110" index.html js/utils.js sw.js` → 20, 1, 1.
   `onclick="fn('...')"` attribute instead of a data-`id` lookup is a second,
   harder-to-escape injection context (attribute breakout) — avoid it rather than
   trying to escape for it.
+- **A `<button>` (or other form control) does NOT inherit `color` from an
+  ancestor.** `#tehilim-fav-star` sat inside `.card-title { color: var(--gold) }`
+  but never got that color itself, falling back to the browser's own
+  `buttontext` default — invisible against this app's dark background. This
+  hid at every review because the STARRED state renders `⭐` (a color emoji
+  glyph, ignores CSS `color`) while the default UNSTARRED state renders `☆` (a
+  plain text glyph that DOES respect `color`) — a screenshot taken after
+  clicking it once looks completely normal. Any icon-only `<button>` with no
+  CSS class needs its OWN explicit `color:`, not a color on a wrapping element.
 - **A stale test is not proof of a real bug, and a passing test is not proof of a
   real fix.** Three tests in this repo (`test_html_structure`'s DOM-id list and
   div-balance check, `test_zmanim`'s Kotel-coords check, `test_business_logic`'s

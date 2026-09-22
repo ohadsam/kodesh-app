@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.116 (Sep 22, 2026)
+**Last updated:** v5.117 (Sep 22, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -333,6 +333,30 @@ could be more precise for edge cases.
 - ✅ תפילת הדרך added to Brachot tab (with תהילים קכא)
 - ✅ Siddur: 3rd floating button 📋 shows prayer status popup
 - ✅ Tehilim search: gematria support (פרק קל, כג, 130 etc.)
+
+### v5.117 (Sep 22, 2026) – Fixed: invisible favorite-star button in Tehilim
+User-reported: "I see the hint saying I can star a chapter to favorite it, but
+there's no visible star button on the chapter itself."
+- ✅ **Root cause**: `#tehilim-fav-star` (index.html, next to the chapter title)
+  had no `color` in its inline style, and `<button>` elements do NOT inherit
+  `color` from an ancestor the way a `<span>` would — a button's initial color
+  is the browser's own `buttontext` system color, independent of the page's
+  theme. The button sits inside `.card-title`, which sets `color: var(--gold)`
+  (styles.css:181), but that never reached the button itself.
+  - The bug was invisible in testing/review because the STARRED state renders
+    `⭐` (U+2B50, a color emoji glyph that ignores CSS `color` entirely and
+    always renders its own built-in gold star) while the default UNSTARRED
+    state renders `☆` (U+2606, a plain monochrome text glyph that DOES respect
+    CSS `color`) — so a `git diff` reader or a screenshot taken after clicking
+    it once would see a normal gold star and never notice the bug.
+  - Fixed by adding `color:var(--gold)` to the button's own inline style,
+    matching `.card-title`'s gold — correct in both dark and light theme (see
+    Theme section above; `--gold` was chosen with WCAG-verified contrast
+    against both `--bg` and `--surface` in each palette).
+- Checked every other styled `<button>` in index.html (54 total) for the same
+  "no CSS class, no inline color" gap — all 11 that lacked an inline `color`
+  get it from a CSS class (`.font-btn`, `.aliya-tab`) instead. This button was
+  the only one with neither, i.e. a one-off, not a systemic pattern.
 
 ### v5.116 (Sep 22, 2026) – Share the app, Siddur → BETA + hidden by default
 - ✅ **Share the app** (Settings, top section): `shareAppWhatsApp()` opens
