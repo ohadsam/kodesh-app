@@ -124,6 +124,7 @@ function initTehilim() {
   applyCollapsedSection('tehilim-day-section');
   applyCollapsedSection('tehilim-fav-section');
   renderTehilimFavoritesList();
+  if (typeof initPrayerNamesSection === 'function') initPrayerNamesSection('tehilim');
   loadTodayTehilim();
 }
 

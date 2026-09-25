@@ -1551,6 +1551,7 @@ async function loadMishnaYomi() {
   const subEl = document.getElementById('mishna-subtitle');
   el.className = 'content-text loading'; el.textContent = 'טוען משנה יומי...';
   _mishnaView = 'text';
+  if (typeof initPrayerNamesSection === 'function') initPrayerNamesSection('mishna');
   try {
     console.log('[MishnaYomi] fetching calendar...');
     const cal  = await fetchWithDelay(_sefariaCalendarUrl());

@@ -25,6 +25,7 @@ kodesh-app/
 │   ├── calendar.js
 │   ├── content.js
 │   ├── tehilim.js
+│   ├── prayer-names.js
 │   ├── tefilot.js
 │   ├── siddur.js
 │   ├── siddur-inserts.js
@@ -65,6 +66,9 @@ js/app.js           → showTab, loadTab, navigation
 js/calendar.js      → Hebrew dates, zmanim, events
 js/content.js       → Parasha, Daf Yomi, Mishna, Rambam
 js/tehilim.js       → Tehilim by day
+js/prayer-names.js  → Shared health/memorial name list, rendered on both
+                       Tehilim and Mishna tabs (loads after tehilim.js — not
+                       a hard dependency, just keeps related tabs together)
 js/siddur-inserts.js→ wrapSeasonalParagraphs (must load before siddur.js)
 js/siddur.js        → getSiddurSections, loadSiddur, _renderParagraphs
 js/omer.js          → buildOmerText, getOmerDay
@@ -194,6 +198,20 @@ Add `<button id="tf-{key}" class="aliya-tab" onclick="showTefila('{key}')">` in 
 | `viewTehilimManual(chapter)` | Sets `tehilimContext = {type:'manual'}` and loads it — entry point for BOTH the dropdown `onchange` and `searchTehilimChapter()`. Prev/next = simple chapter±1 (no schedule/favorite list to derive from), bounded at 1/150 |
 | `_recordManualVisit(chapter)` | De-dupes + re-sorts into `tehilimManualHistory`; called from `getTehilimNavInfo`'s manual branch, so any path that renders a manual-mode chapter records it |
 | `resetTehilimManualHistory()` | Clears the array (and drops `tehilimContext` back to `{type:'day'}` if it was manual) — called from `showTab()` in app.js on leaving the Tehilim tab, NOT on switching between day/favorite/manual navigation while still in the tab (history must survive that, per spec) |
+
+### js/prayer-names.js
+| Function/Const | Description |
+|---|---|
+| `PRAYER_NAMES_LOCATIONS` | `['tehilim', 'mishna']` — the tabs that render this shared list |
+| `getPrayerNames()` / `_prayerNameById(id)` | Reads `appState.prayerNames` |
+| `addPrayerName(name, gender, parentName, type)` / `updatePrayerName(id, ...)` / `deletePrayerName(id)` | CRUD. `gender` is `'son'\|'daughter'`, `type` is `'health'\|'memorial'` (default `'health'`) — both default-corrected rather than rejected if invalid, since they come from a fixed 2-button toggle, not free text |
+| `_validatePrayerName(...)` | Shared validation/trim/truncate (60 chars, mirrors Tehilim favorites) for both add and update |
+| `openPrayerNameForm(editId?)` / `closePrayerNameForm()` / `savePrayerNameForm()` | The ONE shared modal (`#prayer-names-modal`) used by both tabs — not duplicated per tab |
+| `_setPrayerNameGender(g)` / `_setPrayerNameType(t)` | Toggle the 2-button gender/type pairs in the modal, track `_prayerNameFormGender`/`_prayerNameFormType` (buttons, not radio inputs — no native `checked` to read on save) |
+| `confirmDeletePrayerName(id)` | Same "look the name up by id, don't pass free text through onclick" pattern as `confirmDeleteTehilimFavorite` |
+| `renderPrayerNamesList(loc)` | Renders into `prayer-names-list-{loc}`, split into a לרפואה שלמה group and a לעילוי נשמה group |
+| `renderAllPrayerNames()` | Calls `renderPrayerNamesList` for every location — since it's ONE shared list, any add/edit/delete must refresh both tabs, not just the one the user is on |
+| `initPrayerNamesSection(loc)` | Call once per tab's init (`initTehilim`, `loadMishnaYomi`) — restores collapse state + draws the list for that tab |
 
 ### js/omer.js
 | Function | Description |

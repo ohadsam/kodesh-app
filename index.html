@@ -29,13 +29,13 @@
       } catch (e) { /* localStorage unavailable (private mode etc.) — default dark */ }
     })();
   </script>
-  <link rel="stylesheet" href="styles.css?v=5.118" />
+  <link rel="stylesheet" href="styles.css?v=5.119" />
   <!-- INLINE version guard – runs SYNCHRONOUSLY before any SW can intercept.
        Kills any cached service worker and forces a fresh load when version changes.
        NOTE: this is the ONLY version check. utils.js must NOT have another one. -->
   <script>
     (function() {
-      var V = '5.118';
+      var V = '5.119';
       // Show version in splash immediately
       var sv = document.getElementById('splash-version');
       if (sv) sv.textContent = 'גרסה ' + V;
@@ -116,6 +116,53 @@
   </div>
 </div>
 
+<!-- Prayer names (health/memorial) add/edit modal — shared by the Tehilim
+     and Mishna tabs, both of which render the same underlying list -->
+<div id="prayer-names-modal" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,.85);align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--card);border:1px solid var(--gold-dim);border-radius:18px;width:100%;max-width:420px;max-height:85vh;display:flex;flex-direction:column;direction:rtl">
+    <div style="padding:16px 18px 10px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+      <div id="prayer-names-form-title" style="font-family:'Frank Ruhl Libre',serif;font-size:17px;color:var(--gold);font-weight:700">שם חדש</div>
+      <button onclick="closePrayerNameForm()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:4px 8px">✕</button>
+    </div>
+    <div style="padding:16px 18px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:10px">
+      <input type="hidden" id="prayer-name-edit-id" value="">
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">שם פרטי</div>
+        <input id="prayer-name-input" type="text" maxlength="60" placeholder="לדוגמה: משה" aria-label="שם פרטי"
+          style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border);
+          background:var(--surface);color:var(--cream);font-family:'Heebo',sans-serif;font-size:14px;
+          direction:rtl;outline:none;box-sizing:border-box">
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">בן / בת</div>
+        <div style="display:flex;gap:6px">
+          <button id="prayer-name-gender-son" type="button" onclick="_setPrayerNameGender('son')" class="aliya-tab active" style="flex:1">בן</button>
+          <button id="prayer-name-gender-daughter" type="button" onclick="_setPrayerNameGender('daughter')" class="aliya-tab" style="flex:1">בת</button>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">שם ההורה</div>
+        <input id="prayer-name-parent-input" type="text" maxlength="60" placeholder="לדוגמה: שרה" aria-label="שם ההורה"
+          style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border);
+          background:var(--surface);color:var(--cream);font-family:'Heebo',sans-serif;font-size:14px;
+          direction:rtl;outline:none;box-sizing:border-box">
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">סוג</div>
+        <div style="display:flex;gap:6px">
+          <button id="prayer-name-type-health" type="button" onclick="_setPrayerNameType('health')" class="aliya-tab active" style="flex:1">🙏 לרפואה שלמה</button>
+          <button id="prayer-name-type-memorial" type="button" onclick="_setPrayerNameType('memorial')" class="aliya-tab" style="flex:1">🕯️ לעילוי נשמה</button>
+        </div>
+      </div>
+      <div id="prayer-name-form-error" style="font-size:11px;color:#c87060"></div>
+    </div>
+    <div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:10px">
+      <button onclick="savePrayerNameForm()" style="flex:1;background:var(--gold);color:#000;border:none;padding:10px;border-radius:10px;cursor:pointer;font-family:'Heebo',sans-serif;font-size:13px;font-weight:700">שמור</button>
+      <button onclick="closePrayerNameForm()" style="background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:10px 16px;border-radius:10px;cursor:pointer;font-family:'Heebo',sans-serif;font-size:13px">ביטול</button>
+    </div>
+  </div>
+</div>
+
 <div id="splash">
   <div class="logo-big">
     <img src="icons/icon.svg" width="96" height="96" alt="עיתים" 
@@ -124,7 +171,7 @@
   <div style="font-family:'Frank Ruhl Libre',serif;font-size:26px;color:var(--cream);font-weight:700">עיתים</div>
   <div class="spinner"></div>
   <p id="splash-status" style="font-size:12px;color:var(--gold);margin:4px 0 0;min-height:18px">טוען...</p>
-  <p id="splash-version" style="font-size:11px;color:var(--muted);margin-top:2px">גרסה 5.118</p>
+  <p id="splash-version" style="font-size:11px;color:var(--muted);margin-top:2px">גרסה 5.119</p>
   <div id="splash-retry" style="display:none;margin-top:20px">
     <button onclick="localStorage.clear();sessionStorage.clear();location.reload(true)"
       style="background:var(--gold);color:#000;border:none;border-radius:10px;padding:10px 24px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Heebo',sans-serif">🔄 איפוס וטעינה מחדש</button>
@@ -276,7 +323,7 @@
     <!-- Version & Copyright -->
     <div style="text-align:center;padding:18px 0 8px;border-top:1px solid var(--border);margin-top:8px">
       <div style="font-size:13px;font-weight:600;color:var(--gold-dim);margin-bottom:4px">📖 עיתים</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">גרסה 5.118</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">גרסה 5.119</div>
       <button onclick="showWhatsNew()" style="background:var(--card);border:1px solid var(--gold-dim);color:var(--gold);padding:6px 16px;border-radius:8px;font-size:11px;cursor:pointer;font-family:'Heebo',sans-serif;margin-bottom:6px">🆕 מה חדש?</button>
       <div style="font-size:11px;color:var(--muted)">© כל הזכויות שמורות לאוהד סמט</div>
     </div>
@@ -288,15 +335,13 @@
 <div id="whats-new-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
   width:88%;max-width:400px;max-height:80vh;overflow-y:auto;
   background:var(--surface);border:1px solid var(--gold-dim);border-radius:16px;z-index:10001;padding:20px;direction:rtl">
-  <div style="font-size:16px;font-weight:700;color:var(--gold);margin-bottom:12px;text-align:center">🆕 מה חדש בגרסה 5.118</div>
+  <div style="font-size:16px;font-weight:700;color:var(--gold);margin-bottom:12px;text-align:center">🆕 מה חדש בגרסה 5.119</div>
   <div style="font-size:13px;color:var(--cream);line-height:1.7" id="whats-new-content">
-    <div style="margin-bottom:10px"><b>📂 איזורים מתקפלים בתהילים</b></div>
-    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• איזור "תהילים לפי תאריך עברי" ואיזור "מועדפים" ניתנים עכשיו לצמצום/הרחבה בלחיצה על הכותרת</div>
-    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• המצב נשמר אוטומטית ונטען מחדש בפתיחה הבאה של האפליקציה</div>
-    <div style="margin-bottom:10px;margin-top:14px"><b>🔔 תזכורות למועדפי תהילים</b></div>
-    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• אפשר לקבוע תזכורת לכל מועדף בתהילים, עם שעה קבועה</div>
-    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• ניתן לבחור חזרה יומית, או תזכורת חד-פעמית</div>
-    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• התזכורת מופיעה בפעמון ובחלון התזכורות כמו כל תזכורת אחרת באפליקציה</div>
+    <div style="margin-bottom:10px"><b>🕯️ שמות לרפואה שלמה ולעילוי נשמה</b></div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• איזור חדש וניתן לקיפול בטאבי תהילים ומשניות, לשמירת שמות לתפילה</div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• לכל שם: שם פרטי, בן/בת, שם ההורה, וסוג (לרפואה שלמה או לעילוי נשמה)</div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• הרשימה משותפת בין תהילים ומשניות — שם שנוסף מופיע בשני הטאבים</div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• אפשר להוסיף, לערוך ולמחוק שמות, וכן לראות אותם מחולקים לרפואה/לעילוי נשמה</div>
   </div>
   <button onclick="closeWhatsNew()" style="display:block;width:100%;margin-top:14px;background:var(--gold);color:#000;border:none;border-radius:10px;padding:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Heebo',sans-serif">👍 הבנתי</button>
 </div>
@@ -763,6 +808,28 @@
     </div>
   </div>
 
+  <!-- Prayer names — shared with the Mishna tab, same list either way -->
+  <div class="card">
+    <div class="card-header" style="margin-bottom:8px">
+      <button id="prayer-names-tehilim-section-header" class="card-title collapsible-header"
+        onclick="toggleCollapsibleSection('prayer-names-tehilim-section')" aria-expanded="true"
+        aria-controls="prayer-names-tehilim-section-body">
+        <span><span class="emoji">🕯️</span>שמות לרפואה ולעילוי נשמה</span>
+        <span class="collapsible-chevron" aria-hidden="true">▾</span>
+      </button>
+      <button onclick="openPrayerNameForm()" aria-label="הוסף שם חדש"
+        style="background:rgba(201,165,74,.12);border:1px solid var(--gold);color:var(--gold);
+        padding:6px 12px;border-radius:10px;cursor:pointer;font-family:'Heebo',sans-serif;
+        font-size:13px;white-space:nowrap;flex-shrink:0;margin-inline-start:8px">+ הוסף</button>
+    </div>
+    <div id="prayer-names-tehilim-section-body">
+    <div id="prayer-names-list-tehilim" style="display:flex;flex-direction:column"></div>
+    <div id="prayer-names-empty-tehilim" style="font-size:12px;color:var(--muted);text-align:center;padding:8px 0;display:none">
+      אין עדיין שמות. לחצו "+ הוסף" כדי להוסיף שם לרפואה שלמה או לעילוי נשמה.
+    </div>
+    </div>
+  </div>
+
   <div class="card">
     <div class="card-header">
       <div>
@@ -934,6 +1001,28 @@
 
 <!-- ─── PAGE: MISHNA YOMI ─────────────────── -->
 <div class="page" id="page-mishna">
+  <!-- Prayer names — shared with the Tehilim tab, same list either way -->
+  <div class="card">
+    <div class="card-header" style="margin-bottom:8px">
+      <button id="prayer-names-mishna-section-header" class="card-title collapsible-header"
+        onclick="toggleCollapsibleSection('prayer-names-mishna-section')" aria-expanded="true"
+        aria-controls="prayer-names-mishna-section-body">
+        <span><span class="emoji">🕯️</span>שמות לרפואה ולעילוי נשמה</span>
+        <span class="collapsible-chevron" aria-hidden="true">▾</span>
+      </button>
+      <button onclick="openPrayerNameForm()" aria-label="הוסף שם חדש"
+        style="background:rgba(201,165,74,.12);border:1px solid var(--gold);color:var(--gold);
+        padding:6px 12px;border-radius:10px;cursor:pointer;font-family:'Heebo',sans-serif;
+        font-size:13px;white-space:nowrap;flex-shrink:0;margin-inline-start:8px">+ הוסף</button>
+    </div>
+    <div id="prayer-names-mishna-section-body">
+    <div id="prayer-names-list-mishna" style="display:flex;flex-direction:column"></div>
+    <div id="prayer-names-empty-mishna" style="font-size:12px;color:var(--muted);text-align:center;padding:8px 0;display:none">
+      אין עדיין שמות. לחצו "+ הוסף" כדי להוסיף שם לרפואה שלמה או לעילוי נשמה.
+    </div>
+    </div>
+  </div>
+
   <div class="card">
     <div class="card-header">
       <div>
@@ -1385,7 +1474,7 @@
     💡 לכיול המצפן: הזז את הטלפון בתנועת ∞ (שמונה שוכב) מספר פעמים
   </div>
   <div style="text-align:center;color:var(--muted);font-size:11px;padding:12px 0 4px">
-    גרסה 5.118 · עיתים · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
+    גרסה 5.119 · עיתים · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
   </div>
 </div>
 
@@ -1444,20 +1533,21 @@
      JavaScript modules (load order matters)
      v4.3 – querystring busts browser/SW cache
      ═══════════════════════════════════════ -->
-<script src="js/network-log.js?v=5.118"></script>
-<script src="js/utils.js?v=5.118"></script>
-<script src="js/settings.js?v=5.118"></script>
-<script src="js/app.js?v=5.118"></script>
-<script src="js/tehilim.js?v=5.118"></script>
-<script src="js/calendar.js?v=5.118"></script>
-<script src="js/content.js?v=5.118"></script>
-<script src="js/tefilot.js?v=5.118"></script>
-<script src="js/siddur-inserts.js?v=5.118"></script>
-<script src="js/siddur.js?v=5.118"></script>
-<script src="js/omer.js?v=5.118"></script>
-<script src="js/brachot.js?v=5.118"></script>
-<script src="js/misc.js?v=5.118"></script>
-  <script src="js/emuna.js?v=5.118"></script>
-  <script src="js/init.js?v=5.118"></script>
+<script src="js/network-log.js?v=5.119"></script>
+<script src="js/utils.js?v=5.119"></script>
+<script src="js/settings.js?v=5.119"></script>
+<script src="js/app.js?v=5.119"></script>
+<script src="js/tehilim.js?v=5.119"></script>
+<script src="js/prayer-names.js?v=5.119"></script>
+<script src="js/calendar.js?v=5.119"></script>
+<script src="js/content.js?v=5.119"></script>
+<script src="js/tefilot.js?v=5.119"></script>
+<script src="js/siddur-inserts.js?v=5.119"></script>
+<script src="js/siddur.js?v=5.119"></script>
+<script src="js/omer.js?v=5.119"></script>
+<script src="js/brachot.js?v=5.119"></script>
+<script src="js/misc.js?v=5.119"></script>
+  <script src="js/emuna.js?v=5.119"></script>
+  <script src="js/init.js?v=5.119"></script>
 </body>
 </html>

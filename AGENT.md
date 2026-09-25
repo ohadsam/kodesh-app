@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.118 (Sep 22, 2026)
+**Last updated:** v5.119 (Sep 25, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -276,6 +276,36 @@ that goes quiet for `HSRC_STALE_MS` = 3 s yields to a lower-ranked one):
   `markAllRemindersDone`, since nothing in the static item set ever
   auto-disables itself.
 
+### Prayer Names — js/prayer-names.js (v5.119)
+- A single list, `appState.prayerNames`, shared verbatim between the
+  Tehilim and Mishna tabs — there is exactly one collection of names, not
+  one per tab. Each tab has its OWN collapsible section (`{loc}-section`
+  ids, own collapse state) and its OWN list container in the DOM
+  (`prayer-names-list-{loc}`), but `renderAllPrayerNames()` always redraws
+  every location together, so the two tabs never show different content.
+  If a future change adds a THIRD location, add it to
+  `PRAYER_NAMES_LOCATIONS` and mirror the two existing collapsible-card
+  blocks in `index.html` — nothing else in `js/prayer-names.js` needs to
+  change.
+- The add/edit form is ONE modal (`#prayer-names-modal`), opened from
+  either tab's "+ הוסף" button. This was a deliberate choice over Tehilim
+  favorites' inline-form pattern: an inline form would need a second,
+  fully-duplicated copy of every field id per tab (favorites don't have
+  this problem — they only appear on the Tehilim tab).
+- Gender (בן/בת) and type (לרפואה שלמה/לעילוי נשמה) are 2-button toggles,
+  not `<select>`/radio, matching the app's existing toggle-button
+  convention (e.g. Mishna's own מצב יומי/בחר). Because they're plain
+  buttons, not radio inputs, there is no native `.checked` to read on
+  save — `_setPrayerNameGender`/`_setPrayerNameType` track the current
+  choice in module-level `_prayerNameFormGender`/`_prayerNameFormType`,
+  reset explicitly every time the modal opens for a NEW entry (defaults:
+  son / health) or populated from the entry being edited.
+- No reminder integration here (unlike Tehilim favorites, v5.118) — not
+  requested, and "say this today" doesn't map to a recurring/one-time
+  schedule the way "read this psalm" does. If ever requested, follow the
+  `_allReminderItems()`/`_reminderSettingsFor()` pattern in js/settings.js
+  rather than inventing a second reminder pipeline.
+
 ### Omer (omer.js)
 - `getOmerDay()`: computed from Hebrew date
 - Full text: לשם יחוד, ברכה, ספירה, הרחמן, למנצח, אנא בכח, יהי רצון, עלינו
@@ -366,6 +396,60 @@ could be more precise for edge cases.
 ---
 
 ## Recently Fixed
+
+### v5.119 (Sep 25, 2026) – Shared prayer-names list (רפואה שלמה / עילוי נשמה)
+- ✅ **New collapsible section, identical on both the Tehilim and Mishna
+  tabs, backed by ONE shared list** (`appState.prayerNames`), not a
+  per-tab copy — adding/editing/deleting a name from either tab updates
+  both immediately. New file `js/prayer-names.js` per CLAUDE.md §4 (no
+  existing file owned this concept); reuses `escapeHtml`/`saveState`/
+  `toggleCollapsibleSection`/`applyCollapsedSection` from `js/utils.js`
+  rather than duplicating any of that.
+- ✅ Add/edit form is a SINGLE shared modal (`#prayer-names-modal`), not one
+  instance per tab — avoids duplicate-id HTML and duplicate state-sync code
+  that two inline per-tab forms (like Tehilim's own favorites form) would
+  have needed. Fields: שם פרטי (free text) → בן/בת (2-button toggle) → שם
+  ההורה (free text) → סוג: לרפואה שלמה / לעילוי נשמה (2-button toggle,
+  **default לרפואה שלמה** per spec). "אחד או יותר" is satisfied by the list
+  itself supporting any number of entries, added one at a time — same
+  pattern as Tehilim favorites, not a multi-name-per-entry form.
+- ✅ Inside the collapsible body, entries are grouped under two subheaders
+  (🙏 לרפואה שלמה / 🕯️ לעילוי נשמה) with a live count each, per spec
+  ("צריך שבתוך האיזור הזה תהיה חלוקה"). A group with zero entries renders
+  nothing (no empty "לעילוי נשמה (0)" header) rather than an empty section.
+- ✅ Full CRUD: add, edit (✏️), delete (🗑️, confirm-dialog looks the name up
+  by id rather than taking it as a param — same attribute-injection
+  avoidance as `confirmDeleteTehilimFavorite`). Name + parent name are
+  trimmed and truncated to 60 chars (mirrors the Tehilim favorites
+  defense-in-depth fix from v5.115); an invalid/tampered gender or type
+  (only reachable by calling the functions directly, not through the UI,
+  since the form uses fixed 2-button toggles) is corrected to a default
+  rather than rejected.
+- ✅ Security: names are free-text and rendered via `innerHTML` —
+  `escapeHtml()` applied to both the name and the parent name.
+- ✅ Persistence: stored in `appState.prayerNames`, persisted through the
+  same `saveState()` → `localStorage` mechanism as every other preference
+  (Tehilim favorites, collapsed-section state, etc.) — small structured
+  records, not a text blob, so this doesn't conflict with CLAUDE.md §5's
+  "no large blobs in localStorage" rule.
+- ✅ Wired into both tabs' init paths: `initTehilim()` and `loadMishnaYomi()`
+  both call `initPrayerNamesSection(loc)` (applies saved collapse state +
+  draws the list) — in `loadMishnaYomi()` this runs BEFORE the async
+  Sefaria fetch/try-block, so the names section still works even if the
+  network call fails, exactly like Tehilim's favorites card already did.
+- Verified numerically, not by eye: a Node `vm` harness loading the real
+  `js/utils.js` + `js/prayer-names.js` — 37 assertions covering validation
+  (empty name/parent rejected, whitespace trimmed, invalid gender/type
+  defaulted, 60-char truncation), CRUD (add/update/delete/lookup),
+  localStorage persistence, rendering (grouping + per-group counts,
+  identical HTML drawn into BOTH tab containers from one shared-list
+  render call, empty-state show/hide), the XSS escaping path (a raw
+  `<script>` name renders as inert escaped text, not executable markup),
+  the gender/type button-toggle state machine, and the add-vs-edit modal
+  population/reset logic. `python3 Tests/test_runner.py`: 270/288
+  (unchanged baseline — all 18 failures are the expected sandbox network
+  403s). `node --check` clean on every `js/*.js` file. No duplicate DOM
+  ids introduced (checked programmatically across all of `index.html`).
 
 ### v5.118 (Sep 22, 2026) – Collapsible Tehilim sections + favorite reminders
 - ✅ **Collapsible/expandable sections.** The Tehilim tab's "תהילים לפי תאריך
