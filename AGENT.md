@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.124 (Sep 27, 2026)
+**Last updated:** v5.125 (Sep 27, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -170,12 +170,33 @@ that goes quiet for `HSRC_STALE_MS` = 3 s yields to a lower-ranked one):
   can serve the old stylesheet. `release-checklist.py` now checks this too.
 - Almost the entire app (styles.css + all inline `style="..."` in index.html) uses
   `var(--x)`, so it reacts to the theme automatically. A handful of hardcoded hex
-  colors were audited and left as-is deliberately: the compass SVG's decorative
-  gradients/text (self-contained jewel/arrow graphics, theme-independent by
-  design) and semantic status colors (success green, error/warning red) that are
-  mid-saturation enough to read on both a very light and a very dark background.
+  colors are left as-is deliberately: the compass SVG's decorative gradients/text
+  (self-contained jewel/arrow graphics, theme-independent by design) and semantic
+  status colors (success green, error/warning red) that are mid-saturation enough
+  to read on both a very light and a very dark background.
   The PWA `<meta name="theme-color">` tag IS theme-reactive — both the HEAD script
   and `setTheme()` update its `content` to match.
+- **`#topbar` and `#bottom-nav` were NOT actually theme-reactive until v5.125** —
+  both had their `background` hardcoded as `rgba(14,9,5,...)` (this theme's own
+  `--bg`, spelled out as a literal rgba instead of `var(--bg)`), so they stayed
+  black in light mode while every button/icon/text inside them correctly switched
+  colors — an owner-reported bug, not something caught by the original v5.113
+  theme audit. Every OTHER themed surface in the app (`#tabs`, `.card`, modals)
+  already used `var(--surface)`/`var(--card)` correctly; these two were the only
+  holdouts, and the only reason is that both need a semi-transparent color (for
+  the `backdrop-filter: blur()` frosted-glass effect) rather than a fully opaque
+  one, so whoever wrote them reached for a literal `rgba(...)` instead of a CSS
+  variable and never revisited it for the theme feature. Fixed via two new
+  variables, `--nav-bg`/`--nav-bg-fade` (same rgb as `--bg`, kept at their
+  original alpha), defined per-theme exactly like `--addition-bg` already is.
+  Verified in an actual headless-Chromium render (not just static CSS reading):
+  computed `background-image`/`background-color` on both elements now resolves
+  to the light rgba in light mode and the dark rgba in dark mode, and EVERY tab
+  button's computed text color (all 17 tabs, both `#tabs` and `#bottom-nav`, both
+  themes — 68 checks total) was contrast-checked against that resolved
+  background, all passing (light theme actually improved to full AA 4.5:1+;
+  dark theme's inactive-tab contrast is unchanged at its pre-existing 4.40,
+  large-text-only — not a regression, not touched by this fix).
 
 ### Parasha / Haftara
 - **PARASHA_ALIYOT** – static table of all 54 parshiot
@@ -470,6 +491,42 @@ could be more precise for edge cases.
 ---
 
 ## Recently Fixed
+
+### v5.125 (Sep 27, 2026) – Fixed: top/bottom nav bars stuck dark in light theme
+- ✅ **Root cause**: `#topbar` and `#bottom-nav` (styles.css) had their
+  `background` hardcoded as `rgba(14,9,5,.97)`/`rgba(14,9,5,.85)` — that's
+  this app's DARK-theme `--bg` (#0e0905), spelled out as a literal rgba
+  instead of `var(--bg)`, because both bars need a semi-transparent color
+  for the `backdrop-filter: blur()` frosted-glass effect rather than a
+  fully opaque one. Every button/icon/label inside those bars already used
+  `var(--muted)`/`var(--gold)` correctly and DID switch with the theme —
+  only the bar backgrounds themselves stayed permanently dark, which is
+  exactly the visible symptom reported (bars look "stuck in dark mode"
+  while their own icon colors visibly did change).
+- ✅ Added two new theme-reactive variables, `--nav-bg`/`--nav-bg-fade`
+  (same rgb as `--bg`, at the same original alpha), defined in both
+  `:root` and `:root[data-theme="light"]` exactly like `--addition-bg`
+  already is — see AGENT.md → Key Architecture → Theme for the full
+  writeup of why this was missed in the original v5.113 theme audit.
+- ✅ **Verified in an actual headless-Chromium render, not just by reading
+  the CSS**: loaded the real `index.html` (via a local HTTP server),
+  toggled `localStorage.theme` between `'dark'`/`'light'` before load
+  (matching the app's own inline HEAD-script boot sequence), and read
+  `getComputedStyle()` on both bars in each theme — confirms the
+  background now genuinely resolves to light vs dark. Screenshotted both
+  themes for a visual sanity check.
+- ✅ **Checked every tab icon/label for legibility, not just the two that
+  were visible in a screenshot** — all 17 tabs × both nav bars × both
+  themes (68 checks) had their real computed text color contrast-checked
+  against the real computed (composited) background color:
+  light theme reaches full WCAG AA (≥4.5:1) for every tab, including ones
+  that were only "large-text-only" (≥3:1) in dark theme already — and
+  that dark-theme number (4.40) is unchanged from before this fix, i.e.
+  confirmed NOT a regression, just a pre-existing characteristic this fix
+  didn't touch.
+- `Tests/test_runner.py`: 270/288 (unchanged baseline — this is a
+  styles.css-only fix, no JS behavior changed). `release-checklist.py`
+  syntax/version checks unaffected.
 
 ### v5.124 (Sep 27, 2026) – נטילת לולב moved from Tefilot to Brachot
 - ✅ Moved `lulav` from `TEFILOT` (js/tefilot.js) to `BRACHOT`

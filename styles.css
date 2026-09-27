@@ -19,13 +19,21 @@
   --red:      #c94040;
   --green:    #3d8c5a;
   /* Second, neutral accent for "two valid customs, neither wrong" contrast
-     (e.g. Tefilot > נטילת לולב's Ashkenazi/Sephardi shaking-direction
+     (e.g. Brachot > נטילת לולב's Ashkenazi/Sephardi shaking-direction
      opinions) — deliberately NOT --addition/--red, which already carry a
      say-this/don't-say-this meaning elsewhere (siddur-inserts.js) that would
      misleadingly imply one custom is "correct". WCAG AA verified (>=4.5:1
      against both --bg and --surface, both themes) with a standalone script,
      not eyeballed — see AGENT.md. */
   --shita-b:  #7cc4e0;
+  /* Translucent backdrop for the sticky top bar / fixed bottom nav (both use
+     backdrop-filter:blur behind these) — same rgb as --bg, just with alpha,
+     so the frosted-glass look tints toward whichever theme is active
+     instead of always being dark. Was hardcoded as rgba(14,9,5,...) (this
+     theme's own --bg) directly on #topbar/#bottom-nav, which is why they
+     stayed black in light mode — fixed by routing through these instead. */
+  --nav-bg:      rgba(14,9,5,.97);
+  --nav-bg-fade: rgba(14,9,5,.85);
   --radius:   14px;
   --font-size: 16px;
 }
@@ -53,6 +61,8 @@
   --red:      #b03030;
   --green:    #2f6b45;
   --shita-b:  #245e78;
+  --nav-bg:      rgba(250,246,238,.97);
+  --nav-bg-fade: rgba(250,246,238,.85);
 }
 
 
@@ -97,7 +107,7 @@ body {
 /* ─── TOP BAR ────────────────────────────── */
 #topbar {
   position: sticky; top: 0; z-index: 100;
-  background: linear-gradient(180deg, rgba(14,9,5,.97) 0%, rgba(14,9,5,.85) 100%);
+  background: linear-gradient(180deg, var(--nav-bg) 0%, var(--nav-bg-fade) 100%);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--border);
   padding: 10px 16px;
@@ -446,7 +456,7 @@ body {
 /* ─── BOTTOM NAV ─────────────────────────── */
 #bottom-nav {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
-  background: rgba(14,9,5,.97);
+  background: var(--nav-bg);
   backdrop-filter: blur(14px);
   border-top: 1px solid var(--border);
   display: flex;
