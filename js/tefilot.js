@@ -237,6 +237,32 @@ const TEFILOT = {
       'בְּמִלּוּי וּבְרֶוַח בְּלִי טֹרַח וְעָמָל גָּדוֹל',
       'מִתַּחַת יָדְךָ הַנְּקִיָּה וְלֹא מִתַּחַת יְדֵי בָשָׂר וָדָם.',
     ]
+  },
+  lulav: {
+    title: 'נטילת לולב',
+    source: 'נוסח ספרד – ראה Sefaria, Siddur Sefard, Sukkot',
+    // The two blessings below are the fixed, universal nusach for this mitzvah
+    // (identical across Ashkenaz/Sfard/Edot HaMizrach — Chazal's wording for a
+    // mitzva blessing, not subject to nusach variation) — not flagged, per
+    // CLAUDE.md §3 this level of certainty doesn't need a TODO.
+    // TODO: verify source — the יהי רצון and the shaking-direction opinions
+    // below are placeholders pending the exact Sefaria text (network access to
+    // sefaria.org is blocked in this sandbox; see AGENT.md Known Issues).
+    text: [
+      '【ברכות נטילת ארבעת המינים】',
+      'בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם,',
+      'אֲשֶׁר קִדְּשָׁנוּ בְּמִצְוֹתָיו וְצִוָּנוּ עַל נְטִילַת לוּלָב.',
+      '',
+      'בְּיוֹם הָרִאשׁוֹן מוֹסִיפִים:',
+      'בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם,',
+      'שֶׁהֶחֱיָנוּ וְקִיְּמָנוּ וְהִגִּיעָנוּ לַזְּמַן הַזֶּה.',
+      '',
+      '【יהי רצון לאחר הנענועים】',
+      '⚠️ טרם הוזן — נדרש טקסט מדויק מ-Sefaria (נוסח ספרד, סוכות). ראו TODO בקוד ו-AGENT.md.',
+      '',
+      '【דעות שונות בכיווני הניענוע】',
+      '⚠️ טרם הוזנו — נדרשות הדעות המדויקות מ-Sefaria כולל שם הפוסק/המקור לכל דעה. ראו TODO בקוד ו-AGENT.md.',
+    ]
   }
 };
 
