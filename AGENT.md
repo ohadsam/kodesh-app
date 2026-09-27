@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.120 (Sep 27, 2026)
+**Last updated:** v5.121 (Sep 27, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -318,6 +318,24 @@ that goes quiet for `HSRC_STALE_MS` = 3 s yields to a lower-ranked one):
 
 ## Known Issues / Open Items
 
+### 🟡 Duplicate `tefila_haderech` key in BRACHOT (found Sep 27, 2026)
+`js/brachot.js` defines the object key `tefila_haderech` **twice**, with two
+completely different texts (a shorter "ותמלטנו מרוח סועה וסער" version, then
+later a longer "ותצילנו מכף כל אויב ואורב בדרך... ופרוש סוכת שלומך" version).
+In a JS object literal a repeated key isn't a syntax error — the SECOND
+definition silently wins at construction time, so the first one is dead code:
+never reachable, even though it's sitting right there in the source looking
+live. Only one `bb-tefila_haderech` button exists in index.html, so this
+hasn't caused a visibly duplicated UI, just quietly discarded text. Not fixed
+here (found while adding the Ushpizin feature, unrelated to it) — deciding
+which version to keep (or whether to keep both under different keys) is a
+content judgment call for the owner, not something to silently resolve.
+Note: an old, unmerged branch in this repo (`claude/add-flight-prayer-Jc66F`,
+predates this AGENT.md history) has a commit literally titled "remove
+duplicate entry" for this exact prayer — that fix apparently never made it to
+main. Worth checking that branch's version before re-deriving one from
+scratch.
+
 ### 🟡 Siddur tab is BETA and hidden by default (Sep 22, 2026)
 Owner-reported: the siddur pipeline's logic doesn't always behave as expected —
 no specific repro captured yet. Made `siddur` `defaultHidden: true` in
@@ -396,6 +414,51 @@ could be more precise for edge cases.
 ---
 
 ## Recently Fixed
+
+### v5.121 (Sep 27, 2026) – סדר האושפיזין added to Brachot
+- ✅ New `BRACHOT.ushpizin` entry (js/brachot.js) + button in `#bracha-buttons`
+  under a new "חג הסוכות" category, following the existing "Adding a
+  bracha" pattern. All in one card/area, per the request — the nightly
+  entrance prayer, the daily "אזמין" invitation formula, all 7 nights'
+  guest-specific formulas, and the leaving-the-sukkah texts, are one
+  `shared`/`afterText` pair, not 7 separate buttons.
+- ✅ Same network-blocked-Sefaria situation as v5.120's נטילת לולב (still
+  blocked at the environment policy level — not re-tested, since this is a
+  standing policy, not a transient failure). This time the owner pasted the
+  full text upfront rather than being asked mid-task, so there was no
+  intermediate "content authoring paused, need input" step and no
+  placeholder ever needed to exist. Every one of the 11 owner-supplied
+  Hebrew strings was verified as an exact runtime-string match (not a raw
+  source-text substring check — a raw check falsely flagged one string as
+  "missing" because the JS source's `\'` escape for a literal apostrophe
+  reads as two characters in the file text but one at runtime; caught and
+  corrected before trusting the result) before treating the transcription
+  as correct.
+- ✅ Per-night header labels (🌙 ליל א׳ – אברהם אבינו, etc.) are our own
+  descriptive additions, not part of the liturgical text — verified
+  programmatically that each header's named guest actually IS the first
+  guest named in that night's own "בְּמָטֵי מִינָךְ" line, so the labeling is
+  corroborated by the supplied text itself, not a separate claim resting on
+  memory.
+- ✅ Headers use `<span style="display:block">`, not `<div>` — `js/brachot.js`'s
+  `_renderBrachaLines` wraps every non-empty line in a `<p>...</p>`, and a
+  `<div>` is not valid content inside a `<p>` (a browser will silently
+  auto-close the `<p>` early to "fix" it, which would still look fine on
+  screen but leaves genuinely malformed markup). A `<span>` is inline/
+  phrasing content, valid inside a `<p>`, and `display:block` makes it look
+  identical to a div. Checked programmatically (regex over the actual
+  rendered HTML) that no `<div` ever ends up directly inside a `<p`, not
+  just eyeballed on screen.
+- ✅ Found, not fixed (out of scope for this task): a genuine duplicate
+  `tefila_haderech` key elsewhere in `js/brachot.js` — see Known Issues.
+- Verified numerically: a Node `vm` harness loads the real `js/brachot.js`
+  and calls the real `showBracha('ushpizin')` — 21 assertions covering
+  section order (entrance prayer → daily formula → nights 1‑7 in order →
+  leaving-the-sukkah block → its two texts in order), all 7 nights' exact
+  formulas present, the afterText visual-separation mechanism firing, and
+  the `<div>`-inside-`<p>` nesting check above. `Tests/test_runner.py`:
+  270/288 (unchanged baseline). `node --check` clean; no duplicate DOM ids;
+  whole-document `<div>` nesting balanced (all checked programmatically).
 
 ### v5.120 (Sep 27, 2026) – נטילת לולב added to Tefilot (nusach Sfard)
 - ✅ New `TEFILOT.lulav` entry (js/tefilot.js) + button in `#tefila-buttons`

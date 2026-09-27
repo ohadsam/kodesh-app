@@ -126,7 +126,7 @@ js/init.js          → init() – called on DOMContentLoaded
 ### js/brachot.js
 | Function/Const | Description |
 |---|---|
-| `BRACHOT` | Object of all brachot: `{ key: { title, source, shared/nusach } }` |
+| `BRACHOT` | Object of all brachot: `{ key: { title, source, shared/nusach, afterText? } }`. `afterText` renders in its own visually-separated block after `shared`/`nusach` (e.g. `ushpizin`'s leaving-the-sukkah texts). **Known bug**: `tefila_haderech` is defined twice with different text — the second silently wins; see AGENT.md Known Issues, not fixed |
 | `showBracha(key)` | Display bracha by key, set active button |
 | `setBrachotNusach(n)` | Switch nusach (sfard/ashkenaz/mizrach) |
 | `loadBrachot()` | Init: restore nusach, show first bracha |
@@ -134,7 +134,11 @@ js/init.js          → init() – called on DOMContentLoaded
 | `closeBrachotNavPopup()` | Close floating nav |
 | `readBrachaAloud()` | Web Speech API TTS (he-IL voice) |
 
-**Adding a bracha:** Add entry to `BRACHOT` in `js/brachot.js` AND root `brachot.js`.
+**Adding a bracha:** Add entry to `BRACHOT` in `js/brachot.js` only — same dead
+root-level-duplicate situation as `tefilot.js` above; root `brachot.js` is not
+loaded by `index.html` and keeping it in sync is wasted effort (see AGENT.md
+Known Issues → "Dead root-level duplicate .js/.css files"). This note used to
+say "AND root `brachot.js`" — that was wrong, corrected v5.121.
 Add a `<button id="bb-{key}" class="aliya-tab bracha-btn" onclick="showBracha('{key}')">` in `index.html` inside `#bracha-buttons`. The floating nav picks it up automatically.
 
 ### js/tefilot.js
