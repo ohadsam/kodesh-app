@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.119 (Sep 25, 2026)
+**Last updated:** v5.120 (Sep 27, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -396,6 +396,73 @@ could be more precise for edge cases.
 ---
 
 ## Recently Fixed
+
+### v5.120 (Sep 27, 2026) – נטילת לולב added to Tefilot (nusach Sfard)
+- ✅ New `TEFILOT.lulav` entry (js/tefilot.js) + button in `#tefila-buttons`
+  (index.html), following the existing "Adding a tefila" pattern exactly
+  (STRUCTURE.md).
+- ✅ **Network constraint hit and documented, not silently worked around**:
+  Sefaria is blocked at the environment's network-egress-policy level in
+  this sandbox — confirmed 3 independent ways (`curl` CONNECT-tunnel 403,
+  the `WebFetch` tool returning `EGRESS_BLOCKED`, and the proxy's own
+  status/README explicitly saying "do not retry or route around it, report
+  the blocked host"). This is a harder block than the already-known
+  Sefaria/Hebcal API-test failures elsewhere in this repo (those are
+  *tests* failing offline; this was *content authoring* that needed live
+  Sefaria access and genuinely couldn't get it).
+  - The two ברכות (על נטילת לולב + שהחיינו) were written from confident,
+    independently-certain knowledge — Chazal's fixed wording for a mitzva
+    blessing, identical across every nusach, not something that varies —
+    and were NOT held up on this.
+  - The יהי רצון (both the long קבלי text and the short one) and the
+    shaking-direction opinions (real, disputed minhag content — Ashkenaz/
+    הגר"א vs Sephardim/האר"י — exactly the kind of content where a
+    misattribution or wrong order is a real halachic error, not a
+    cosmetic one) were **explicitly NOT filled in from memory**. Asked the
+    owner to paste the exact Sefaria text instead (`AskUserQuestion`
+    offered 3 options: paste it / best-effort-with-TODO / blessings-only;
+    owner chose paste-it) — see CLAUDE.md §3's "add a `// TODO: verify
+    source` comment... when in doubt" and the v5.111 precedent for
+    exactly this situation (owner-supplied liturgical text, not
+    independently cross-checked).
+  - While waiting for the pasted text, committed the partial scaffold to
+    a **separate branch** (`wip/lulav-tefila`), not `main` — this repo's
+    `main` IS the GitHub Pages deploy (CLAUDE.md §11), so a half-finished
+    feature with a visible "⚠️ not yet entered" placeholder must not
+    reach it. Merged that branch back locally once the owner's text
+    arrived, then replaced every placeholder before this version's commit
+    — nothing with a placeholder in it was ever pushed to `main`.
+  - Every one of the owner-supplied Hebrew strings was verified
+    **character-for-character present, byte-for-byte**, in the final file
+    with a standalone script (`in` substring check per string) before
+    treating the transcription as correct — not eyeballed.
+- ✅ **Color-coded shaking-direction opinions, deliberately NOT using the
+  app's existing green/red seasonal colors** (`_greenBlock`/`_redBlock` in
+  js/siddur-inserts.js) — those already carry a "say this today / don't
+  say this today" meaning elsewhere in the app, which would have
+  misleadingly implied one of two equally-valid customs is "wrong". Added
+  a new neutral second accent, `--shita-b` (styles.css `:root` +
+  `:root[data-theme="light"]`), verified for WCAG AA contrast (≥4.5:1
+  against both `--bg` and `--surface`, both themes) with a standalone
+  script before picking the value — not eyeballed, matching the rigor the
+  original theme feature (v5.113) used. `--gold` (already verified, already
+  the app's "primary" accent) is reused for the Ashkenaz/הגר"א opinion;
+  the new `--shita-b` is used for the Sfaradi/האר"י opinion.
+- ✅ Confirmed the new content does not accidentally trip
+  `showTefila`'s pre-existing (fragile) "Targum line" styling heuristic —
+  it muted-quote-styles any line containing `יְיָ`/`תרגום`/`מְחֵית`. The new
+  blessings use the fully-spelled `יְהֹוָה` (as the owner supplied it), which
+  doesn't match, so they render in the normal primary style, not muted —
+  checked programmatically, not by eye.
+- Verified numerically: a Node `vm` harness loads the real `js/tefilot.js`
+  and calls the real `showTefila('lulav')` — 24 assertions covering section
+  presence/order (יהי רצון ×2 → ברכה → שהחיינו note+ברכה → ניענוע opinions,
+  matching the order the owner supplied), the two opinions' exact wording,
+  their attribution text, that neither reuses the green/red semantic
+  colors, and the Targum-heuristic non-collision. `Tests/test_runner.py`:
+  270/288 (unchanged baseline). `node --check` clean; CSS brace count
+  balanced; no duplicate DOM ids; whole-document `<div>` nesting balanced
+  (checked programmatically, as in v5.118/v5.119).
 
 ### v5.119 (Sep 25, 2026) – Shared prayer-names list (רפואה שלמה / עילוי נשמה)
 - ✅ **New collapsible section, identical on both the Tehilim and Mishna

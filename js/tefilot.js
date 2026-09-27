@@ -240,28 +240,42 @@ const TEFILOT = {
   },
   lulav: {
     title: 'נטילת לולב',
-    source: 'נוסח ספרד – ראה Sefaria, Siddur Sefard, Sukkot',
-    // The two blessings below are the fixed, universal nusach for this mitzvah
-    // (identical across Ashkenaz/Sfard/Edot HaMizrach — Chazal's wording for a
-    // mitzva blessing, not subject to nusach variation) — not flagged, per
-    // CLAUDE.md §3 this level of certainty doesn't need a TODO.
-    // TODO: verify source — the יהי רצון and the shaking-direction opinions
-    // below are placeholders pending the exact Sefaria text (network access to
-    // sefaria.org is blocked in this sandbox; see AGENT.md Known Issues).
+    source: 'נוסח ספרד – סדר נטילת לולב',
+    // TODO: verify source — text supplied directly by the app owner (not
+    // independently cross-checked against Sefaria: network access to
+    // sefaria.org is blocked in this sandbox, confirmed via curl/WebFetch/the
+    // proxy's own egress policy — see AGENT.md Known Issues). The two
+    // ברכות (נטילת לולב + שהחיינו) are the fixed, universal nusach for this
+    // mitzvah regardless — identical across Ashkenaz/Sfard/Edot HaMizrach,
+    // Chazal's wording for a mitzva blessing, not subject to nusach variation.
+    // The shaking-direction opinions are real, disputed minhag content
+    // (Ashkenaz/הגר"א vs Sephardim/האר"י) — kept exactly as supplied, with
+    // the attribution to each source built into the text itself.
     text: [
+      '【יהי רצון לפני הנטילה (נוסח קבלי)】',
+      'יְהִי רָצוֹן מִלְּפָנֶיךָ יְהֹוָה אֱלֹהַי וֵאלֹהֵי אֲבוֹתַי, בִּפְרִי עֵץ הָדָר וְכַפֹּת תְּמָרִים וַעֲנַף עֵץ עָבוֹת וְעַרְבֵי נָחַל אוֹתִיּוֹת שִׁמְךָ הַמְּיֻחָד תְּקָרֵב אֶחָד אֶל אֶחָד וְהָיוּ לַאֲחָדִים בְּיָדִי וְלֵידַע אֵיךְ שִׁמְךָ נִקְרָא עָלַי וְיִירְאוּ מִגֶּשֶּׁת אֵלַי וּבְנַעֲנוּעִי אוֹתָם תַּשְׁפִּיעַ שֶׁפַע בְּרָכוֹת מִדַּעַת עֶלְיוֹן לִנְוֵה אַפִּרְיוֹן לִמְכוֹן בֵּית אֱלֹהֵינוּ, וּתְהֵא חֲשׁוּבָה לְפָנֶיךָ מִצְוַת אַרְבָּעָה מִינִים אֵלּוּ, כְּאִלּוּ קִיַּמְתִּיהָ בְּכָל פְּרָטוֹתֶיהָ וְשָׁרָשֶׁיהָ וְתַרְיַ"ג מִצְוֹת הַתְּלוּיִם בָּהּ. כִּי כַוָּנָתִי לְיַחֲדָא שְׁמָא דְקוּדְשָׁא בְּרִיךְ הוּא וּשְׁכִינְתֵּיהּ בִּדְחִילוּ וּרְחִימוּ לְיַחֵד שֵׁם י"ה בּו"ה בְּיִחוּדָא שְׁלִים בְּשֵׁם כָּל יִשְׂרָאֵל אָמֵן: בָּרוּךְ יְהֹוָה לְעוֹלָם אָמֵן וְאָמֵן:',
+      '',
+      'יְהִי רָצוֹן מִלְּפָנֶיךָ, שֶׁתְּהֵא חֲשׁוּבָה לְפָנֶיךָ מִצְוַת אַרְבָּעָה מִינִים אֵלּוּ כְּאִלּוּ כִּוַּנְתִּי בְּכָל הַכַּוָּנוֹת שֶׁכִּוְנוּ בָהֶם אַנְשֵׁי כְנֶסֶת הַגְּדוֹלָה:',
+      '',
       '【ברכות נטילת ארבעת המינים】',
-      'בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם,',
-      'אֲשֶׁר קִדְּשָׁנוּ בְּמִצְוֹתָיו וְצִוָּנוּ עַל נְטִילַת לוּלָב.',
+      'בָּרוּךְ אַתָּה יְהֹוָה אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, אֲשֶׁר קִדְּשָׁנוּ בְּמִצְוֹתָיו, וְצִוָּנוּ עַל נְטִילַת לוּלָב:',
       '',
-      'בְּיוֹם הָרִאשׁוֹן מוֹסִיפִים:',
-      'בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם,',
-      'שֶׁהֶחֱיָנוּ וְקִיְּמָנוּ וְהִגִּיעָנוּ לַזְּמַן הַזֶּה.',
+      '<span style="font-size:11px;color:var(--muted)">בפעם הראשונה שמברך על הלולב מברך גם שהחיינו:</span>',
+      'בָּרוּךְ אַתָּה יְהֹוָה אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, שֶׁהֶחֱיָנוּ וְקִיְּמָנוּ וְהִגִּיעָנוּ לַזְמַן הַזֶּה:',
       '',
-      '【יהי רצון לאחר הנענועים】',
-      '⚠️ טרם הוזן — נדרש טקסט מדויק מ-Sefaria (נוסח ספרד, סוכות). ראו TODO בקוד ו-AGENT.md.',
-      '',
-      '【דעות שונות בכיווני הניענוע】',
-      '⚠️ טרם הוזנו — נדרשות הדעות המדויקות מ-Sefaria כולל שם הפוסק/המקור לכל דעה. ראו TODO בקוד ו-AGENT.md.',
+      '【דעות שונות בכיווני הניענוע (בהלל)】',
+      `<div style="border-right:3px solid var(--gold);background:rgba(201,165,74,.06);
+        border-radius:0 8px 8px 0;padding:9px 12px;margin-bottom:8px;color:var(--gold);
+        font-size:calc(var(--font-size) - 1px);line-height:1.8">
+        <b>מנהג האשכנזים והגר"א</b> (על פי השולחן ערוך):<br>
+        מזרח (קדימה), דרום (ימין), מערב (אחורה), צפון (שמאל), מעלה, מטה (לפי כיוון השעון).
+      </div>`,
+      `<div style="border-right:3px solid var(--shita-b);background:rgba(124,196,224,.08);
+        border-radius:0 8px 8px 0;padding:9px 12px;margin-bottom:8px;color:var(--shita-b);
+        font-size:calc(var(--font-size) - 1px);line-height:1.8">
+        <b>מנהג הספרדים ועדות המזרח</b> (על פי האר"י והקבלה):<br>
+        דרום, צפון, מזרח, מעלה, מטה, מערב.
+      </div>`,
     ]
   }
 };

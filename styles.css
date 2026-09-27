@@ -18,6 +18,14 @@
   --accent:   #e8b84b;
   --red:      #c94040;
   --green:    #3d8c5a;
+  /* Second, neutral accent for "two valid customs, neither wrong" contrast
+     (e.g. Tefilot > נטילת לולב's Ashkenazi/Sephardi shaking-direction
+     opinions) — deliberately NOT --addition/--red, which already carry a
+     say-this/don't-say-this meaning elsewhere (siddur-inserts.js) that would
+     misleadingly imply one custom is "correct". WCAG AA verified (>=4.5:1
+     against both --bg and --surface, both themes) with a standalone script,
+     not eyeballed — see AGENT.md. */
+  --shita-b:  #7cc4e0;
   --radius:   14px;
   --font-size: 16px;
 }
@@ -44,6 +52,7 @@
   --accent:   #7d5c08;
   --red:      #b03030;
   --green:    #2f6b45;
+  --shita-b:  #245e78;
 }
 
 
