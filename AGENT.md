@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.123 (Sep 27, 2026)
+**Last updated:** v5.124 (Sep 27, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -306,7 +306,34 @@ that goes quiet for `HSRC_STALE_MS` = 3 s yields to a lower-ranked one):
   `_allReminderItems()`/`_reminderSettingsFor()` pattern in js/settings.js
   rather than inventing a second reminder pipeline.
 
-### Ushpizin — js/brachot.js (v5.121, day-auto-detection added v5.123)
+### חג הסוכות (נטילת לולב + Ushpizin) — js/brachot.js
+Both live under one "חג הסוכות" category in `#bracha-buttons`, grouped
+together at the owner's request (`lulav` moved here from `js/tefilot.js` in
+v5.124 specifically so both Sukkot items sit in the same place).
+
+#### נטילת לולב (v5.120, moved from Tefilot to Brachot v5.124)
+- Uses the plain `shared` shape like most other BRACHOT entries (no
+  day-detection — unlike Ushpizin below, there's no "which day" question
+  for this one). Content unchanged by the move.
+- The move required converting tefilot.js-specific conventions to
+  brachot.js's simpler renderer: `showTefila()` (js/tefilot.js) auto-styles
+  a line starting with `【...】` as a gold header and wraps every default
+  line in a `<div>`; `_renderBrachaLines()` (js/brachot.js) does neither —
+  it wraps every line in `<p>...</p>` and has no `【】` handling at all.
+  Both the two section headers and the two shaking-direction opinion blocks
+  (previously raw `<div>`, valid inside tefilot.js's own `<div>` wrapper)
+  were rewritten as explicit `<span style="display:block/flex">` — the
+  same fix already needed twice for Ushpizin's own headers/banner (v5.121,
+  v5.123), applied here proactively during the move instead of
+  reproducing the bug a third time.
+- Verified numerically: a Node `vm` harness loading the real `js/tefilot.js`
+  + `js/brachot.js` together — confirms `TEFILOT.lulav` no longer exists,
+  `BRACHOT.lulav` renders every piece of text (both יהי רצון texts, both
+  ברכות, both shaking-direction opinions) in the same order as before the
+  move, the `【〜】` markers never leak into the rendered HTML as literal
+  text, and no `<div>` ends up nested inside a `<p>`.
+
+#### Ushpizin (v5.121, day-auto-detection added v5.123)
 - Data shape is deliberately NOT the generic `shared`/`nusach` every other
   BRACHOT entry uses: `intro[]` (entrance prayer + daily אזמין formula,
   always shown) + `nights[]` (7 × `{label, text}`) + `afterText` (leaving-
@@ -443,6 +470,36 @@ could be more precise for edge cases.
 ---
 
 ## Recently Fixed
+
+### v5.124 (Sep 27, 2026) – נטילת לולב moved from Tefilot to Brachot
+- ✅ Moved `lulav` from `TEFILOT` (js/tefilot.js) to `BRACHOT`
+  (js/brachot.js), under the "חג הסוכות" category, at the owner's request
+  to group it with Ushpizin (v5.121) — both Sukkot items now live in one
+  place. Content is unchanged; only the file/tab it lives in changed.
+- ✅ **Proactively fixed the same `<div>`-inside-`<p>` nesting bug a third
+  time** rather than reproducing it — `showTefila()`'s rendering
+  conventions (`【header】` auto-styling, default `<div>` line wrapper)
+  don't carry over to `_renderBrachaLines()` (default `<p>` line wrapper,
+  no `【】` support at all). Both section headers and the two
+  shaking-direction opinion blocks were rewritten as
+  `<span style="display:block/flex">` during the move — see AGENT.md → Key
+  Architecture → חג הסוכות for the full explanation of why this class of
+  bug keeps recurring here and how it's checked (programmatically, with a
+  regex over the actual rendered HTML, every time — a visual check has
+  never once caught it in this feature).
+- ✅ Removed the `tf-lulav` button from `#tefila-buttons` (index.html) and
+  added `bb-lulav` under `#bracha-buttons`'s "חג הסוכות" category, next to
+  `bb-ushpizin`.
+- Verified numerically: a Node `vm` harness loading the real
+  `js/tefilot.js` + `js/brachot.js` — confirms `TEFILOT.lulav` no longer
+  exists, `BRACHOT.lulav` renders every piece of the original text in the
+  same order, no `【〜】` marker leaks into the HTML as literal text, and no
+  `<div>` ends up nested inside a `<p>`. Re-ran the existing Ushpizin
+  verification harness (31 assertions, v5.123) unchanged to confirm
+  inserting `lulav` immediately before it in the `BRACHOT` object didn't
+  disturb anything. `Tests/test_runner.py`: 270/288 (unchanged baseline).
+  `node --check` clean; no duplicate DOM ids; whole-document `<div>`
+  nesting balanced.
 
 ### v5.123 (Sep 27, 2026) – Ushpizin auto-shows the correct night by date
 - ✅ Ushpizin (v5.121) now automatically shows only the Hebrew-date-relevant

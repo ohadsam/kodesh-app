@@ -527,6 +527,59 @@ const BRACHOT = {
     ],
   },
 
+  // ── נטילת לולב ───────────────────────────────────────────────────────
+  // Moved here from js/tefilot.js (was TEFILOT.lulav, v5.120) — same content,
+  // same TODO/sourcing notes, at the owner's request to group it with the
+  // other חג הסוכות content (ushpizin, below). Headers and the two
+  // shaking-direction opinion blocks were converted from tefilot.js's
+  // 【header】 convention / raw <div> to explicit <span style="display:
+  // block/flex"> — showTefila() auto-styles 【...】 lines and wraps
+  // everything else in a <div>, but _renderBrachaLines (used here) does
+  // neither: it doesn't know about 【】 at all, and it wraps every line in
+  // <p>...</p>, where a <div> is invalid content (the exact bug already
+  // caught twice for ushpizin's own headers/banner — fixed here proactively
+  // during the move rather than reproducing it a third time).
+  // TODO: verify source — text supplied directly by the app owner (not
+  // independently cross-checked against Sefaria: network access to
+  // sefaria.org is blocked in this sandbox, confirmed via curl/WebFetch/the
+  // proxy's own egress policy — see AGENT.md Known Issues). The two
+  // ברכות (נטילת לולב + שהחיינו) are the fixed, universal nusach for this
+  // mitzvah regardless — identical across Ashkenaz/Sfard/Edot HaMizrach,
+  // Chazal's wording for a mitzva blessing, not subject to nusach variation.
+  // The shaking-direction opinions are real, disputed minhag content
+  // (Ashkenaz/הגר"א vs Sephardim/האר"י) — kept exactly as supplied, with
+  // the attribution to each source built into the text itself.
+  lulav: {
+    title: 'נטילת לולב',
+    source: 'נוסח ספרד – סדר נטילת לולב',
+    shared: [
+      '<span style="display:block;font-size:12px;color:var(--gold);font-weight:700;margin:14px 0 6px;letter-spacing:.5px">יהי רצון לפני הנטילה (נוסח קבלי)</span>',
+      'יְהִי רָצוֹן מִלְּפָנֶיךָ יְהֹוָה אֱלֹהַי וֵאלֹהֵי אֲבוֹתַי, בִּפְרִי עֵץ הָדָר וְכַפֹּת תְּמָרִים וַעֲנַף עֵץ עָבוֹת וְעַרְבֵי נָחַל אוֹתִיּוֹת שִׁמְךָ הַמְּיֻחָד תְּקָרֵב אֶחָד אֶל אֶחָד וְהָיוּ לַאֲחָדִים בְּיָדִי וְלֵידַע אֵיךְ שִׁמְךָ נִקְרָא עָלַי וְיִירְאוּ מִגֶּשֶּׁת אֵלַי וּבְנַעֲנוּעִי אוֹתָם תַּשְׁפִּיעַ שֶׁפַע בְּרָכוֹת מִדַּעַת עֶלְיוֹן לִנְוֵה אַפִּרְיוֹן לִמְכוֹן בֵּית אֱלֹהֵינוּ, וּתְהֵא חֲשׁוּבָה לְפָנֶיךָ מִצְוַת אַרְבָּעָה מִינִים אֵלּוּ, כְּאִלּוּ קִיַּמְתִּיהָ בְּכָל פְּרָטוֹתֶיהָ וְשָׁרָשֶׁיהָ וְתַרְיַ"ג מִצְוֹת הַתְּלוּיִם בָּהּ. כִּי כַוָּנָתִי לְיַחֲדָא שְׁמָא דְקוּדְשָׁא בְּרִיךְ הוּא וּשְׁכִינְתֵּיהּ בִּדְחִילוּ וּרְחִימוּ לְיַחֵד שֵׁם י"ה בּו"ה בְּיִחוּדָא שְׁלִים בְּשֵׁם כָּל יִשְׂרָאֵל אָמֵן: בָּרוּךְ יְהֹוָה לְעוֹלָם אָמֵן וְאָמֵן:',
+      '',
+      'יְהִי רָצוֹן מִלְּפָנֶיךָ, שֶׁתְּהֵא חֲשׁוּבָה לְפָנֶיךָ מִצְוַת אַרְבָּעָה מִינִים אֵלּוּ כְּאִלּוּ כִּוַּנְתִּי בְּכָל הַכַּוָּנוֹת שֶׁכִּוְנוּ בָהֶם אַנְשֵׁי כְנֶסֶת הַגְּדוֹלָה:',
+      '',
+      '<span style="display:block;font-size:12px;color:var(--gold);font-weight:700;margin:14px 0 6px;letter-spacing:.5px">ברכות נטילת ארבעת המינים</span>',
+      'בָּרוּךְ אַתָּה יְהֹוָה אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, אֲשֶׁר קִדְּשָׁנוּ בְּמִצְוֹתָיו, וְצִוָּנוּ עַל נְטִילַת לוּלָב:',
+      '',
+      '<span style="font-size:11px;color:var(--muted)">בפעם הראשונה שמברך על הלולב מברך גם שהחיינו:</span>',
+      'בָּרוּךְ אַתָּה יְהֹוָה אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, שֶׁהֶחֱיָנוּ וְקִיְּמָנוּ וְהִגִּיעָנוּ לַזְמַן הַזֶּה:',
+      '',
+      '<span style="display:block;font-size:12px;color:var(--gold);font-weight:700;margin:14px 0 6px;letter-spacing:.5px">דעות שונות בכיווני הניענוע (בהלל)</span>',
+      `<span style="display:flex;border-right:3px solid var(--gold);background:rgba(201,165,74,.06);
+        border-radius:0 8px 8px 0;padding:9px 12px;margin-bottom:8px;color:var(--gold);
+        font-size:calc(var(--font-size) - 1px);line-height:1.8">
+        <span><b>מנהג האשכנזים והגר"א</b> (על פי השולחן ערוך):<br>
+        מזרח (קדימה), דרום (ימין), מערב (אחורה), צפון (שמאל), מעלה, מטה (לפי כיוון השעון).</span>
+      </span>`,
+      `<span style="display:flex;border-right:3px solid var(--shita-b);background:rgba(124,196,224,.08);
+        border-radius:0 8px 8px 0;padding:9px 12px;margin-bottom:8px;color:var(--shita-b);
+        font-size:calc(var(--font-size) - 1px);line-height:1.8">
+        <span><b>מנהג הספרדים ועדות המזרח</b> (על פי האר"י והקבלה):<br>
+        דרום, צפון, מזרח, מעלה, מטה, מערב.</span>
+      </span>`,
+    ],
+  },
+
   // ── סדר האושפיזין ────────────────────────────────────────────────────
   // TODO: verify source — text supplied directly by the app owner (not
   // independently cross-checked against Sefaria: network access to
