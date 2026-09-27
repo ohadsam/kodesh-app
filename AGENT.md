@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.122 (Sep 27, 2026)
+**Last updated:** v5.123 (Sep 27, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -306,6 +306,53 @@ that goes quiet for `HSRC_STALE_MS` = 3 s yields to a lower-ranked one):
   `_allReminderItems()`/`_reminderSettingsFor()` pattern in js/settings.js
   rather than inventing a second reminder pipeline.
 
+### Ushpizin — js/brachot.js (v5.121, day-auto-detection added v5.123)
+- Data shape is deliberately NOT the generic `shared`/`nusach` every other
+  BRACHOT entry uses: `intro[]` (entrance prayer + daily אזמין formula,
+  always shown) + `nights[]` (7 × `{label, text}`) + `afterText` (leaving-
+  the-sukkah texts, always shown regardless of mode). `showBracha` special-
+  cases `key === 'ushpizin'` to call `_buildUshpizinLines(b)` instead of
+  reading `b.shared` directly — everything else about `showBracha` (title/
+  source/TTS/afterText rendering) is untouched and shared normally.
+- `getUshpizinNightForDisplay()` returns 1–7 or `null`, mirroring
+  `getOmerDayForDisplay()` (js/omer.js) exactly in spirit: Hebcal's g2h
+  converter returns the DAYTIME Hebrew date for a Gregorian day; after that
+  day's tzeit (sunset+18min, the ישיבה.org standard used throughout this
+  app), the Hebrew day has already advanced — so Tishrei 15 in the evening
+  is really the night of Tishrei 16 (Ushpizin #2), per the owner's own
+  explicit example. Uses `getTargetDate()` (currentOffset-aware), not a bare
+  `new Date()`, so it responds to the date-nav, not always literal "today".
+  **Shares the exact same `appState._lastZmanim` staleness caveat the Omer
+  feature already has** (sunset only refreshes when the calendar tab loads,
+  not on every date-nav step) — not fixed here, matching existing precedent,
+  not a new bug introduced by this feature.
+- Auto-mode shows ONLY the detected night; a toggle button always offers the
+  opposite view (📜 "show all 7" when one night is auto-shown; 🔎 "show only
+  today" when all 7 are shown AND there IS a valid today-night to return
+  to). When the date is outside Tishrei 15–21 entirely, all 7 nights show
+  unconditionally and no misleading "show only today" button appears (there
+  is nothing to return to).
+- `_ushpizinShowAll` (module-level toggle) resets to auto-mode only when
+  `showBracha('ushpizin')` is called while `currentBracha` is something
+  ELSE (a genuine navigate-away-and-back) — a re-render triggered by the
+  toggle button itself, or by `loadBrachot()` on a date-nav step, keeps
+  `currentBracha === 'ushpizin'` already and does NOT reset the user's
+  choice. `loadBrachot()` was extended with `else if (currentBracha ===
+  'ushpizin') showBracha('ushpizin')` specifically so paging the date-nav
+  (`changeDay()` → `loaded={}` → `loadTab` → `loadBrachot`) updates which
+  night is shown, matching the explicit request that date-nav paging should
+  drive the same day-detection logic, not just literal real-time "now".
+- Night-header labels AND the new banner/toggle-button wrapper both use
+  `<span style="display:block/flex">`, never `<div>` — `_renderBrachaLines`
+  wraps every non-empty line in `<p>...</p>`, and a `<div>` is invalid
+  content there (a browser silently "fixes" it by auto-closing the `<p>`
+  early, which still LOOKS fine on screen while leaving genuinely malformed
+  markup — caught once already for the night headers in v5.121, and caught
+  a SECOND time here when the toggle-button banner initially used `<div>`
+  too; both are checked programmatically with a regex over the rendered
+  HTML in the verification harness, not by eye, since a visual check alone
+  would not have caught either instance).
+
 ### Omer (omer.js)
 - `getOmerDay()`: computed from Hebrew date
 - Full text: לשם יחוד, ברכה, ספירה, הרחמן, למנצח, אנא בכח, יהי רצון, עלינו
@@ -396,6 +443,42 @@ could be more precise for edge cases.
 ---
 
 ## Recently Fixed
+
+### v5.123 (Sep 27, 2026) – Ushpizin auto-shows the correct night by date
+- ✅ Ushpizin (v5.121) now automatically shows only the Hebrew-date-relevant
+  night (Tishrei 15→ליל א׳/אברהם ... Tishrei 21→ליל ז׳/דוד) instead of always
+  showing all 7. Falls back to showing everything when today isn't one of
+  the 7 nights (any other Tishrei day, or a different month) — exactly as
+  requested. A toggle button is always available to see all 7 nights even
+  while a specific night is auto-shown, and to return to just today's night
+  from there. See AGENT.md → Key Architecture → Ushpizin for the full
+  day-detection design (mirrors `getOmerDayForDisplay()`'s nightfall/tzeit
+  pattern) and `getUshpizinNightForDisplay()`/`_buildUshpizinLines`/
+  `toggleUshpizinShowAll()` in js/brachot.js.
+- ✅ **Nightfall boundary implemented exactly per the owner's own example**:
+  on the evening of Tishrei 15, once tzeit (sunset+18min) has passed, the
+  night already shown is #2 (Yitzchak), not #1 — verified numerically for
+  that exact case, not just read by eye.
+- ✅ **Date-nav-aware**: paging via the top date button re-renders whichever
+  night is correct for the day actually selected, not always "real today" —
+  required extending `loadBrachot()` (previously only called `showBracha`
+  once, on first-ever visit) to also re-render `ushpizin` specifically on
+  every call, since `changeDay()`'s `loaded={}` reset otherwise leaves the
+  Brachot tab's content stale after navigating the date away from and back
+  to it.
+- ✅ **Found and fixed a second, self-introduced instance of the same
+  `<div>`-inside-`<p>` bug already documented for v5.121's night headers** —
+  the new "show all / show only today" banner initially used `<div>` too;
+  caught by the same programmatic (not visual) check before merge.
+- Verified numerically: a Node `vm` harness loading the real `js/utils.js` +
+  `js/brachot.js` — 31 assertions covering the day-boundary math (before/
+  after tzeit, month/day-range edges, no-zmanim-data fallback, currentOffset
+  awareness), the auto-vs-show-all rendering split, the toggle button's
+  presence/absence/label in every mode, the "reset only on genuine
+  navigate-away" rule for the toggle, the `loadBrachot()` date-nav
+  re-render hook, and the `<div>`-in-`<p>` nesting check in all three
+  render modes. `Tests/test_runner.py`: 270/288 (unchanged baseline).
+  `node --check` clean.
 
 ### v5.122 (Sep 27, 2026) – Fixed: duplicate `tefila_haderech` key in BRACHOT
 - ✅ **Root cause** (found while adding v5.121's Ushpizin feature, fixed now

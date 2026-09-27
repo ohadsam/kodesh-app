@@ -5,6 +5,7 @@
 
 let brachotNusach = 'sfard'; // default
 let currentBracha = null;
+let _ushpizinShowAll = false; // manual override; reset to auto-mode on fresh entry — see showBracha
 
 // ── Bracha definitions ───────────────────────────────────────────────
 // Each bracha has: title, variants per nusach (or shared), paragraphs[]
@@ -537,33 +538,25 @@ const BRACHOT = {
   ushpizin: {
     title: 'סדר האושפיזין',
     source: 'לילות חג הסוכות',
-    shared: [
+    // `intro` (always shown) + `nights[]` (filtered to just today's night, or
+    // all 7, by _buildUshpizinLines below — see getUshpizinNightForDisplay)
+    // replace the old flat `shared` array so the per-night text is
+    // individually addressable instead of just concatenated strings.
+    intro: [
       '<span style="font-size:11px;color:var(--muted)">ראוי לומר בכל פעם שיכנס לסעודה בסוכה תפלה קצרה זו:</span>',
       'רִבּוֹן כָּל הָעוֹלָמִים, יְהִי רָצוֹן מִלְּפָנֶיךָ, שֶׁיְּהֵא חָשׁוּב לְפָנֶיךָ מִצְוַת יְשִׁיבַת סֻכָּה זוֹ, כְּאִלּוּ קִיַּמְתִּיהָ בְּכָל פְּרָטֶיהָ וְדִקְדּוּקֶיהָ, וְתרי"ג מִצְּוֹת הַתְּלוּיִּם בָּהּ, וּכְאִלּוּ כִּוַּנְתִּי בְּכָל הַכַּוָּנוֹת, שֶׁכִּוְּנוּ בָהּ אַנְשֵׁי כְּנֶסֶת הַגְּדוֹלָה.',
       '',
       '<span style="font-size:11px;color:var(--muted)">בליל ראשון כשנכנס לסוכה וקודם שמיסב לאכול, ובכל יום ויום קודם סעודתו, יאמר זה:</span>',
       'אֲזַמִּין לִסְעוּדָתִי אוּשְׁפִּיזִין עִילָאִין, אַבְרָהָם יִצְחָק יַעֲקֹב משֶׁה אַהֲרֹן יוֹסֵף וְדָוִד.',
-      '',
-      '<span style="display:block;font-size:12px;color:var(--gold);font-weight:700;margin:14px 0 6px;letter-spacing:.5px">🌙 ליל א׳ – אברהם אבינו</span>',
-      'בְּמָטֵי מִינָךְ אַבְרָהָם אוּשְׁפִּיזִי עִילָאִי דְיַתְבֵי עִמִּי וְעִמָּךְ כָּל אוּשְׁפִּיזֵי עִילָאִי יִצְחָק יַעֲקֹב משֶׁה אַהֲרֹן יוֹסֵף וְדָוִד.',
-      '',
-      '<span style="display:block;font-size:12px;color:var(--gold);font-weight:700;margin:14px 0 6px;letter-spacing:.5px">🌙 ליל ב׳ – יצחק אבינו</span>',
-      'בְּמָטֵי מִינָךְ יִצְחָק אוּשְׁפִּיזִי עִילָאִי דְיַתְבֵי עִמִּי וְעִמָּךְ כָּל אוּשְׁפִּיזֵי עִילָאִי אַבְרָהָם יַעֲקֹב משֶׁה אַהֲרֹן יוֹסֵף וְדָוִד.',
-      '',
-      '<span style="display:block;font-size:12px;color:var(--gold);font-weight:700;margin:14px 0 6px;letter-spacing:.5px">🌙 ליל ג׳ – יעקב אבינו</span>',
-      'בְּמָטֵי מִינָךְ יַעֲקֹב אוּשְׁפִּיזִי עִילָאִי דְיַתְבֵי עִמִּי וְעִמָּךְ כָּל אוּשְׁפִּיזֵי עִילָאִי אַבְרָהָם יִצְחָק משֶׁה אַהֲרֹן יוֹסֵף וְדָוִד.',
-      '',
-      '<span style="display:block;font-size:12px;color:var(--gold);font-weight:700;margin:14px 0 6px;letter-spacing:.5px">🌙 ליל ד׳ – משה רבינו</span>',
-      'בְּמָטֵי מִינָךְ משֶׁה אוּשְׁפִּיזִי עִילָאִי דְיַתְבֵי עִמִּי וְעִמָּךְ כָּל אוּשְׁפִּיזֵי עִילָאִי אַבְרָהָם יִצְחָק יַעֲקֹב אַהֲרֹן יוֹסֵף וְדָוִד.',
-      '',
-      '<span style="display:block;font-size:12px;color:var(--gold);font-weight:700;margin:14px 0 6px;letter-spacing:.5px">🌙 ליל ה׳ – אהרן הכהן</span>',
-      'בְּמָטֵי מִינָךְ אַהֲרֹן אוּשְׁפִּיזִי עִילָאִי דְיַתְבֵי עִמִּי וְעִמָּךְ כָּל אוּשְׁפִּיזֵי עִילָאִי אַבְרָהָם יִצְחָק יַעֲקֹב משֶׁה יוֹסֵף וְדָוִד.',
-      '',
-      '<span style="display:block;font-size:12px;color:var(--gold);font-weight:700;margin:14px 0 6px;letter-spacing:.5px">🌙 ליל ו׳ – יוסף הצדיק</span>',
-      'בְּמָטֵי מִינָךְ יוֹסֵף אוּשְׁפִּיזִי עִילָאִי דְיַתְבֵי עִמִּי וְעִמָּךְ כָּל אוּשְׁפִּיזֵי עִילָאִי אַבְרָהָם יִצְחָק יַעֲקֹב משֶׁה אַהֲרֹן וְדָוִד.',
-      '',
-      '<span style="display:block;font-size:12px;color:var(--gold);font-weight:700;margin:14px 0 6px;letter-spacing:.5px">🌙 ליל ז׳ – דוד המלך</span>',
-      'בְּמָטֵי מִינָךְ דָּוִד אוּשְׁפִּיזִי עִילָאִי דְיַתְבֵי עִמִּי וְעִמָּךְ כָּל אוּשְׁפִּיזֵי עִילָאִי אַבְרָהָם יִצְחָק יַעֲקֹב משֶׁה אַהֲרֹן וְיוֹסֵף.',
+    ],
+    nights: [
+      { label: '🌙 ליל א׳ – אברהם אבינו', text: 'בְּמָטֵי מִינָךְ אַבְרָהָם אוּשְׁפִּיזִי עִילָאִי דְיַתְבֵי עִמִּי וְעִמָּךְ כָּל אוּשְׁפִּיזֵי עִילָאִי יִצְחָק יַעֲקֹב משֶׁה אַהֲרֹן יוֹסֵף וְדָוִד.' },
+      { label: '🌙 ליל ב׳ – יצחק אבינו', text: 'בְּמָטֵי מִינָךְ יִצְחָק אוּשְׁפִּיזִי עִילָאִי דְיַתְבֵי עִמִּי וְעִמָּךְ כָּל אוּשְׁפִּיזֵי עִילָאִי אַבְרָהָם יַעֲקֹב משֶׁה אַהֲרֹן יוֹסֵף וְדָוִד.' },
+      { label: '🌙 ליל ג׳ – יעקב אבינו', text: 'בְּמָטֵי מִינָךְ יַעֲקֹב אוּשְׁפִּיזִי עִילָאִי דְיַתְבֵי עִמִּי וְעִמָּךְ כָּל אוּשְׁפִּיזֵי עִילָאִי אַבְרָהָם יִצְחָק משֶׁה אַהֲרֹן יוֹסֵף וְדָוִד.' },
+      { label: '🌙 ליל ד׳ – משה רבינו', text: 'בְּמָטֵי מִינָךְ משֶׁה אוּשְׁפִּיזִי עִילָאִי דְיַתְבֵי עִמִּי וְעִמָּךְ כָּל אוּשְׁפִּיזֵי עִילָאִי אַבְרָהָם יִצְחָק יַעֲקֹב אַהֲרֹן יוֹסֵף וְדָוִד.' },
+      { label: '🌙 ליל ה׳ – אהרן הכהן', text: 'בְּמָטֵי מִינָךְ אַהֲרֹן אוּשְׁפִּיזִי עִילָאִי דְיַתְבֵי עִמִּי וְעִמָּךְ כָּל אוּשְׁפִּיזֵי עִילָאִי אַבְרָהָם יִצְחָק יַעֲקֹב משֶׁה יוֹסֵף וְדָוִד.' },
+      { label: '🌙 ליל ו׳ – יוסף הצדיק', text: 'בְּמָטֵי מִינָךְ יוֹסֵף אוּשְׁפִּיזִי עִילָאִי דְיַתְבֵי עִמִּי וְעִמָּךְ כָּל אוּשְׁפִּיזֵי עִילָאִי אַבְרָהָם יִצְחָק יַעֲקֹב משֶׁה אַהֲרֹן וְדָוִד.' },
+      { label: '🌙 ליל ז׳ – דוד המלך', text: 'בְּמָטֵי מִינָךְ דָּוִד אוּשְׁפִּיזִי עִילָאִי דְיַתְבֵי עִמִּי וְעִמָּךְ כָּל אוּשְׁפִּיזֵי עִילָאִי אַבְרָהָם יִצְחָק יַעֲקֹב משֶׁה אַהֲרֹן וְיוֹסֵף.' },
     ],
     afterText: [
       '<span style="display:block;font-size:12px;color:var(--gold);font-weight:700;margin-bottom:6px;letter-spacing:.5px">🍃 בצאת מהסוכה – ערב הושענא רבה</span>',
@@ -585,8 +578,87 @@ function setBrachotNusach(n) {
   if (currentBracha) showBracha(currentBracha);
 }
 
+// ── Ushpizin: which night to auto-show ────────────────────────────────
+// Mirrors getOmerDayForDisplay() (js/omer.js) exactly in spirit: Hebcal's
+// g2h date converter returns the DAYTIME Hebrew date for a Gregorian day;
+// after that day's tzeit (sunset+18min — the same ישיבה.org standard used
+// throughout this app, e.g. js/omer.js, js/siddur.js), the Hebrew day has
+// already advanced, so Tishrei 15 in the evening is really the night of
+// Tishrei 16. Uses getTargetDate() (currentOffset-aware), not a hardcoded
+// `new Date()`, so paging with the date-nav shows the SELECTED day's night,
+// not always today's — see AGENT.md for the known appState._lastZmanim
+// staleness caveat this shares with the Omer feature (unfixed there too).
+function getUshpizinNightForDisplay() {
+  const hDate = appState?._lastHebrewDate;
+  if (!hDate || hDate.hm !== 'Tishrei') return null;
+  let day = hDate.hd;
+
+  const tzet = appState?._lastZmanim?.sunset
+    ? new Date(new Date(appState._lastZmanim.sunset).getTime() + 18 * 60000)
+    : null;
+  const now = getTargetDate();
+  if (tzet && now >= tzet) day += 1;
+
+  if (day < 15 || day > 21) return null;
+  return day - 14; // Tishrei 15 -> 1 (Avraham) ... Tishrei 21 -> 7 (David)
+}
+
+// Toggle button handler — re-renders via the normal showBracha path, so
+// currentBracha is already 'ushpizin' and the "entering fresh" reset below
+// does not fire (the toggle survives a date-nav re-render, only resets when
+// actually navigating away to a different bracha and back).
+function toggleUshpizinShowAll() {
+  _ushpizinShowAll = !_ushpizinShowAll;
+  showBracha('ushpizin');
+}
+
+// Builds the "lines" array showBracha renders for the ushpizin entry —
+// intro (always) + either just today's night or all 7, depending on
+// getUshpizinNightForDisplay() and the manual _ushpizinShowAll toggle.
+function _buildUshpizinLines(b) {
+  const night = getUshpizinNightForDisplay(); // 1..7 or null
+  const showAll = _ushpizinShowAll || night === null;
+  const lines = [...b.intro, ''];
+
+  // display:block/flex on a <span>, not a <div> — _renderBrachaLines wraps
+  // every non-empty line in <p>...</p>, and a <div> is not valid content
+  // inside a <p> (same reasoning as the night-header labels above).
+  const bannerStyle = `display:flex;border-right:3px solid var(--gold);background:rgba(201,165,74,.06);
+    border-radius:0 8px 8px 0;padding:8px 12px;font-size:12px;color:var(--gold);
+    align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap`;
+  const btnStyle = `background:rgba(201,165,74,.15);border:1px solid var(--gold);color:var(--gold);
+    padding:5px 10px;border-radius:8px;cursor:pointer;font-family:'Heebo',sans-serif;
+    font-size:11px;white-space:nowrap;flex-shrink:0`;
+
+  if (night !== null) {
+    lines.push(showAll
+      ? `<span style="${bannerStyle}"><span>📅 היום, לפי התאריך העברי, הוא ${b.nights[night - 1].label.replace('🌙 ', '')}</span>
+          <button onclick="toggleUshpizinShowAll()" style="${btnStyle}">🔎 הצג רק את לילה של היום</button></span>`
+      : `<span style="${bannerStyle}"><span>📅 מוצג אוטומטית לפי התאריך העברי של היום</span>
+          <button onclick="toggleUshpizinShowAll()" style="${btnStyle}">📜 הצג את כל שבעת הלילות</button></span>`);
+  } else {
+    lines.push(`<span style="${bannerStyle}"><span>היום אינו אחד משבעת לילות חג הסוכות — מוצגים כל שבעת הלילות</span></span>`);
+  }
+  lines.push('');
+
+  if (showAll) {
+    b.nights.forEach((n, i) => {
+      lines.push(n.label, n.text);
+      if (i < b.nights.length - 1) lines.push('');
+    });
+  } else {
+    lines.push(b.nights[night - 1].label, b.nights[night - 1].text);
+  }
+  return lines;
+}
+
 // ── Display a bracha ─────────────────────────────────────────────────
 async function showBracha(key) {
+  // Reset the manual show-all override only when actually navigating INTO
+  // ushpizin from a different bracha — a date-nav-triggered re-render (from
+  // loadBrachot(), or the toggle button itself) keeps currentBracha ===
+  // 'ushpizin' already, so it must NOT reset the user's choice mid-browse.
+  if (key === 'ushpizin' && currentBracha !== 'ushpizin') _ushpizinShowAll = false;
   currentBracha = key;
   const b = BRACHOT[key];
   if (!b) return;
@@ -667,7 +739,9 @@ async function showBracha(key) {
   }
 
   // ── Static text ────────────────────────────────────────────────────
-  const lines = b.shared || b.nusach?.[brachotNusach] || b.nusach?.sfard || [];
+  const lines = key === 'ushpizin'
+    ? _buildUshpizinLines(b)
+    : (b.shared || b.nusach?.[brachotNusach] || b.nusach?.sfard || []);
   contentEl.innerHTML = _renderBrachaLines(lines);
 
   // Append afterText if exists
@@ -785,6 +859,10 @@ function loadBrachot() {
   if (btn) btn.classList.add('active');
   // Show first bracha by default
   if (!currentBracha) showBracha('birkat_hamazon');
+  // Ushpizin's auto-selected night depends on the Hebrew date — re-render on
+  // every loadBrachot() call (including the one changeDay() triggers via its
+  // loaded={} reset) so paging the date-nav updates which night is shown.
+  else if (currentBracha === 'ushpizin') showBracha('ushpizin');
   // Init floating buttons scroll listener
   _initBrachotFloatBtns();
 }

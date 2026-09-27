@@ -126,10 +126,13 @@ js/init.js          → init() – called on DOMContentLoaded
 ### js/brachot.js
 | Function/Const | Description |
 |---|---|
-| `BRACHOT` | Object of all brachot: `{ key: { title, source, shared/nusach, afterText? } }`. `afterText` renders in its own visually-separated block after `shared`/`nusach` (e.g. `ushpizin`'s leaving-the-sukkah texts). A duplicate `tefila_haderech` key (silently-overriding second definition) was found and fixed in v5.122 — see AGENT.md → Recently Fixed if it ever needs re-deriving |
-| `showBracha(key)` | Display bracha by key, set active button |
+| `BRACHOT` | Object of all brachot: `{ key: { title, source, shared/nusach, afterText? } }`. `afterText` renders in its own visually-separated block after `shared`/`nusach`. `ushpizin` is structured differently — `intro[]` (always shown) + `nights[]` (`{label, text}` ×7, filtered by day-detection — see below) + `afterText` (leaving-the-sukkah texts). A duplicate `tefila_haderech` key (silently-overriding second definition) was found and fixed in v5.122 — see AGENT.md → Recently Fixed if it ever needs re-deriving |
+| `showBracha(key)` | Display bracha by key, set active button. For `key === 'ushpizin'` specifically, builds its lines via `_buildUshpizinLines` instead of the generic `shared`/`nusach` lookup — see below |
+| `getUshpizinNightForDisplay()` | Returns 1–7 (which Ushpizin night) or `null` if today (per `appState._lastHebrewDate`, nightfall-adjusted via `appState._lastZmanim.sunset`+18min, `currentOffset`-aware) isn't one of the 7 nights of Sukkot. Mirrors `getOmerDayForDisplay()` (js/omer.js) — same tzeit pattern, same `_lastZmanim` staleness caveat (unfixed there too, not new here) |
+| `_buildUshpizinLines(b)` | `intro` + either just today's auto-detected night or all 7 (`_ushpizinShowAll` toggle, or forced when `getUshpizinNightForDisplay()` returns `null`) — the array `showBracha` then renders exactly like any other bracha's `shared` lines |
+| `toggleUshpizinShowAll()` | Flips `_ushpizinShowAll` and re-renders via `showBracha('ushpizin')`. `showBracha` only resets the toggle to auto-mode when actually navigating in from a DIFFERENT bracha (`currentBracha !== 'ushpizin'` at call time) — a toggle-triggered or date-nav-triggered re-render (same `currentBracha`) preserves it |
 | `setBrachotNusach(n)` | Switch nusach (sfard/ashkenaz/mizrach) |
-| `loadBrachot()` | Init: restore nusach, show first bracha |
+| `loadBrachot()` | Init: restore nusach, show first bracha. Also re-renders `ushpizin` (if it's the currently-open bracha) on every call — this is what makes date-nav paging (`changeDay()`'s `loaded={}` reset → `loadTab` → `loadBrachot`) update which night is shown |
 | `openBrachotNavPopup()` | Floating nav – auto-built from Object.keys(BRACHOT) |
 | `closeBrachotNavPopup()` | Close floating nav |
 | `readBrachaAloud()` | Web Speech API TTS (he-IL voice) |
