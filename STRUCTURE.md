@@ -126,7 +126,7 @@ js/init.js          → init() – called on DOMContentLoaded
 ### js/brachot.js
 | Function/Const | Description |
 |---|---|
-| `BRACHOT` | Object of all brachot: `{ key: { title, source, shared/nusach, afterText? } }`. `afterText` renders in its own visually-separated block after `shared`/`nusach` (e.g. `ushpizin`'s leaving-the-sukkah texts). **Known bug**: `tefila_haderech` is defined twice with different text — the second silently wins; see AGENT.md Known Issues, not fixed |
+| `BRACHOT` | Object of all brachot: `{ key: { title, source, shared/nusach, afterText? } }`. `afterText` renders in its own visually-separated block after `shared`/`nusach` (e.g. `ushpizin`'s leaving-the-sukkah texts). A duplicate `tefila_haderech` key (silently-overriding second definition) was found and fixed in v5.122 — see AGENT.md → Recently Fixed if it ever needs re-deriving |
 | `showBracha(key)` | Display bracha by key, set active button |
 | `setBrachotNusach(n)` | Switch nusach (sfard/ashkenaz/mizrach) |
 | `loadBrachot()` | Init: restore nusach, show first bracha |

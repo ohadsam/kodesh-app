@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.121 (Sep 27, 2026)
+**Last updated:** v5.122 (Sep 27, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -318,24 +318,6 @@ that goes quiet for `HSRC_STALE_MS` = 3 s yields to a lower-ranked one):
 
 ## Known Issues / Open Items
 
-### 🟡 Duplicate `tefila_haderech` key in BRACHOT (found Sep 27, 2026)
-`js/brachot.js` defines the object key `tefila_haderech` **twice**, with two
-completely different texts (a shorter "ותמלטנו מרוח סועה וסער" version, then
-later a longer "ותצילנו מכף כל אויב ואורב בדרך... ופרוש סוכת שלומך" version).
-In a JS object literal a repeated key isn't a syntax error — the SECOND
-definition silently wins at construction time, so the first one is dead code:
-never reachable, even though it's sitting right there in the source looking
-live. Only one `bb-tefila_haderech` button exists in index.html, so this
-hasn't caused a visibly duplicated UI, just quietly discarded text. Not fixed
-here (found while adding the Ushpizin feature, unrelated to it) — deciding
-which version to keep (or whether to keep both under different keys) is a
-content judgment call for the owner, not something to silently resolve.
-Note: an old, unmerged branch in this repo (`claude/add-flight-prayer-Jc66F`,
-predates this AGENT.md history) has a commit literally titled "remove
-duplicate entry" for this exact prayer — that fix apparently never made it to
-main. Worth checking that branch's version before re-deriving one from
-scratch.
-
 ### 🟡 Siddur tab is BETA and hidden by default (Sep 22, 2026)
 Owner-reported: the siddur pipeline's logic doesn't always behave as expected —
 no specific repro captured yet. Made `siddur` `defaultHidden: true` in
@@ -414,6 +396,38 @@ could be more precise for edge cases.
 ---
 
 ## Recently Fixed
+
+### v5.122 (Sep 27, 2026) – Fixed: duplicate `tefila_haderech` key in BRACHOT
+- ✅ **Root cause** (found while adding v5.121's Ushpizin feature, fixed now
+  on the owner's explicit go-ahead): `js/brachot.js` defined the object key
+  `tefila_haderech` twice, with two completely different texts. In a JS
+  object literal a repeated key is not a syntax error — the SECOND
+  definition silently wins at construction time, so the first sat in the
+  source looking live while actually being unreachable dead code.
+- ✅ **Which version to keep was not a coin-flip** — an old, unmerged branch
+  in this repo (`claude/add-flight-prayer-Jc66F`) has a commit
+  (`4f75700`, authored directly by the app owner, not an agent) titled
+  "Fix flight prayer: correct nusach and remove duplicate entry" that
+  already resolved this exact duplicate: it replaced the FIRST
+  definition's content with the "קונה שמים וארץ" nusach (title `תפילת
+  הדרך לטיסה`, source `לאמור לפני ממריאה`) and deleted the SECOND
+  ("ותצילנו... טייסים... מטוס" text) entirely. That branch was never
+  merged to `main`, so `main` ended up with the fixed first entry's
+  content already present (identical to `4f75700`'s replacement — likely
+  landed on `main` independently at some point) but WITHOUT the matching
+  deletion of the second, stale entry, which is what let the bug persist.
+  Removed exactly the same second entry `4f75700` removed, matching the
+  owner's own prior decision rather than re-litigating which nusach is
+  "correct."
+- ✅ Verified: `Object.keys(BRACHOT)` (23 keys) has no duplicates; the
+  surviving `tefila_haderech` entry's text contains `קוֹנֵה שָׁמַיִם וָאָרֶץ`
+  and does NOT contain any of the deleted entry's distinguishing text
+  (`טַּיָּסִים`/`מַּטּוֹס`) — checked programmatically, not by eye. No other
+  file references the deleted text. `index.html` already had exactly one
+  `bb-tefila_haderech` button with the correct label
+  (`✈️ תפילת הדרך לטיסה`) before this fix, so no HTML change was needed —
+  this was purely removing unreachable JS dead code.
+- `Tests/test_runner.py`: 270/288 (unchanged baseline).
 
 ### v5.121 (Sep 27, 2026) – סדר האושפיזין added to Brachot
 - ✅ New `BRACHOT.ushpizin` entry (js/brachot.js) + button in `#bracha-buttons`
