@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.125 (Sep 27, 2026)
+**Last updated:** v5.126 (Sep 29, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -491,6 +491,33 @@ could be more precise for edge cases.
 ---
 
 ## Recently Fixed
+
+### v5.126 (Sep 29, 2026) – קריאת שמע שעל המיטה added to Tefilot
+- ✅ New `TEFILOT.shema_mita` (js/tefilot.js) + button `tf-shema_mita` in
+  `#tefila-buttons` (index.html), nusach Sfard, text supplied verbatim by the
+  owner (pasted from Sefaria's Siddur Sefard page — Sefaria itself is still
+  blocked in this sandbox, so `// TODO: verify source` per CLAUDE.md §3 and
+  the v5.111/v5.120/v5.121 precedent).
+- ✅ **Scoped to what was asked**: the pasted page also contained the
+  קידוש לבנה + קדיש יתום text that precedes this section on Sefaria.
+  Only what follows the "קריאת שמע שעל המיטה" heading was added (קידוש לבנה
+  already exists as `BRACHOT.kiddush_levana`). Verified programmatically that
+  none of that text leaked in.
+- ✅ Kept as pasted, in order: מחילה + המפיל, the halachic note on who reads
+  which parshiyot, אל מלך נאמן / שמע / ברוך שם, ואהבת, ויהי נועם, ישב בסתר,
+  ה' מה רבו, השכיבנו, ברוך ה' ביום, יראו עינינו, the verse series, ×3 notes
+  (2 of them, as pasted), אדון עולם (10 lines). Instruction/note lines are
+  wrapped in a muted `<span>` so they read as instructions, not prayer text.
+- ✅ Checked the pre-existing `showTefila()` "targum line" heuristic (muted
+  quote style for any line containing `יְיָ`/`תרגום`/`מְחֵית`) does not fire on
+  any line — this text spells the Name `יְהֹוָה` — so nothing renders muted by
+  accident.
+- Verified with a Node `vm` harness on the real `js/tefilot.js` +
+  `showTefila('shema_mita')`: 33 assertions (22 section anchors present and in
+  the pasted order, no muted wrapper, no leaked קידוש לבנה, all 10 אדון עולם
+  lines, notes count). Note this proves structure/order, not letter-level
+  fidelity of the owner's paste — that stays under the TODO above.
+  `Tests/test_runner.py`: 270/288 (unchanged baseline).
 
 ### v5.125 (Sep 27, 2026) – Fixed: top/bottom nav bars stuck dark in light theme
 - ✅ **Root cause**: `#topbar` and `#bottom-nav` (styles.css) had their
