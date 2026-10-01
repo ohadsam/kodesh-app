@@ -67,6 +67,9 @@ async function init() {
     _status('initTabScrollSync...');
     if (typeof initTabScrollSync === 'function') initTabScrollSync();
 
+    _status('initAutoScroll...');
+    if (typeof initAutoScroll === 'function') initAutoScroll();
+
     _status('✅ הצלחה! מסיר splash...');
     setTimeout(_removeSplash, 800);
 

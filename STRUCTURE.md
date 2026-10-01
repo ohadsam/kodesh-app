@@ -26,6 +26,7 @@ kodesh-app/
 │   ├── content.js
 │   ├── tehilim.js
 │   ├── prayer-names.js
+│   ├── autoscroll.js
 │   ├── tefilot.js
 │   ├── siddur.js
 │   ├── siddur-inserts.js
@@ -66,6 +67,7 @@ js/app.js           → showTab, loadTab, navigation
 js/calendar.js      → Hebrew dates, zmanim, events
 js/content.js       → Parasha, Daf Yomi, Mishna, Rambam
 js/tehilim.js       → Tehilim by day
+js/autoscroll.js    → Auto-scroll: ▶ button on long pages + toolbar (init from init.js, hook in showTab)
 js/prayer-names.js  → Shared health/memorial name list, rendered on both
                        Tehilim and Mishna tabs (loads after tehilim.js — not
                        a hard dependency, just keeps related tabs together)
@@ -219,6 +221,19 @@ Add `<button id="tf-{key}" class="aliya-tab" onclick="showTefila('{key}')">` in 
 | `renderPrayerNamesList(loc)` | Renders into `prayer-names-list-{loc}`, split into a לרפואה שלמה group and a לעילוי נשמה group |
 | `renderAllPrayerNames()` | Calls `renderPrayerNamesList` for every location — since it's ONE shared list, any add/edit/delete must refresh both tabs, not just the one the user is on |
 | `initPrayerNamesSection(loc)` | Call once per tab's init (`initTehilim`, `loadMishnaYomi`) — restores collapse state + draws the list for that tab |
+
+### js/autoscroll.js
+| Function/Const | Description |
+|---|---|
+| `AUTOSCROLL_DEFAULTS` | `{speed:3, keepAwake:true, pauseOnTouch:true, newSectionDelay:2}` — "original defaults" for Settings → reset. Overrides live in `appState.autoScroll` |
+| `autoScrollPxPerSec(level)` | Level 1–10 → 16…88 px/s (`8 + 8*level`) |
+| `_asState` | `idle`, `playing`, `paused` or `ended`. `ended` = hit the bottom but the SESSION stays alive: `_asRefresh` resumes it when new content appears below (next aliya finishing its load) |
+| `autoScrollStart/Pause/Resume/Toggle/Stop()` | Controls. Resume from `ended` while still at the bottom restarts from the top |
+| `autoScrollChangeSpeed(delta)` | Toolbar −/+ (session-only; `_asLevel`) |
+| `autoScrollOnTabChange()` | Called from `showTab()` (app.js) — a tab switch stops playback; in-tab navigation (next aliya, date-nav) does NOT |
+| `_asRefresh()` | ▶ visibility (`_asEligible`: page overflows by >80px, tab not in `AUTOSCROLL_EXCLUDED_TABS`) + resume-after-end. Driven by a ResizeObserver on `<body>`, window resize and `showTab` |
+| `initAutoScroll()` | Called from init.js: builds the DOM (`#as-fab`, `#as-toolbar`), wires wheel/touchmove/keydown (manual scroll pauses) |
+| `initAutoScrollSettingsUI()` / `setAutoScrollSetting(k,v)` / `resetAutoScrollSettings()` | Settings → ⏬ גלילה אוטומטית (`#as-set-*`) |
 
 ### js/omer.js
 | Function | Description |

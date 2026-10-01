@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.126 (Sep 29, 2026)
+**Last updated:** v5.127 (Oct 1, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -401,6 +401,29 @@ v5.124 specifically so both Sukkot items sit in the same place).
   HTML in the verification harness, not by eye, since a visual check alone
   would not have caught either instance).
 
+### Auto-scroll — js/autoscroll.js (v5.127)
+- UX: a round ▶ (bottom-left, above the bottom nav; lifted above siddur's own
+  stacked floats on that tab) appears by itself when the page overflows the
+  screen. Pressing it swaps in a compact pill toolbar (bottom-center, 44px
+  touch targets): pause/play, stop, − "מהירות N" +. Thumb zone, doesn't cover
+  the text being read. Toolbar speed is session-only; Settings holds the
+  DEFAULT (+ reset to the original), changing it there applies immediately.
+- **Survives in-tab navigation**: the app's loaders replace content and jump
+  to the top. A big upward jump while playing, or new content appearing after
+  the bottom was reached (`ended`), is treated as "new section" → optional
+  short hold (setting, default 2s) then continue at the SAME speed. A tab
+  switch stops it (per-tab by design, as requested).
+- Extras beyond the request (owner asked for suggestions): auto-pause on
+  manual scroll (wheel/touchmove/keys; taps don't pause, so tapping "next
+  aliya" keeps it going), screen wake lock while playing, new-section hold,
+  Esc stops, a "הגעת לסוף" state instead of silently stopping, restart from
+  the top when pressing play at the end, ▶ hidden on the compass tab.
+- Mechanics: rAF loop with a fractional-pixel accumulator (16px/s is
+  0.27px/frame; `scrollBy` needs whole px), `dt` clamped to 100ms so a
+  backgrounded tab doesn't lurch, `behavior:'instant'`. Icons are inline SVG
+  (`currentColor`) so they follow the theme; every `<button>` sets its own
+  color (buttons don't inherit it).
+
 ### Omer (omer.js)
 - `getOmerDay()`: computed from Hebrew date
 - Full text: לשם יחוד, ברכה, ספירה, הרחמן, למנצח, אנא בכח, יהי רצון, עלינו
@@ -491,6 +514,22 @@ could be more precise for edge cases.
 ---
 
 ## Recently Fixed
+
+### v5.127 (Oct 1, 2026) – Auto-scroll (גלילה אוטומטית)
+- ✅ New js/autoscroll.js — see Key Architecture → Auto-scroll for the design:
+  play button on long pages, toolbar (pause/stop/speed), continues across
+  in-tab navigation at the same speed, default speed + reset in Settings, plus
+  the suggested extras listed there.
+- Verified in a REAL headless Chromium (not mocks): 44 checks x dark & light —
+  button visible and not overlapping the nav, ~32px/s at level 3 and ~48px/s
+  at level 5 measured from actual scrollY, pause/resume, wheel pauses, bottom
+  -> `ended` -> content appended + jump to top -> resumes after the 2s hold at
+  the same level, jump-to-top while playing holds then continues, stop, tab
+  switch stops, hidden on qibla, Settings save/apply/reset, no page errors.
+  Screenshots of toolbar + settings checked in both themes.
+- Test-harness note: the what's-new modal (shown once per new version) covers
+  the page and blocks clicks — pre-set `_lastSeenVersion` in localStorage.
+- `Tests/test_runner.py`: 270/288 (unchanged baseline).
 
 ### v5.126 (Sep 29, 2026) – קריאת שמע שעל המיטה added to Tefilot
 - ✅ New `TEFILOT.shema_mita` (js/tefilot.js) + button `tf-shema_mita` in
