@@ -628,12 +628,18 @@ body {
 #as-toolbar {
   position: fixed; left: 50%; transform: translateX(-50%);
   bottom: calc(72px + env(safe-area-inset-bottom, 0px)); z-index: 130;
-  display: none; align-items: center; gap: 6px; direction: rtl;
-  padding: 6px 8px; border-radius: 32px;
+  display: none; flex-direction: column; align-items: stretch; gap: 5px; direction: rtl;
+  padding: 6px 10px 8px; border-radius: 26px;
   background: var(--surface); border: 1px solid var(--gold-dim);
   box-shadow: 0 4px 16px rgba(0,0,0,.35);
   max-width: calc(100vw - 16px);
 }
+.as-row { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.as-progress { padding: 0 6px; }
+.as-bar { height: 4px; border-radius: 2px; background: var(--border); overflow: hidden; direction: rtl; }
+.as-bar-fill { height: 100%; width: 0; border-radius: 2px; background: var(--gold); transition: width .25s linear; }
+.as-info { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; font-family: 'Heebo', sans-serif; font-size: 11px; color: var(--cream); white-space: nowrap; }
+.as-pct { font-weight: 700; color: var(--gold); min-width: 30px; }
 .as-speed { display: flex; align-items: center; gap: 2px; margin-inline-start: 4px; }
 .as-label { min-width: 74px; text-align: center; font-size: 12px; color: var(--cream); font-family: 'Heebo', sans-serif; white-space: nowrap; }
 .as-btn {

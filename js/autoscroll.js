@@ -19,6 +19,7 @@ const AUTOSCROLL_MIN_OVERFLOW_PX = 80;        // page must overflow by this much
 
 let _asState = 'idle';          // 'idle' | 'playing' | 'paused' | 'ended'
 let _asLevel = null;            // session speed level (null until first use → settings default)
+let _asLastProgressTs = 0;
 let _asRaf = 0, _asLastTs = 0, _asAcc = 0, _asLastY = 0, _asDelayUntil = 0;
 let _asWakeLock = null;
 
@@ -54,6 +55,28 @@ function _asCurrentLevel() {
   return _asLevel;
 }
 
+// ── Progress / time-remaining (pure) ────────────────────────────────────
+// 7 → "7 שנ׳", 125 → "2 דק׳ 05 שנ׳", 3725 → "1 ש׳ 02 דק׳" (seconds are dropped once an hour is involved)
+function autoScrollFormatTime(sec) {
+  sec = Math.max(0, Math.ceil(sec));
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  if (h > 0) return `${h} ש׳ ${String(m).padStart(2, '0')} דק׳`;
+  if (m > 0) return `${m} דק׳ ${String(s).padStart(2, '0')} שנ׳`;
+  return `${s} שנ׳`;
+}
+
+// y/max in px, level = speed level, holdMs = a still-pending "new section" pause.
+// Computed from the REAL position every time, never accumulated — so a manual
+// scroll, a speed change or a growing page are all just a new input.
+function autoScrollCalc(y, max, level, holdMs) {
+  if (!(max > 0)) return { pct: 100, sec: 0 };
+  const left = Math.max(0, max - y);
+  return {
+    pct: Math.min(100, Math.max(0, (y / max) * 100)),
+    sec: left / autoScrollPxPerSec(level) + Math.max(0, holdMs || 0) / 1000,
+  };
+}
+
 // ── UI (built once, appended to <body>) ─────────────────────────────────
 const _AS_SVG = {
   play:   '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>',
@@ -78,12 +101,18 @@ function _asEnsureUI() {
   tb.setAttribute('role', 'toolbar');
   tb.setAttribute('aria-label', 'גלילה אוטומטית');
   tb.innerHTML = `
-    <button id="as-btn-toggle" type="button" class="as-btn as-btn-main"></button>
-    <button id="as-btn-stop" type="button" class="as-btn" aria-label="עצור" title="עצור">${_AS_SVG.stop}</button>
-    <div class="as-speed" dir="ltr">
-      <button id="as-btn-slower" type="button" class="as-btn as-btn-sm" aria-label="האט" title="האט">${_AS_SVG.minus}</button>
-      <span id="as-label" class="as-label" dir="rtl" aria-live="polite"></span>
-      <button id="as-btn-faster" type="button" class="as-btn as-btn-sm" aria-label="הגבר מהירות" title="הגבר מהירות">${_AS_SVG.plus}</button>
+    <div class="as-row">
+      <button id="as-btn-toggle" type="button" class="as-btn as-btn-main"></button>
+      <button id="as-btn-stop" type="button" class="as-btn" aria-label="עצור" title="עצור">${_AS_SVG.stop}</button>
+      <div class="as-speed" dir="ltr">
+        <button id="as-btn-slower" type="button" class="as-btn as-btn-sm" aria-label="האט" title="האט">${_AS_SVG.minus}</button>
+        <span id="as-label" class="as-label" dir="rtl" aria-live="polite"></span>
+        <button id="as-btn-faster" type="button" class="as-btn as-btn-sm" aria-label="הגבר מהירות" title="הגבר מהירות">${_AS_SVG.plus}</button>
+      </div>
+    </div>
+    <div class="as-progress" dir="rtl">
+      <div id="as-bar" class="as-bar" role="progressbar" aria-label="התקדמות בעמוד" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="as-bar-fill" class="as-bar-fill"></div></div>
+      <div class="as-info"><span id="as-pct" class="as-pct"></span><span id="as-eta" class="as-eta"></span></div>
     </div>`;
   document.body.appendChild(tb);
   document.getElementById('as-btn-toggle').addEventListener('click', autoScrollToggle);
@@ -110,10 +139,42 @@ function _asRenderUI() {
   toggle.setAttribute('aria-label', playing ? 'השהה' : (_asState === 'ended' ? 'התחל מההתחלה' : 'המשך'));
   toggle.title = toggle.getAttribute('aria-label');
   const level = _asCurrentLevel();
-  document.getElementById('as-label').textContent =
-    _asState === 'ended' ? 'הגעת לסוף' : `מהירות ${level}`;
+  document.getElementById('as-label').textContent = `מהירות ${level}`;
   document.getElementById('as-btn-slower').disabled = level <= AUTOSCROLL_MIN_LEVEL;
   document.getElementById('as-btn-faster').disabled = level >= AUTOSCROLL_MAX_LEVEL;
+  _asUpdateProgress();
+}
+
+// Percent scrolled + time to the bottom, redrawn from the live position. Triggered by
+// every event that can change either number: scroll (ours or the user's), speed change,
+// pause/resume, content growth/replacement, and a 250ms heartbeat while a hold counts down.
+const _asProgressCache = {};
+function _asUpdateProgress() {
+  if (_asState === 'idle') return;
+  const pctEl = document.getElementById('as-pct'), etaEl = document.getElementById('as-eta');
+  if (!pctEl || !etaEl) return;
+  const max = _asMaxScroll(), y = window.scrollY;
+  const now = performance.now();
+  const hold = _asState === 'playing' && _asDelayUntil > now ? _asDelayUntil - now : 0;
+  const c = autoScrollCalc(y, max, _asCurrentLevel(), hold);
+  const atEnd = _asState === 'ended' || !(max > 0) || max - y < 1;
+  const pct = atEnd ? 100 : Math.min(99, Math.floor(c.pct));   // never claim 100% before the bottom
+  const eta = atEnd ? 'הגעת לסוף'
+    : (_asState === 'paused' ? 'מושהה · ' : '') + 'נותרו ' + autoScrollFormatTime(c.sec);
+  const set = (el, key, text) => { if (_asProgressCache[key] !== text) { _asProgressCache[key] = text; el.textContent = text; } };
+  set(pctEl, 'pct', `${pct}%`);
+  set(etaEl, 'eta', eta);
+  etaEl.dataset.sec = atEnd ? '0' : String(Math.ceil(c.sec));
+  etaEl.style.opacity = _asState === 'paused' ? '.7' : '';
+  const fill = document.getElementById('as-bar-fill'), bar = document.getElementById('as-bar');
+  const w = (atEnd ? 100 : Math.round(c.pct * 2) / 2) + '%';
+  if (_asProgressCache.w !== w) { _asProgressCache.w = w; fill.style.width = w; bar.setAttribute('aria-valuenow', String(pct)); }
+}
+
+let _asProgressRaf = 0;
+function _asScheduleProgress() {          // coalesce bursts of scroll events into one repaint per frame
+  if (_asState === 'idle' || _asProgressRaf) return;
+  _asProgressRaf = requestAnimationFrame(() => { _asProgressRaf = 0; _asUpdateProgress(); });
 }
 
 // ── Wake lock (keep the screen on while actually scrolling) ─────────────
@@ -151,6 +212,7 @@ function _asTick(ts) {
     }
   }
   _asLastY = window.scrollY;
+  if (ts - _asLastProgressTs > 250) { _asLastProgressTs = ts; _asUpdateProgress(); }   // keeps a pending hold's countdown moving
 
   if (window.scrollY >= _asMaxScroll() - 1) { _asEnd(); return; }
   _asRaf = requestAnimationFrame(_asTick);
@@ -261,6 +323,7 @@ function initAutoScroll() {
     if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(e.key)) _asOnManualScroll(e);
   });
   window.addEventListener('resize', _asRefresh);
+  window.addEventListener('scroll', _asScheduleProgress, { passive: true });
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden && _asState === 'playing') _asAcquireWake();   // lock is dropped when the tab hides
   });

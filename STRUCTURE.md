@@ -234,6 +234,8 @@ Add `<button id="tf-{key}" class="aliya-tab" onclick="showTefila('{key}')">` in 
 | `autoScrollChangeSpeed(delta)` | Toolbar −/+ (session-only; `_asLevel`) |
 | `autoScrollOnTabChange()` | Called from `showTab()` (app.js) — a tab switch stops playback; in-tab navigation (next aliya, date-nav) does NOT |
 | `_asRefresh()` | ▶ visibility (`_asEligible`: page overflows by >80px, tab not in `AUTOSCROLL_EXCLUDED_TABS`) + resume-after-end. Driven by a ResizeObserver on `<body>`, window resize and `showTab` |
+| `autoScrollFormatTime(sec)` / `autoScrollCalc(y,max,level,holdMs)` | Pure helpers for the toolbar's progress row: "2 דק׳ 05 שנ׳" formatting; `{pct, sec}` from the live position (recomputed on every event, never accumulated) |
+| `_asUpdateProgress()` / `_asScheduleProgress()` | Redraw bar + `NN%` + ETA; fed by scroll events (rAF-coalesced), speed/pause changes, content growth and a 250ms heartbeat |
 | `initAutoScroll()` | Called from init.js: builds the DOM (`#as-fab`, `#as-toolbar`), wires wheel/touchmove/keydown (manual scroll pauses) |
 | `initAutoScrollSettingsUI()` / `setAutoScrollSetting(k,v)` / `resetAutoScrollSettings()` | Settings → ⏬ גלילה אוטומטית (`#as-set-*`) |
 

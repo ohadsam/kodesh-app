@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.130 (Oct 7, 2026)
+**Last updated:** v5.131 (Oct 8, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -452,6 +452,19 @@ v5.124 specifically so both Sukkot items sit in the same place).
   aliya" keeps it going), screen wake lock while playing, new-section hold,
   Esc stops, a "הגעת לסוף" state instead of silently stopping, restart from
   the top when pressing play at the end, ▶ hidden on the compass tab.
+- **Progress row (v5.131)**: under the buttons, a thin bar + `NN%` + "נותרו
+  2 דק׳ 05 שנ׳" (`autoScrollFormatTime`: seconds → min+sec → hours+min).
+  Both numbers are RECOMPUTED from the live position on every event, never
+  accumulated (`autoScrollCalc(y, max, level, holdMs)`): remaining = distance
+  left ÷ px/s of the CURRENT level (+ any still-pending new-section hold), so
+  a manual scroll anywhere, a speed change, pause/resume or the page growing
+  (next section finished loading) are all just new inputs. Triggers: scroll
+  event (rAF-coalesced; covers our own scrolling and the user's), speed
+  change/pause/resume via `_asRenderUI`, ResizeObserver content growth, and a
+  250ms heartbeat in the tick so a hold's countdown keeps moving. Paused shows
+  "מושהה · נותרו …" dimmed; at the bottom "הגעת לסוף" / 100% (it never shows
+  100% before the real bottom: floor + cap at 99). DOM writes are skipped when
+  the text is unchanged. `#as-eta[data-sec]` exposes the numeric seconds.
 - Mechanics: rAF loop with a fractional-pixel accumulator (16px/s is
   0.27px/frame; `scrollBy` needs whole px), `dt` clamped to 100ms so a
   backgrounded tab doesn't lurch, `behavior:'instant'`. Icons are inline SVG
@@ -548,6 +561,23 @@ could be more precise for edge cases.
 ---
 
 ## Recently Fixed
+
+### v5.131 (Oct 8, 2026) – Auto-scroll: percent scrolled + time remaining
+- ✅ Toolbar now shows a progress bar, `NN%` and the time left to the bottom
+  in minutes/seconds (hours+minutes for very long pages), dynamic and aware of
+  manual scrolling, speed changes, pause, a pending new-section hold and the
+  page changing size. See Key Architecture → Auto-scroll → Progress row.
+- The ended state's "הגעת לסוף" moved from the speed label to the progress row
+  (the speed label always reads "מהירות N" now).
+- Verified in real headless Chromium, dark + light, 82 checks incl.: format
+  edge cases (7s, 1:00, 2:05, 59:59, 1h00, 1h02), calc maths (1000px @32px/s =
+  31.25s, halfway 50%, double speed halves it, hold adds, no-overflow = 100%),
+  live numbers vs expected, drops ~2s per 2s, speed 4→7 recalculates at once,
+  paused freezes + label, manual jump to 80% and back to 10% updates at once,
+  user scroll while playing keeps going from the new spot, a +4000px page drops
+  the percent and adds ~125s, the hold is counted, bar fill matches percent,
+  ended = 100%. Screenshots checked in both themes.
+- `Tests/test_runner.py`: 270/288 (unchanged baseline).
 
 ### v5.130 (Oct 7, 2026) – Cache verified for combined parshiot (+ rationale comment)
 - ✅ Owner asked to make sure the parasha cache handles combined parshiot and
