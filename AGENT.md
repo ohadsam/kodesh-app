@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.128 (Oct 5, 2026)
+**Last updated:** v5.129 (Oct 6, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -539,6 +539,23 @@ could be more precise for edge cases.
 ---
 
 ## Recently Fixed
+
+### v5.129 (Oct 6, 2026) – Auto-scroll speed range 1..15, slower step 1
+- ✅ Scale changed from levels 1..10 at `8 + 8*level` px/s to **1..15 at
+  `8*level` px/s**: level 1 = 8 px/s (half the old slowest), 15 = 120 px/s
+  (old top was 88). Every old level keeps its real speed one step higher
+  (old n == new n+1), so the DEFAULT moved from 3 to 4 and is still 32 px/s —
+  nobody's feel changes.
+- ✅ Saved speeds are migrated once (`_asMigrateSettings`, marker
+  `appState.autoScroll.v = 2`): a speed saved under the old scale becomes
+  speed+1, keeping its px/s. Every later write stamps `v:2`; "reset to
+  defaults" just deletes the object. Settings slider is now 1..15.
+- Verified in real headless Chromium, dark + light: measured ~8px/s at level 1
+  and ~120px/s at level 15 from actual scrollY, − disabled at 1 and + disabled
+  at 15, clamps, default still ~32px/s, migration (3→4, 10→11, once only),
+  settings save/reset. `Tests/test_runner.py`: 270/288 (unchanged baseline).
+- Test-harness note: seed `_lastSeenVersion` with the CURRENT version or the
+  what's-new modal blocks clicks.
 
 ### v5.128 (Oct 5, 2026) – IndexedDB cache for parasha + tehilim
 - ✅ New js/cache.js — see Key Architecture → IndexedDB cache. Cache-first for

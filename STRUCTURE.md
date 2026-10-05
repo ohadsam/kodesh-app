@@ -227,8 +227,8 @@ Add `<button id="tf-{key}" class="aliya-tab" onclick="showTefila('{key}')">` in 
 ### js/autoscroll.js
 | Function/Const | Description |
 |---|---|
-| `AUTOSCROLL_DEFAULTS` | `{speed:3, keepAwake:true, pauseOnTouch:true, newSectionDelay:2}` — "original defaults" for Settings → reset. Overrides live in `appState.autoScroll` |
-| `autoScrollPxPerSec(level)` | Level 1–10 → 16…88 px/s (`8 + 8*level`) |
+| `AUTOSCROLL_DEFAULTS` | `{speed:4, keepAwake:true, pauseOnTouch:true, newSectionDelay:2}` (+ `v:2` scale marker once saved) — "original defaults" for Settings → reset. Overrides live in `appState.autoScroll` |
+| `autoScrollPxPerSec(level)` | Level 1–15 → 8…120 px/s (`8*level`; default 4 = 32). `_asMigrateSettings()` shifts speeds saved under the old 1–10 scale up one level |
 | `_asState` | `idle`, `playing`, `paused` or `ended`. `ended` = hit the bottom but the SESSION stays alive: `_asRefresh` resumes it when new content appears below (next aliya finishing its load) |
 | `autoScrollStart/Pause/Resume/Toggle/Stop()` | Controls. Resume from `ended` while still at the bottom restarts from the top |
 | `autoScrollChangeSpeed(delta)` | Toolbar −/+ (session-only; `_asLevel`) |

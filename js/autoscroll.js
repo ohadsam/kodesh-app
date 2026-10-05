@@ -11,9 +11,9 @@
 // Settings (appState.autoScroll) are the defaults; speed changes made from
 // the toolbar are session-only and are reset to the default by Settings.
 
-const AUTOSCROLL_DEFAULTS = { speed: 3, keepAwake: true, pauseOnTouch: true, newSectionDelay: 2 };
+const AUTOSCROLL_DEFAULTS = { speed: 4, keepAwake: true, pauseOnTouch: true, newSectionDelay: 2 };
 const AUTOSCROLL_MIN_LEVEL = 1;
-const AUTOSCROLL_MAX_LEVEL = 10;
+const AUTOSCROLL_MAX_LEVEL = 15;
 const AUTOSCROLL_EXCLUDED_TABS = ['qibla'];   // compass screen: nothing to read
 const AUTOSCROLL_MIN_OVERFLOW_PX = 80;        // page must overflow by this much for ▶ to show
 
@@ -27,14 +27,19 @@ function getAutoScrollSettings() {
   return { ...AUTOSCROLL_DEFAULTS, ...(appState.autoScroll || {}) };
 }
 
+const AUTOSCROLL_SCALE_VERSION = 2;   // 1 = original 1..10 scale, 2 = 1..15 scale
+
 function _asClampLevel(l) {
   l = Math.round(Number(l));
   if (!isFinite(l)) return AUTOSCROLL_DEFAULTS.speed;
   return Math.min(AUTOSCROLL_MAX_LEVEL, Math.max(AUTOSCROLL_MIN_LEVEL, l));
 }
 
-// level 1 → 16 px/s (slow, careful reading) … level 10 → 88 px/s
-function autoScrollPxPerSec(level) { return 8 + _asClampLevel(level) * 8; }
+// level 1 → 8 px/s (very slow) … level 15 → 120 px/s. Level 4 (the default) is 32 px/s.
+// Until v5.129 the scale was 1..10 at `8 + 8*level` px/s; levels were shifted up by one
+// (old level n == new level n+1, same px/s) when a slower step was added below it —
+// see _asMigrateSettings.
+function autoScrollPxPerSec(level) { return _asClampLevel(level) * 8; }
 
 function _asMaxScroll() {
   return document.documentElement.scrollHeight - window.innerHeight;
@@ -235,7 +240,17 @@ function _asOnManualScroll(e) {
   autoScrollPause();
 }
 
+// A speed saved under the old scale keeps its real px/s by moving up one level.
+function _asMigrateSettings() {
+  const s = appState.autoScroll;
+  if (!s || s.v === AUTOSCROLL_SCALE_VERSION) return;
+  if (s.speed != null) s.speed = _asClampLevel(Number(s.speed) + 1);
+  s.v = AUTOSCROLL_SCALE_VERSION;
+  saveState();
+}
+
 function initAutoScroll() {
+  _asMigrateSettings();
   _asEnsureUI();
   window.addEventListener('wheel', _asOnManualScroll, { passive: true });
   window.addEventListener('touchmove', _asOnManualScroll, { passive: true });
@@ -266,7 +281,7 @@ function initAutoScrollSettingsUI() {
 
 function setAutoScrollSetting(key, value) {
   if (!(key in AUTOSCROLL_DEFAULTS)) return;
-  const next = { ...(appState.autoScroll || {}) };
+  const next = { ...(appState.autoScroll || {}), v: AUTOSCROLL_SCALE_VERSION };
   if (key === 'speed') next.speed = _asClampLevel(value);
   else if (key === 'newSectionDelay') next.newSectionDelay = Math.max(0, Math.min(10, Number(value) || 0));
   else next[key] = !!value;
