@@ -29,13 +29,13 @@
       } catch (e) { /* localStorage unavailable (private mode etc.) — default dark */ }
     })();
   </script>
-  <link rel="stylesheet" href="styles.css?v=5.127" />
+  <link rel="stylesheet" href="styles.css?v=5.128" />
   <!-- INLINE version guard – runs SYNCHRONOUSLY before any SW can intercept.
        Kills any cached service worker and forces a fresh load when version changes.
        NOTE: this is the ONLY version check. utils.js must NOT have another one. -->
   <script>
     (function() {
-      var V = '5.127';
+      var V = '5.128';
       // Show version in splash immediately
       var sv = document.getElementById('splash-version');
       if (sv) sv.textContent = 'גרסה ' + V;
@@ -163,6 +163,21 @@
   </div>
 </div>
 
+<!-- Load-failure popup: offers (never forces) clearing the cache -->
+<div id="cache-fail-modal" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,.85);align-items:center;justify-content:center;padding:20px" role="dialog" aria-modal="true" aria-labelledby="cache-fail-title">
+  <div style="background:var(--card);border:1px solid var(--gold-dim);border-radius:18px;width:100%;max-width:380px;direction:rtl;padding:18px">
+    <div id="cache-fail-title" style="font-family:'Frank Ruhl Libre',serif;font-size:17px;color:var(--gold);font-weight:700;margin-bottom:8px">⚠️ הייתה תקלה בטעינה</div>
+    <div style="font-size:13px;color:var(--cream);line-height:1.7;margin-bottom:14px">
+      טעינת <b id="cache-fail-tab"></b> נכשלה. לפעמים נתונים שמורים במכשיר (מטמון) גורמים לכך.
+      אפשר לנקות את המטמון של הטאב ולנסות שוב — או להתעלם, והכול יישאר כמו שהוא.
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button onclick="clearCacheFromFailModal()" style="flex:1;min-width:150px;background:var(--gold);color:#000;border:none;padding:10px;border-radius:10px;cursor:pointer;font-family:'Heebo',sans-serif;font-size:13px;font-weight:700">🧹 נקה מטמון וטען מחדש</button>
+      <button onclick="closeCacheFailModal()" style="background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:10px 16px;border-radius:10px;cursor:pointer;font-family:'Heebo',sans-serif;font-size:13px">לא עכשיו</button>
+    </div>
+  </div>
+</div>
+
 <div id="splash">
   <div class="logo-big">
     <img src="icons/icon.svg" width="96" height="96" alt="עיתים" 
@@ -171,7 +186,7 @@
   <div style="font-family:'Frank Ruhl Libre',serif;font-size:26px;color:var(--cream);font-weight:700">עיתים</div>
   <div class="spinner"></div>
   <p id="splash-status" style="font-size:12px;color:var(--gold);margin:4px 0 0;min-height:18px">טוען...</p>
-  <p id="splash-version" style="font-size:11px;color:var(--muted);margin-top:2px">גרסה 5.127</p>
+  <p id="splash-version" style="font-size:11px;color:var(--muted);margin-top:2px">גרסה 5.128</p>
   <div id="splash-retry" style="display:none;margin-top:20px">
     <button onclick="localStorage.clear();sessionStorage.clear();location.reload(true)"
       style="background:var(--gold);color:#000;border:none;border-radius:10px;padding:10px 24px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Heebo',sans-serif">🔄 איפוס וטעינה מחדש</button>
@@ -264,6 +279,19 @@
       <button onclick="resetAutoScrollSettings()" style="margin-top:6px;background:var(--card);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:10px;font-size:12px;cursor:pointer;font-family:'Heebo',sans-serif">↺ שחזר ברירת מחדל</button>
     </div>
 
+    <!-- Cache (IndexedDB) -->
+    <div style="padding:14px 0;border-bottom:1px solid var(--border)">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:4px;font-weight:600">💾 מטמון (Cache)</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">פרשת שבוע ותהילים נשמרים במכשיר אחרי הטעינה הראשונה — טעינה מהירה וגם בלי אינטרנט</div>
+      <div class="settings-row">
+        <label>הפעל מטמון (כללי)</label>
+        <label class="toggle"><input type="checkbox" id="cache-global-toggle" checked onchange="setCacheGlobalEnabled(this.checked)" aria-label="הפעל מטמון" /><span class="toggle-slider"></span></label>
+      </div>
+      <div id="cache-tab-rows"></div>
+      <div id="cache-summary" style="font-size:12px;color:var(--cream);margin:8px 0">טוען...</div>
+      <button onclick="clearCacheFromSettings()" style="background:rgba(201,65,65,.12);border:1px solid rgba(201,65,65,.45);color:#e07070;padding:8px 14px;border-radius:10px;font-size:12px;cursor:pointer;font-family:'Heebo',sans-serif">🧹 נקה את כל המטמון</button>
+    </div>
+
     <!-- Tab Visibility -->
     <div style="padding:14px 0;border-bottom:1px solid var(--border)">
       <div style="font-size:12px;color:var(--muted);margin-bottom:10px;font-weight:600">📑 טאבים מוצגים</div>
@@ -354,7 +382,7 @@
     <!-- Version & Copyright -->
     <div style="text-align:center;padding:18px 0 8px;border-top:1px solid var(--border);margin-top:8px">
       <div style="font-size:13px;font-weight:600;color:var(--gold-dim);margin-bottom:4px">📖 עיתים</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">גרסה 5.127</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">גרסה 5.128</div>
       <button onclick="showWhatsNew()" style="background:var(--card);border:1px solid var(--gold-dim);color:var(--gold);padding:6px 16px;border-radius:8px;font-size:11px;cursor:pointer;font-family:'Heebo',sans-serif;margin-bottom:6px">🆕 מה חדש?</button>
       <div style="font-size:11px;color:var(--muted)">© כל הזכויות שמורות לאוהד סמט</div>
     </div>
@@ -366,12 +394,12 @@
 <div id="whats-new-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
   width:88%;max-width:400px;max-height:80vh;overflow-y:auto;
   background:var(--surface);border:1px solid var(--gold-dim);border-radius:16px;z-index:10001;padding:20px;direction:rtl">
-  <div style="font-size:16px;font-weight:700;color:var(--gold);margin-bottom:12px;text-align:center">🆕 מה חדש בגרסה 5.127</div>
+  <div style="font-size:16px;font-weight:700;color:var(--gold);margin-bottom:12px;text-align:center">🆕 מה חדש בגרסה 5.128</div>
   <div style="font-size:13px;color:var(--cream);line-height:1.7" id="whats-new-content">
-    <div style="margin-bottom:10px"><b>⏬ גלילה אוטומטית</b></div>
-    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• בדפים ארוכים מופיע כפתור ▶ — לחיצה מפעילה סרגל קטן עם השהיה, עצירה ומהירות</div>
-    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• הגלילה ממשיכה גם במעבר לעליה/קטע הבא באותו טאב, באותה מהירות</div>
-    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• בהגדרות: מהירות ברירת מחדל, השהיה בקטע חדש, עצירה בגלילה ידנית, מסך דלוק ושחזור ברירת מחדל</div>
+    <div style="margin-bottom:10px"><b>💾 מטמון (Cache) לפרשת שבוע ולתהילים</b></div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• טקסטים שכבר נטענו נשמרים במכשיר — טעינה מהירה וגם בלי אינטרנט</div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• בהגדרות: הפעלה/כיבוי כללי ולכל טאב, גודל המטמון וכמה בכל טאב, וניקוי</div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• אם הייתה תקלה בטעינה — תוצע (בלי לחייב) אפשרות לנקות את המטמון ולנסות שוב</div>
   </div>
   <button onclick="closeWhatsNew()" style="display:block;width:100%;margin-top:14px;background:var(--gold);color:#000;border:none;border-radius:10px;padding:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Heebo',sans-serif">👍 הבנתי</button>
 </div>
@@ -1511,7 +1539,7 @@
     💡 לכיול המצפן: הזז את הטלפון בתנועת ∞ (שמונה שוכב) מספר פעמים
   </div>
   <div style="text-align:center;color:var(--muted);font-size:11px;padding:12px 0 4px">
-    גרסה 5.127 · עיתים · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
+    גרסה 5.128 · עיתים · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
   </div>
 </div>
 
@@ -1570,22 +1598,23 @@
      JavaScript modules (load order matters)
      v4.3 – querystring busts browser/SW cache
      ═══════════════════════════════════════ -->
-<script src="js/network-log.js?v=5.127"></script>
-<script src="js/utils.js?v=5.127"></script>
-<script src="js/settings.js?v=5.127"></script>
-<script src="js/app.js?v=5.127"></script>
-<script src="js/tehilim.js?v=5.127"></script>
-<script src="js/prayer-names.js?v=5.127"></script>
-<script src="js/autoscroll.js?v=5.127"></script>
-<script src="js/calendar.js?v=5.127"></script>
-<script src="js/content.js?v=5.127"></script>
-<script src="js/tefilot.js?v=5.127"></script>
-<script src="js/siddur-inserts.js?v=5.127"></script>
-<script src="js/siddur.js?v=5.127"></script>
-<script src="js/omer.js?v=5.127"></script>
-<script src="js/brachot.js?v=5.127"></script>
-<script src="js/misc.js?v=5.127"></script>
-  <script src="js/emuna.js?v=5.127"></script>
-  <script src="js/init.js?v=5.127"></script>
+<script src="js/network-log.js?v=5.128"></script>
+<script src="js/utils.js?v=5.128"></script>
+<script src="js/cache.js?v=5.128"></script>
+<script src="js/settings.js?v=5.128"></script>
+<script src="js/app.js?v=5.128"></script>
+<script src="js/tehilim.js?v=5.128"></script>
+<script src="js/prayer-names.js?v=5.128"></script>
+<script src="js/autoscroll.js?v=5.128"></script>
+<script src="js/calendar.js?v=5.128"></script>
+<script src="js/content.js?v=5.128"></script>
+<script src="js/tefilot.js?v=5.128"></script>
+<script src="js/siddur-inserts.js?v=5.128"></script>
+<script src="js/siddur.js?v=5.128"></script>
+<script src="js/omer.js?v=5.128"></script>
+<script src="js/brachot.js?v=5.128"></script>
+<script src="js/misc.js?v=5.128"></script>
+  <script src="js/emuna.js?v=5.128"></script>
+  <script src="js/init.js?v=5.128"></script>
 </body>
 </html>

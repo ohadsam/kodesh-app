@@ -108,7 +108,7 @@ let currentAliya = 'all';
 let rashiLoaded = false;
 let rashiVisible = false;
 
-const APP_VERSION  = '5.127';
+const APP_VERSION  = '5.128';
 const STORAGE_KEY  = 'kodesh_app_v1';
 const SIDDUR_CACHE_KEY = 'siddur_cache_v';
 
@@ -225,13 +225,21 @@ function toGematria(n) {
   return s.slice(0, -1) + '\u05F4' + s.slice(-1);
 }
 
-async function fetchWithDelay(url, delay = 300) {
+// `tab` (optional) opts the request into the IndexedDB cache (js/cache.js):
+// a hit skips both the network and the throttling delay.
+async function fetchWithDelay(url, delay = 300, tab = null) {
+  if (tab && typeof cacheGetJson === 'function') {
+    const hit = await cacheGetJson(url, tab);
+    if (hit !== undefined) { console.log(`[Cache] HIT ${tab} ${url.slice(0,90)}`); return hit; }
+  }
   await new Promise(r => setTimeout(r, delay));
   console.log(`[fetch] GET ${url.length > 120 ? url.slice(0,120)+'...' : url}`);
   const resp = await fetch(url);
   console.log(`[fetch] → ${resp.status}`);
   if (!resp.ok) throw new Error(`HTTP ${resp.status} for ${url}`);
-  return resp.json();
+  const data = await resp.json();
+  if (tab && typeof cachePutJson === 'function') cachePutJson(url, data, tab);
+  return data;
 }
 
 // Helper: extract Hebrew text from Sefaria - supports both v2 and v3 responses
@@ -253,11 +261,16 @@ function extractHeText(data) {
 }
 
 // ─── Sefaria v2 fetch – the ONLY function that calls Sefaria texts ───
-async function sefariaText(ref, delay = 350) {
-  await new Promise(r => setTimeout(r, delay));
+// `tab` (optional) opts the request into the IndexedDB cache (js/cache.js).
+async function sefariaText(ref, delay = 350, tab = null) {
   // encodeURI preserves commas (needed for siddur refs like "Weekday_Siddur...,_Section")
   // encodeURIComponent would break them by encoding commas as %2C
   const url = `https://www.sefaria.org/api/texts/${encodeURI(ref)}?lang=he&commentary=0&context=0`;
+  if (tab && typeof cacheGetJson === 'function') {
+    const hit = await cacheGetJson(url, tab);
+    if (hit !== undefined) { console.log(`[Cache] HIT ${tab} "${ref}"`); return hit; }
+  }
+  await new Promise(r => setTimeout(r, delay));
   console.log(`[Sefaria] GET ${url}`);
   const resp = await fetch(url);
   console.log(`[Sefaria] ${resp.status} for "${ref}"`);
@@ -281,6 +294,7 @@ async function sefariaText(ref, delay = 350) {
   if (!filled.length) {
     console.warn(`[Sefaria] EMPTY Hebrew for "${ref}" – full response:`, JSON.stringify(data).slice(0, 300));
   }
+  if (tab && typeof cachePutJson === 'function') cachePutJson(url, data, tab); // empty responses are refused inside
   return data;
 }
 

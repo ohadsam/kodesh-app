@@ -20,6 +20,7 @@ kodesh-app/
 │
 ├── js/                 ← PRIMARY source files (loaded by index.html)
 │   ├── utils.js
+│   ├── cache.js
 │   ├── settings.js
 │   ├── app.js
 │   ├── calendar.js
@@ -62,6 +63,7 @@ kodesh-app/
 ```html
 js/network-log.js   → patches fetch(), 10-min log retention
 js/utils.js         → must be first: APP_VERSION, state, shared helpers
+js/cache.js         → IndexedDB cache for Sefaria texts (parasha, tehilim) + its Settings UI and failure popup (loads right after utils.js)
 js/settings.js      → ALL_TABS, tab visibility config
 js/app.js           → showTab, loadTab, navigation
 js/calendar.js      → Hebrew dates, zmanim, events
@@ -234,6 +236,19 @@ Add `<button id="tf-{key}" class="aliya-tab" onclick="showTefila('{key}')">` in 
 | `_asRefresh()` | ▶ visibility (`_asEligible`: page overflows by >80px, tab not in `AUTOSCROLL_EXCLUDED_TABS`) + resume-after-end. Driven by a ResizeObserver on `<body>`, window resize and `showTab` |
 | `initAutoScroll()` | Called from init.js: builds the DOM (`#as-fab`, `#as-toolbar`), wires wheel/touchmove/keydown (manual scroll pauses) |
 | `initAutoScrollSettingsUI()` / `setAutoScrollSetting(k,v)` / `resetAutoScrollSettings()` | Settings → ⏬ גלילה אוטומטית (`#as-set-*`) |
+
+### js/cache.js
+| Function/Const | Description |
+|---|---|
+| `CACHE_TABS` | Registry of cacheable tabs `[{id,name}]` — `parasha`, `tehilim`. Adding a tab = add it here + pass its id at the call sites |
+| `getCacheSettings()` / `cacheEnabledFor(tab)` | `appState.cacheSettings = {enabled, tabs:{id:bool}}`; default ON. A tab is cached only if the global switch AND its own switch are on |
+| `cacheGetJson(key, tab)` / `cachePutJson(key, data, tab)` | IndexedDB `itim-cache` / store `entries` `{key, tab, data, size, ts}`. Get returns `undefined` on miss/disabled/any failure. Put refuses empty/error bodies (`cacheWorthStoring`) so a transient bad response can never stick |
+| `cacheFetch(url, init, tab)` | Drop-in for `fetch()` (used by the Rashi strategies + Onkelos): hit → Response-like `{ok,json()}`, miss → real fetch + store of a clone |
+| `cacheClear(tab?)` / `cacheStats()` | Clear all or one tab; stats = counts + bytes per tab + `navigator.storage.estimate()` |
+| `renderCacheSettings()` + `setCacheGlobalEnabled` / `setCacheTabEnabled` / `clearCacheFromSettings` | Settings → 💾 מטמון: global + per-tab toggles, per-tab count/size/status, clear buttons |
+| `offerCacheClearOnFailure(tab, retryFn)` | Called from a tab's load-failure path → `#cache-fail-modal` (clear + retry, or dismiss). Suppressed when offline, when that tab's cache is off, and for 5 min after showing |
+
+Opt-in at call sites: `sefariaText(ref, delay, tab)` and `fetchWithDelay(url, delay, tab)` (utils.js) take an optional 3rd `tab` arg; a hit skips the network AND the throttling delay.
 
 ### js/omer.js
 | Function | Description |

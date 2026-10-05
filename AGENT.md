@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.127 (Oct 1, 2026)
+**Last updated:** v5.128 (Oct 5, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -401,6 +401,31 @@ v5.124 specifically so both Sukkot items sit in the same place).
   HTML in the verification harness, not by eye, since a visual check alone
   would not have caught either instance).
 
+### IndexedDB cache — js/cache.js (v5.128)
+- Scope: Sefaria TEXT responses for the **parasha** tab (Torah aliya, haftara,
+  Sacks article, all three Rashi strategy fetches, Onkelos) and the **tehilim**
+  tab (`Psalms.N`). Cache key = the full request URL. Opt-in per call site by
+  passing the tab id (`sefariaText(ref, delay, 'tehilim')`, `cacheFetch(...)`).
+  Deliberately NOT cached: Hebcal lookups and Sefaria's calendar endpoint —
+  their URLs embed today's date (a fresh key every day = pure garbage), and
+  the parasha-of-the-week answer must stay live.
+- Safety rules: (1) only responses with non-empty Hebrew `he` are stored, so a
+  transient empty/error answer can never become permanent (the same lesson as
+  the Rashi Strategy-3 bug in CLAUDE.md §13); (2) every IndexedDB failure
+  degrades to "no cache", never to a broken tab; (3) a hit also skips the
+  300ms+ throttling delay, which is what makes cached loads feel instant.
+- Settings (`appState.cacheSettings`): default ON; global switch + per-tab
+  switch, per-tab item count/size/status, "clear" per tab and for everything.
+  Turning a tab OFF stops reads and writes but keeps what is already stored
+  (visible in the stats, clearable) — it does not silently delete.
+- Failure popup: `offerCacheClearOnFailure()` from `loadTehilim`'s and
+  `loadAliyaText`'s catch blocks. Offered, never forced ("לא עכשיו" clears
+  nothing). Suppressed when OFFLINE (the failure is the network and clearing
+  would destroy the very content that still works offline), when the tab's
+  cache is off (it can't be the cause) and for 5 minutes after showing.
+- Test-harness note: the app registers a service worker whose own `fetch`
+  bypasses Playwright's `context.route` — use `serviceWorkers:'block'`.
+
 ### Auto-scroll — js/autoscroll.js (v5.127)
 - UX: a round ▶ (bottom-left, above the bottom nav; lifted above siddur's own
   stacked floats on that tab) appears by itself when the page overflows the
@@ -514,6 +539,23 @@ could be more precise for edge cases.
 ---
 
 ## Recently Fixed
+
+### v5.128 (Oct 5, 2026) – IndexedDB cache for parasha + tehilim
+- ✅ New js/cache.js — see Key Architecture → IndexedDB cache. Cache-first for
+  Sefaria texts on the parasha and tehilim tabs, network on a miss; Settings
+  section with global + per-tab switches (default ON), per-tab count/size/
+  status and clear buttons; load-failure popup that offers (never forces) a
+  clear + retry.
+- Verified in real headless Chromium with mocked Sefaria routes, 37 checks:
+  miss→network / hit→no network, persistence across a full reload, empty
+  responses not stored (and a retry reaches the network), per-tab OFF and
+  global OFF both bypass reads and writes, a parasha aliya reload makes ZERO
+  Sefaria calls (text + 3 Rashi paths + Onkelos), popup offered / dismissed /
+  cooldown / direct clear-and-retry, no popup offline or with the tab's cache
+  off, Settings counts/sizes/toggles/clear, no page errors. Screenshots
+  checked in both themes (caught and fixed jumbled "12 KB" inside RTL text
+  with `<bdi dir="ltr">`).
+- `Tests/test_runner.py`: 270/288 (unchanged baseline).
 
 ### v5.127 (Oct 1, 2026) – Auto-scroll (גלילה אוטומטית)
 - ✅ New js/autoscroll.js — see Key Architecture → Auto-scroll for the design:

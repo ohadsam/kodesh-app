@@ -654,7 +654,7 @@ async function loadTehilim(chapterOrRange) {
 
   try {
     console.log(`[Tehilim] loading chapter ${chapter}${isRange ? ` verses ${verseFrom}-${verseTo}` : ''}`);
-    const data = await sefariaText(`Psalms.${chapter}`);
+    const data = await sefariaText(`Psalms.${chapter}`, 350, 'tehilim');
     let flat = heFlat(data);
     if (!flat.length) throw new Error(`אין טקסט עברי לפרק ${chapter}`);
 
@@ -709,6 +709,7 @@ async function loadTehilim(chapterOrRange) {
   } catch(e) {
     console.error('[Tehilim] error:', e);
     el.textContent = 'שגיאה בטעינה: ' + e.message;
+    if (typeof offerCacheClearOnFailure === 'function') offerCacheClearOnFailure('tehilim', () => loadTehilim(chapterOrRange));
     // currentTehilimChapter/tehilimContext were already updated above (and by the
     // caller) before this fetch failed — refresh these two even on failure, or a
     // mode switch during a network error leaves the favorites sidebar/star

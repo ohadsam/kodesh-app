@@ -320,7 +320,7 @@ async function _loadSacksArticle() {
   for (let article = 1; article <= 3; article++) {
     const sacksRef = `Covenant_and_Conversation;_Hebrew_Edition,_${sacksName},_${article}`;
     try {
-      const data = await sefariaText(sacksRef, 200);
+      const data = await sefariaText(sacksRef, 200, 'parasha');
       const flat = heFlat(data).filter(Boolean);
       if (flat.length) {
         allContent.push(...flat);
@@ -729,7 +729,7 @@ async function _kickoffHaftara(haftaraRef) {
   haftaraVerses = [];
   console.log('[Haftara] loading:', normalRef);
   try {
-    const data = await sefariaText(normalRef, 200);
+    const data = await sefariaText(normalRef, 200, 'parasha');
     const flat = heFlat(data);
     if (flat.length) {
       haftaraVerses = flat;
@@ -746,7 +746,7 @@ async function _kickoffHaftara(haftaraRef) {
           const endV   = ch === parseInt(ch2) ? parseInt(v2) : 999;
           const chRef  = `${book} ${ch}`;
           try {
-            const chData = await sefariaText(chRef, 100);
+            const chData = await sefariaText(chRef, 100, 'parasha');
             const chFlat = heFlat(chData);
             // Slice to requested verses (1-indexed)
             const sliced = chFlat.slice(startV - 1, endV === 999 ? chFlat.length : endV);
@@ -765,7 +765,7 @@ async function _kickoffHaftara(haftaraRef) {
         if (chMatch) {
           const singleChRef = `${bookOnly} ${chMatch[1]}`;
           console.warn('[Haftara] trying single chapter:', singleChRef);
-          const data2 = await sefariaText(singleChRef, 200);
+          const data2 = await sefariaText(singleChRef, 200, 'parasha');
           haftaraVerses = heFlat(data2);
           if (haftaraVerses.length) console.log('[Haftara] ✅ single chapter fallback:', haftaraVerses.length);
         }
@@ -821,7 +821,7 @@ async function loadAliyaText(ref) {
 
   try {
     console.log('[Parasha] loading text for ref:', ref);
-    const data = await sefariaText(ref);
+    const data = await sefariaText(ref, 350, 'parasha');
     if (_currentAliyaRef !== ref) return; // aliya changed while loading
 
     // Derive authoritative chapter lengths from nested Torah text structure.
@@ -861,6 +861,7 @@ async function loadAliyaText(ref) {
   } catch(e) {
     console.error('[Parasha] loadAliyaText error:', e);
     loadingEl.textContent = 'שגיאה בטעינת הפרשה: ' + e.message;
+    if (typeof offerCacheClearOnFailure === 'function') offerCacheClearOnFailure('parasha', () => loadAliyaText(ref));
   } finally {
     _parashaLoading = false;
   }
@@ -925,7 +926,7 @@ async function loadRashiForRef(torahRef) {
           const timer = setTimeout(() => ctrl.abort(), 20000); // 20s timeout
           const rashiUrl = `https://www.sefaria.org/api/texts/${encodeURI(rashiRef)}?lang=he&commentary=0&context=0`;
           console.log('[Rashi] trying direct:', rashiRef);
-          const rashiResp = await fetch(rashiUrl, { signal: ctrl.signal });
+          const rashiResp = await cacheFetch(rashiUrl, { signal: ctrl.signal }, 'parasha');
           clearTimeout(timer);
           if (rashiResp.ok) {
             rashiData = await rashiResp.json();
@@ -1014,7 +1015,7 @@ async function loadRashiForRef(torahRef) {
           const timer2 = setTimeout(() => ctrl2.abort(), 20000);
           const url2 = `https://www.sefaria.org/api/texts/${encodeURI(rangeRef)}?lang=he&commentary=0&context=0`;
           console.log('[Rashi] trying range ref:', rangeRef);
-          const resp2 = await fetch(url2, { signal: ctrl2.signal });
+          const resp2 = await cacheFetch(url2, { signal: ctrl2.signal }, 'parasha');
           clearTimeout(timer2);
           if (resp2.ok) {
             const data2 = await resp2.json();
@@ -1072,7 +1073,7 @@ async function loadRashiForRef(torahRef) {
         const ctrl3 = new AbortController();
         const timer3 = setTimeout(() => ctrl3.abort(), 35000);
         const url = `https://www.sefaria.org/api/texts/${encodeURI(book + ' ' + ch)}?lang=he&commentary=1&context=0`;
-        const resp = await fetch(url, { signal: ctrl3.signal });
+        const resp = await cacheFetch(url, { signal: ctrl3.signal }, 'parasha');
         clearTimeout(timer3);
         if (!resp.ok) {
           console.warn('[Rashi] ch', ch, 'attempt', attempt+1, 'HTTP', resp.status);
@@ -1189,7 +1190,7 @@ async function loadOnkelosForRef(torahRef) {
       await new Promise(r => setTimeout(r, 200));
       const ref = `${onkelosBook}.${ch}`;
       const url = `https://www.sefaria.org/api/texts/${encodeURI(ref)}?lang=he&commentary=0&context=0`;
-      const resp = await fetch(url);
+      const resp = await cacheFetch(url, undefined, 'parasha');
       if (!resp.ok) continue;
       const data = await resp.json();
       const verses = heFlat(data);

@@ -43,6 +43,7 @@ This is an Orthodox Jewish app. Content rules:
 - The service worker (`sw.js`) caches all static assets. When adding new static files, make sure they are included in the SW cache list.
 - Session-level API responses should be cached in `window._cache` or similar in-memory map — never refetch the same Sefaria ref twice per session.
 - Do **not** store large text blobs in `localStorage` — use session memory only.
+  Persistent text caches belong in IndexedDB via `js/cache.js` (opt a call site in by passing its tab id to `sefariaText`/`fetchWithDelay`/`cacheFetch`); never cache empty or error responses.
 - When bumping `APP_VERSION`, the SW automatically clears old caches. Do not add manual cache-clearing logic elsewhere.
 
 ## 6. Token Efficiency

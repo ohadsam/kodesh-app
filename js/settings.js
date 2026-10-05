@@ -171,6 +171,7 @@ function loadSettingsState() {
   if (appState.fontSize) setFont(appState.fontSize);
   initThemeUI();
   if (typeof initAutoScrollSettingsUI === 'function') initAutoScrollSettingsUI();
+  if (typeof renderCacheSettings === 'function') renderCacheSettings();
   const reminders = appState.reminders || {};
 
   // Restore standard reminder toggles (halacha, tehilim, lashon, parasha, igeret, omer)
