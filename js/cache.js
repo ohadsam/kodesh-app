@@ -7,6 +7,12 @@
 // Cache hit → no network (and no artificial throttling delay); miss → normal
 // network call, then store. Everything here is best-effort: any IndexedDB
 // failure degrades to "no cache", never to a broken tab.
+// KEY = the full request URL, i.e. it embeds the exact Sefaria ref (incl. verse range).
+// That is what keeps a COMBINED parasha (e.g. תזריע-מצורע → "Leviticus 12:1-15:33", or
+// Hebcal's combined aliyot like "Leviticus 12:1-13:5") from ever overwriting the same
+// parasha cached on its own ("Leviticus 12:1-13:59" / its static aliyot): different
+// ref ⇒ different key. A ref that is identical in both flows is the same text, so
+// sharing that one entry is correct. Never key by parasha NAME.
 // Settings (appState.cacheSettings): { enabled: true, tabs: { parasha: true, tehilim: true } }
 // — on by default; a tab is cached only if the global switch AND its own switch are on.
 

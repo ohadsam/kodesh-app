@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.129 (Oct 6, 2026)
+**Last updated:** v5.130 (Oct 7, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -423,6 +423,15 @@ v5.124 specifically so both Sukkot items sit in the same place).
   nothing). Suppressed when OFFLINE (the failure is the network and clearing
   would destroy the very content that still works offline), when the tab's
   cache is off (it can't be the cause) and for 5 minutes after showing.
+- **Combined parshiot vs the same parasha on its own** (verified v5.130): the
+  key is the full request URL, so it embeds the exact ref/range. Combined
+  `תזריע-מצורע` resolves to `Leviticus 12:1-15:33` and loads either Hebcal's
+  combined aliyot (`12:1-13:5`, `13:6-13:17`…) or, with no leyning, that whole
+  range; standalone Tazria uses its static aliyot (`12:1-12:8`, `13:1-13:17`…)
+  / `12:1-13:59`. Different ref ⇒ different entry, so neither can overwrite the
+  other; an identical ref in both flows is identical text and is shared on
+  purpose. NEVER key by parasha name. Aliyot load lazily (one entry per aliya
+  the user opens), not all seven up front.
 - Test-harness note: the app registers a service worker whose own `fetch`
   bypasses Playwright's `context.route` — use `serviceWorkers:'block'`.
 
@@ -539,6 +548,23 @@ could be more precise for edge cases.
 ---
 
 ## Recently Fixed
+
+### v5.130 (Oct 7, 2026) – Cache verified for combined parshiot (+ rationale comment)
+- ✅ Owner asked to make sure the parasha cache handles combined parshiot and
+  never overwrites the same parasha cached on its own. Analysis: it cannot, by
+  construction (key = full ref URL) — see Key Architecture → IndexedDB cache.
+  Rather than trust that, verified it end to end in real headless Chromium with
+  mocked Sefaria/Hebcal (25 checks): standalone Tazria stored, then combined
+  Tazria-Metzora (Hebcal aliyot) loaded — every standalone row still present and
+  byte-identical, combined aliyot in their own rows (lazy, per aliya opened),
+  standalone aliya 2 (`13:1-13:17`) and combined aliya 2 (`13:6-13:17`) separate
+  and each rendering its OWN text (every mock response embeds its ref, so any
+  mix-up shows), swapping back and forth makes zero Sefaria calls, the
+  no-leyning whole-range fallback (`12:1-15:33`) gets a third separate key,
+  Hebcal (date-keyed) is not cached, stats consistent.
+- No behavior change; added a comment in js/cache.js stating the invariant so
+  nobody "optimises" the key down to a parasha name later.
+- `Tests/test_runner.py`: 270/288 (unchanged baseline).
 
 ### v5.129 (Oct 6, 2026) – Auto-scroll speed range 1..15, slower step 1
 - ✅ Scale changed from levels 1..10 at `8 + 8*level` px/s to **1..15 at
