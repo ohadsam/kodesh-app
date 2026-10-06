@@ -24,6 +24,7 @@ function showTab(name) {
   if (bn)  bn.classList.add('active');
   currentTab = name;
   if (typeof autoScrollOnTabChange === 'function') autoScrollOnTabChange();
+  if (typeof bookmarksOnTabChange === 'function') bookmarksOnTabChange();
 
   // Scroll active tab into view in both nav bars
   if (tab) tab.scrollIntoView({ behavior: 'instant', block: 'nearest', inline: 'center' });

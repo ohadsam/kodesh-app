@@ -654,3 +654,48 @@ body {
 .as-btn:disabled { opacity: .35; cursor: default; }
 .as-fab svg, .as-btn svg { width: 22px; height: 22px; fill: currentColor; }
 .as-btn-sm svg { width: 20px; height: 20px; }
+
+/* ─── BOOKMARKS (js/bookmarks.js) ────────────
+   Bar at the top of a tab, 🔖 flag + highlight at the bookmarked spot, toast.
+   Every <button> sets its own color (buttons do not inherit it). */
+body.bm-pressing, body.bm-pressing * {
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+}
+.bm-bar {
+  display: none; align-items: center; gap: 8px; direction: rtl;
+  margin: 0 0 10px; padding: 8px 10px;
+  background: var(--surface); border: 1px solid var(--gold-dim); border-radius: 12px;
+}
+.bm-bar-icon { width: 18px; height: 24px; color: var(--gold); flex-shrink: 0; display: flex; }
+.bm-bar-icon svg, .bm-flag svg { width: 100%; height: 100%; fill: currentColor; }
+.bm-bar-text { flex: 1; min-width: 0; }
+.bm-bar-label { font-size: 13px; font-weight: 600; color: var(--cream); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bm-bar-snip { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bm-btn {
+  flex-shrink: 0; cursor: pointer; font-family: 'Heebo', sans-serif;
+  background: var(--card); color: var(--cream); border: 1px solid var(--border);
+  border-radius: 10px; padding: 7px 12px; font-size: 12px; min-height: 36px;
+}
+.bm-btn-go { color: var(--gold); border-color: var(--gold); font-weight: 600; }
+.bm-btn-clear { padding: 7px 10px; min-width: 36px; }
+.bm-flag {
+  position: absolute; right: 2px; z-index: 90; width: 20px; height: 28px; padding: 0;
+  display: none; background: none; border: none; color: var(--gold); cursor: pointer;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,.45)); touch-action: manipulation;
+}
+.bm-target { background: rgba(201,165,74,.08); box-shadow: inset -3px 0 0 var(--gold); border-radius: 4px; }
+@keyframes bm-pulse { 0% { background: rgba(201,165,74,.5); } 100% { background: rgba(201,165,74,.08); } }
+.bm-pulse { animation: bm-pulse 1.4s ease-out; }
+.bm-toast {
+  position: fixed; left: 50%; transform: translateX(-50%); z-index: 140;
+  bottom: calc(172px + env(safe-area-inset-bottom, 0px));
+  display: none; align-items: center; gap: 10px; direction: rtl;
+  max-width: calc(100vw - 24px); padding: 10px 14px; border-radius: 20px;
+  background: var(--surface); color: var(--cream); border: 1px solid var(--gold-dim);
+  font-family: 'Heebo', sans-serif; font-size: 13px; box-shadow: 0 4px 16px rgba(0,0,0,.35);
+}
+.bm-toast-btn {
+  background: none; border: 1px solid var(--gold); color: var(--gold); border-radius: 12px;
+  padding: 4px 12px; font-size: 12px; cursor: pointer; font-family: 'Heebo', sans-serif;
+}
+

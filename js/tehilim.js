@@ -631,6 +631,7 @@ function scrollTehilimTop() {
 async function loadTehilim(chapterOrRange) {
   // chapterOrRange: number like 23, or string like '119:1-88'
   const isRange = typeof chapterOrRange === 'string' && chapterOrRange.includes(':');
+  window._lastTehilimArg = chapterOrRange;   // what bookmarks.js needs to reopen exactly this view
   let chapter, verseFrom, verseTo, rangeLabel;
   if (isRange) {
     const [ch, vRange] = chapterOrRange.split(':');

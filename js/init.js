@@ -70,6 +70,9 @@ async function init() {
     _status('initAutoScroll...');
     if (typeof initAutoScroll === 'function') initAutoScroll();
 
+    _status('initBookmarks...');
+    if (typeof initBookmarks === 'function') initBookmarks();
+
     _status('✅ הצלחה! מסיר splash...');
     setTimeout(_removeSplash, 800);
 

@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.131 (Oct 8, 2026)
+**Last updated:** v5.132 (Oct 9, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -435,6 +435,43 @@ v5.124 specifically so both Sukkot items sit in the same place).
 - Test-harness note: the app registers a service worker whose own `fetch`
   bypasses Playwright's `context.route` — use `serviceWorkers:'block'`.
 
+### Bookmarks — js/bookmarks.js (v5.132)
+- One bookmark per tab in `appState.bookmarks[tab]` (localStorage). Long-press
+  (500ms) on text in a tab's content root saves the tab's FULL state plus an
+  anchor; the bar at the top of the tab ("🔖 label «snippet» [עבור לסימניה] [✕]")
+  returns to it; a 🔖 flag + highlight mark the spot while the tab shows that
+  state; long-press on the flag deletes (toast with "בטל").
+- **State is per-tab knowledge** (`BM_ADAPTERS`): everything that changes which
+  DOM exists is part of it — parasha: ref, aliyot list, aliya, exact aliya ref,
+  view (text/Rashi/Onkelos/haftara/Sacks), haftara; tehilim: the exact
+  `loadTehilim` argument (`window._lastTehilimArg`, e.g. `"119:1-88"`) + day/
+  favorite/manual context; daf/mishna: date, daily-vs-pick, ref, commentary
+  view, picker values; brachot: key, nusach AND ushpizin's show-all toggle
+  (found by testing — without it GO restored the right bracha but the anchored
+  night wasn't rendered); emuna: book + unit. Daily tabs are date-driven, so
+  restore moves the global date-nav (`_bmGoDate`) to the saved date. New tab ⇒
+  add an adapter; a tab without one is not bookmarkable.
+- **Anchor** = child-index path from the content root (skipping `[data-bm-ui]`
+  nodes, i.e. our own bar) + 80-char snippet + fractional Y inside the element +
+  the press' viewport Y. Restore verifies the path hit with the snippet and
+  falls back to a snippet search, then scrolls so the SAME element is at the
+  SAME screen height (clamped to stay on screen), and keeps correcting for
+  ~2.5s because several loaders scroll on their own after rendering
+  (`scrollTehilimTop`, `showBracha`'s smooth `scrollIntoView`, Rashi arriving
+  late) — stopped by any user input so it never fights the reader.
+- **Restore order matters**: wait for the tab's own initial load to go idle
+  BEFORE restoring (otherwise the default load can land after ours and win),
+  restore only if `same()` says the tab isn't already there, wait idle again,
+  then wait for the anchor. `idle()` per tab: parasha also waits for the
+  Rashi/Onkelos/haftara/Sacks data its view needs; a failed load counts as idle.
+- **Showing the bar shifts the page**: `_bmShowBar` measures an element at the
+  viewport center before/after and scrolls by the difference. A fixed
+  compensation double-shifted in Chrome (its scroll anchoring already
+  compensates; Safari's doesn't) — measuring works in both.
+- Test-harness notes: pressing a button for 700ms and releasing on it CLICKS
+  it (the first test run silently switched aliyot); release elsewhere. Block
+  coordinates must lie inside the content root (brachot's button list is long).
+
 ### Auto-scroll — js/autoscroll.js (v5.127)
 - UX: a round ▶ (bottom-left, above the bottom nav; lifted above siddur's own
   stacked floats on that tab) appears by itself when the page overflows the
@@ -561,6 +598,29 @@ could be more precise for edge cases.
 ---
 
 ## Recently Fixed
+
+### v5.132 (Oct 9, 2026) – Bookmarks (סימניה) per tab
+- ✅ New js/bookmarks.js — see Key Architecture → Bookmarks. Long-press saves,
+  the bar jumps back to the exact state and place, ✕ clears, long-press on the
+  flag deletes; stored per tab in localStorage; works for parasha (aliya +
+  Rashi/Onkelos/haftara/Sacks view), tehilim, daf, mishna, rambam, tefilot,
+  brachot (incl. ushpizin toggle), emuna, siddur and the date-driven tabs.
+- Verified in real headless Chromium, 43 checks: short tap / dragged press /
+  button press / outside-content press save nothing; a real long-press stores
+  state + anchor + label with no selection left and no jump; bar at the top of
+  the page, flag at the pressed height; GO from a different parasha restores
+  ref + aliya ג + Rashi view + the aliya tab + dropdown and puts the SAME Rashi
+  block at the SAME screen height; survives a full reload; a second press
+  replaces; per-tab independence; ✕/undo; flag long-press delete/undo; tap on
+  the flag only explains; brachot, tefilot and daf (date moved +2 days and
+  restored, Steinsaltz view) return to the same spot. Screenshots checked in
+  both themes. Auto-scroll (82) and cache (37 + 25) suites re-run: no
+  regressions.
+- Bugs found by the tests and fixed: (1) an empty spacer `<div>` under the
+  finger made the press count as "nothing" — now the nearest paragraph is
+  taken; (2) the ushpizin show-all toggle wasn't part of brachot state;
+  (3) a fixed scroll compensation for the new bar double-shifted in Chrome.
+- `Tests/test_runner.py`: 270/288 (unchanged baseline).
 
 ### v5.131 (Oct 8, 2026) – Auto-scroll: percent scrolled + time remaining
 - ✅ Toolbar now shows a progress bar, `NN%` and the time left to the bottom

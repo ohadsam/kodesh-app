@@ -28,6 +28,7 @@ kodesh-app/
 │   ├── tehilim.js
 │   ├── prayer-names.js
 │   ├── autoscroll.js
+│   ├── bookmarks.js
 │   ├── tefilot.js
 │   ├── siddur.js
 │   ├── siddur-inserts.js
@@ -70,6 +71,7 @@ js/calendar.js      → Hebrew dates, zmanim, events
 js/content.js       → Parasha, Daf Yomi, Mishna, Rambam
 js/tehilim.js       → Tehilim by day
 js/autoscroll.js    → Auto-scroll: ▶ button on long pages + toolbar (init from init.js, hook in showTab)
+js/bookmarks.js     → Per-tab bookmarks: long-press to save, bar + flag to return (init from init.js, hook in showTab)
 js/prayer-names.js  → Shared health/memorial name list, rendered on both
                        Tehilim and Mishna tabs (loads after tehilim.js — not
                        a hard dependency, just keeps related tabs together)
@@ -251,6 +253,16 @@ Add `<button id="tf-{key}" class="aliya-tab" onclick="showTefila('{key}')">` in 
 | `offerCacheClearOnFailure(tab, retryFn)` | Called from a tab's load-failure path → `#cache-fail-modal` (clear + retry, or dismiss). Suppressed when offline, when that tab's cache is off, and for 5 min after showing |
 
 Opt-in at call sites: `sefariaText(ref, delay, tab)` and `fetchWithDelay(url, delay, tab)` (utils.js) take an optional 3rd `tab` arg; a hit skips the network AND the throttling delay.
+
+### js/bookmarks.js
+| Function/Const | Description |
+|---|---|
+| `BM_ADAPTERS` | Per-tab knowledge: `root()` (content element whose descendants can be bookmarked), `capture()` (FULL state, null = nothing yet), `same(a,b)`, `idle()` (loaders done), `restore(s)` (through the tab's own loaders), `describe(s)` (label). Tabs: parasha (ref+name+aliyot+aliya+aliyaRef+view+haftara), tehilim (`window._lastTehilimArg` + context), daf/mishna (date, daily/pick mode, ref, view, pick), rambam, tefilot, brachot (+ushpizin show-all toggle), emuna (book+unit), siddur, and date-only adapters (halacha, lashon, igeret, 929, calendar) via `_bmDateAdapter`. qibla/logs/network excluded |
+| `getBookmark(tab)` / `_bmSave(tab, bm)` | `appState.bookmarks[tab] = {v, ts, tab, state, anchor, label, snip}` (localStorage via `saveState`) |
+| `bookmarkAddAt(x,y)` / `bookmarkDelete(tab)` / `bookmarkGo(tab)` | Save at a screen point, delete (toast with "בטל"), and restore: switch tab → wait idle → restore state if different → wait for the anchor element → scroll → keep correcting ~2.5s unless the user touches the screen |
+| `_bmPickElement` / `_bmCaptureAnchor` / `_bmLocate` | Anchor = child-index path from the content root (ignoring `[data-bm-ui]` nodes) + 80-char text snippet (verifies the path hit, and re-finds the element if the structure shifted) + fractional Y inside the element + the press' viewport Y (`vy`). A press on blank space picks the nearest paragraph |
+| `_bmOnPointerDown` / `BM_LONGPRESS_MS` | 500ms hold, cancelled by >10px movement, pointerup/cancel or scroll; ignores buttons/links/inputs/`[onclick]`; `body.bm-pressing` suppresses text selection/callout; the context menu a long-press may raise is swallowed |
+| `bookmarksRefresh()` / `bookmarksOnTabChange()` | Moves `#bm-bar` to the top of the active page, shows `#bm-flag` + `.bm-target` only when the tab is displaying the bookmarked state. `_bmShowBar` re-measures a reference element before/after toggling the bar and scrolls by the difference so the text under the finger doesn't jump |
 
 ### js/omer.js
 | Function | Description |
