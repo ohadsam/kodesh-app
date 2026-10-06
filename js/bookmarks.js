@@ -16,9 +16,22 @@
 // verify (and, if the structure shifted, to re-find) the element + the fractional
 // position inside it. Per-tab knowledge lives in BM_ADAPTERS below.
 
-const BM_LONGPRESS_MS = 500;
+const BM_HOLD_DEFAULT_MS = 500;       // original default; Settings can change it (appState.bookmarkSettings.holdMs)
+const BM_HOLD_MIN_MS = 250;           // below this a normal tap-and-linger would save bookmarks by accident
+const BM_HOLD_MAX_MS = 1500;
 const BM_MOVE_TOLERANCE_PX = 10;
 const BM_EXCLUDED_TABS = ['qibla', 'logs', 'network'];
+
+// ── Hold time (Settings) ────────────────────────────────────────────────
+function _bmClampHold(ms) {
+  ms = Math.round(Number(ms));
+  if (!isFinite(ms)) return BM_HOLD_DEFAULT_MS;
+  return Math.min(BM_HOLD_MAX_MS, Math.max(BM_HOLD_MIN_MS, ms));
+}
+function getBookmarkHoldMs() {
+  const s = appState.bookmarkSettings;
+  return s && s.holdMs != null ? _bmClampHold(s.holdMs) : BM_HOLD_DEFAULT_MS;
+}
 
 // ── Storage ─────────────────────────────────────────────────────────────
 function getBookmark(tab) { return (appState.bookmarks || {})[tab] || null; }
@@ -384,7 +397,7 @@ function _bmOnPointerDown(e) {
   if (!mode) return;
   document.body.classList.add('bm-pressing');            // no text selection / callout while the finger is down
   const x = e.clientX, y = e.clientY;
-  _bmPress = { x, y, mode, timer: setTimeout(() => { const m = _bmPress && _bmPress.mode; _bmCancelPress(); _bmRecentPress = performance.now(); if (m === 'delete') bookmarkDelete(currentTab); else if (m === 'add') bookmarkAddAt(x, y); }, BM_LONGPRESS_MS) };
+  _bmPress = { x, y, mode, timer: setTimeout(() => { const m = _bmPress && _bmPress.mode; _bmCancelPress(); _bmRecentPress = performance.now(); if (m === 'delete') bookmarkDelete(currentTab); else if (m === 'add') bookmarkAddAt(x, y); }, getBookmarkHoldMs()) };
 }
 
 function _bmOnPointerMove(e) {
@@ -597,4 +610,26 @@ function initBookmarks() {
   });
   if ('ResizeObserver' in window) new ResizeObserver(() => { const f = _bmEl('bm-flag'); if (f && f.style.display !== 'none') _bmScheduleRefresh(); }).observe(document.body);
   bookmarksOnTabChange();
+}
+
+// ── Settings panel: how long to hold ────────────────────────────────────
+function _bmFmtSeconds(ms) { return (ms / 1000).toFixed(2).replace(/0$/, '').replace(/\.0$/, '') + ' שנ׳'; }
+
+function initBookmarkSettingsUI() {
+  const ms = getBookmarkHoldMs();
+  const slider = _bmEl('bm-set-hold'), val = _bmEl('bm-set-hold-val');
+  if (slider) slider.value = ms;
+  if (val) val.textContent = _bmFmtSeconds(ms);
+}
+
+function setBookmarkHoldMs(v) {
+  appState.bookmarkSettings = { ...(appState.bookmarkSettings || {}), holdMs: _bmClampHold(v) };
+  saveState();
+  initBookmarkSettingsUI();
+}
+
+function resetBookmarkSettings() {
+  delete appState.bookmarkSettings;
+  saveState();
+  initBookmarkSettingsUI();
 }

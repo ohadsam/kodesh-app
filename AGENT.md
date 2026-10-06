@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.132 (Oct 9, 2026)
+**Last updated:** v5.133 (Oct 10, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -468,6 +468,14 @@ v5.124 specifically so both Sukkot items sit in the same place).
   viewport center before/after and scrolls by the difference. A fixed
   compensation double-shifted in Chrome (its scroll anchoring already
   compensates; Safari's doesn't) — measuring works in both.
+- **Hold time is configurable** (v5.133): Settings → 🔖 סימניות, slider
+  0.25–1.5s (`appState.bookmarkSettings.holdMs`, default `BM_HOLD_DEFAULT_MS` =
+  500), applies to BOTH adding (long-press on text) and deleting (long-press on
+  the flag). `getBookmarkHoldMs()` clamps any stored value to
+  `BM_HOLD_MIN_MS`..`BM_HOLD_MAX_MS` (250..1500; non-numbers → default) so a
+  hand-edited/corrupt value can't make every tap save a bookmark. Reset deletes
+  the override object (so a future change of the default reaches users who never
+  customized it) and refreshes the slider/label.
 - Test-harness notes: pressing a button for 700ms and releasing on it CLICKS
   it (the first test run silently switched aliyot); release elsewhere. Block
   coordinates must lie inside the content root (brachot's button list is long).
@@ -598,6 +606,19 @@ could be more precise for edge cases.
 ---
 
 ## Recently Fixed
+
+### v5.133 (Oct 10, 2026) – Bookmark hold time in Settings
+- ✅ Settings → 🔖 סימניות: slider for how long to hold to add/delete a bookmark
+  (0.25–1.5s, live label "0.75 שנ׳"), plus "שחזר ברירת מחדל" (500ms). Stored in
+  `appState.bookmarkSettings.holdMs`; replaces the hard-coded
+  `BM_LONGPRESS_MS` (now `BM_HOLD_DEFAULT_MS` + min/max clamps).
+- Verified in real headless Chromium, 18 checks: default 500 (300ms saves
+  nothing, 700ms saves); the real slider sets 1000 → 700ms saves nothing, 1250ms
+  saves; the flag's delete obeys the same value; 300 → a 420ms press saves, a
+  150ms tap doesn't; persists across reload and the panel shows it; reset
+  restores 500, clears the override, slider+label; garbage/out-of-range values
+  clamp; labels 0.25…1.5. Bookmark suite (43) re-run: no regressions.
+- `Tests/test_runner.py`: 270/288 (unchanged baseline).
 
 ### v5.132 (Oct 9, 2026) – Bookmarks (סימניה) per tab
 - ✅ New js/bookmarks.js — see Key Architecture → Bookmarks. Long-press saves,
