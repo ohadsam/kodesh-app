@@ -741,4 +741,6 @@ body.bm-pressing, body.bm-pressing * {
   box-shadow: 0 4px 16px rgba(0,0,0,.35);
 }
 .bm-pick-root { outline: 2px dashed var(--gold); outline-offset: 3px; cursor: crosshair; }
+.bm-btn-rem.has-rem, .bm-menu-x.has-rem { color: var(--gold); border-color: var(--gold); }
+.bm-btn-rem { font-size: 14px; }
 

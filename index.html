@@ -29,13 +29,13 @@
       } catch (e) { /* localStorage unavailable (private mode etc.) — default dark */ }
     })();
   </script>
-  <link rel="stylesheet" href="styles.css?v=5.134" />
+  <link rel="stylesheet" href="styles.css?v=5.135" />
   <!-- INLINE version guard – runs SYNCHRONOUSLY before any SW can intercept.
        Kills any cached service worker and forces a fresh load when version changes.
        NOTE: this is the ONLY version check. utils.js must NOT have another one. -->
   <script>
     (function() {
-      var V = '5.134';
+      var V = '5.135';
       // Show version in splash immediately
       var sv = document.getElementById('splash-version');
       if (sv) sv.textContent = 'גרסה ' + V;
@@ -178,6 +178,30 @@
   </div>
 </div>
 
+<!-- Bookmark reminder (js/bookmarks.js) -->
+<div id="bm-rem-modal" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,.85);align-items:center;justify-content:center;padding:20px" role="dialog" aria-modal="true" aria-labelledby="bm-rem-title">
+  <div style="background:var(--card);border:1px solid var(--gold-dim);border-radius:18px;width:100%;max-width:380px;direction:rtl;padding:18px">
+    <div id="bm-rem-title" style="font-family:'Frank Ruhl Libre',serif;font-size:17px;color:var(--gold);font-weight:700;margin-bottom:6px">⏰ תזכורת לסימניה</div>
+    <div id="bm-rem-label" style="font-size:12px;color:var(--muted);margin-bottom:12px"></div>
+    <label for="bm-rem-kind" style="display:block;font-size:12px;color:var(--cream);margin-bottom:4px">מתי להזכיר?</label>
+    <select id="bm-rem-kind" onchange="bmRemToggleFields()" style="width:100%;background:var(--surface);color:var(--cream);border:1px solid var(--border);border-radius:10px;padding:9px 10px;font-family:'Heebo',sans-serif;font-size:13px">
+      <option value="open-once">בפתיחה הבאה של האפליקציה (פעם אחת)</option>
+      <option value="open-daily">בכל פתיחה של האפליקציה</option>
+      <option value="time">בשעה קבועה</option>
+    </select>
+    <div id="bm-rem-time-wrap" style="display:none;align-items:center;gap:12px;margin-top:10px;flex-wrap:wrap">
+      <input type="time" id="bm-rem-time" value="08:00" aria-label="שעת תזכורת" style="padding:7px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--cream);font-family:'Heebo',sans-serif;font-size:13px">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="bm-rem-recurring" checked><span style="font-size:12px;color:var(--cream)">חזרה יומית</span></label>
+    </div>
+    <div style="font-size:10px;color:var(--muted);margin:10px 0 14px;line-height:1.6">התזכורת קופצת בתוך האפליקציה בעת הפתיחה (עם כפתור "עבור לסימניה"), ומופיעה גם בפעמון. "בכל פתיחה" ממשיכה לקפוץ עד שמסמנים "בוצע" להיום, וחוזרת למחרת. בשעה קבועה תוצג גם התראת מכשיר אם האפליקציה פתוחה באותה שעה.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button type="button" onclick="saveBookmarkReminder()" style="flex:1;min-width:100px;background:var(--gold);color:#000;border:none;padding:10px;border-radius:10px;cursor:pointer;font-family:'Heebo',sans-serif;font-size:13px;font-weight:700">שמור</button>
+      <button type="button" id="bm-rem-delete" onclick="deleteBookmarkReminder()" style="display:none;background:rgba(201,65,65,.12);border:1px solid rgba(201,65,65,.45);color:#e07070;padding:10px 14px;border-radius:10px;cursor:pointer;font-family:'Heebo',sans-serif;font-size:13px">מחק תזכורת</button>
+      <button type="button" onclick="closeBookmarkReminder()" style="background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:10px 16px;border-radius:10px;cursor:pointer;font-family:'Heebo',sans-serif;font-size:13px">ביטול</button>
+    </div>
+  </div>
+</div>
+
 <div id="splash">
   <div class="logo-big">
     <img src="icons/icon.svg" width="96" height="96" alt="עיתים" 
@@ -186,7 +210,7 @@
   <div style="font-family:'Frank Ruhl Libre',serif;font-size:26px;color:var(--cream);font-weight:700">עיתים</div>
   <div class="spinner"></div>
   <p id="splash-status" style="font-size:12px;color:var(--gold);margin:4px 0 0;min-height:18px">טוען...</p>
-  <p id="splash-version" style="font-size:11px;color:var(--muted);margin-top:2px">גרסה 5.134</p>
+  <p id="splash-version" style="font-size:11px;color:var(--muted);margin-top:2px">גרסה 5.135</p>
   <div id="splash-retry" style="display:none;margin-top:20px">
     <button onclick="localStorage.clear();sessionStorage.clear();location.reload(true)"
       style="background:var(--gold);color:#000;border:none;border-radius:10px;padding:10px 24px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Heebo',sans-serif">🔄 איפוס וטעינה מחדש</button>
@@ -397,7 +421,7 @@
     <!-- Version & Copyright -->
     <div style="text-align:center;padding:18px 0 8px;border-top:1px solid var(--border);margin-top:8px">
       <div style="font-size:13px;font-weight:600;color:var(--gold-dim);margin-bottom:4px">📖 עיתים</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">גרסה 5.134</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">גרסה 5.135</div>
       <button onclick="showWhatsNew()" style="background:var(--card);border:1px solid var(--gold-dim);color:var(--gold);padding:6px 16px;border-radius:8px;font-size:11px;cursor:pointer;font-family:'Heebo',sans-serif;margin-bottom:6px">🆕 מה חדש?</button>
       <div style="font-size:11px;color:var(--muted)">© כל הזכויות שמורות לאוהד סמט</div>
     </div>
@@ -409,12 +433,12 @@
 <div id="whats-new-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
   width:88%;max-width:400px;max-height:80vh;overflow-y:auto;
   background:var(--surface);border:1px solid var(--gold-dim);border-radius:16px;z-index:10001;padding:20px;direction:rtl">
-  <div style="font-size:16px;font-weight:700;color:var(--gold);margin-bottom:12px;text-align:center">🆕 מה חדש בגרסה 5.134</div>
+  <div style="font-size:16px;font-weight:700;color:var(--gold);margin-bottom:12px;text-align:center">🆕 מה חדש בגרסה 5.135</div>
   <div style="font-size:13px;color:var(--cream);line-height:1.7" id="whats-new-content">
-    <div style="margin-bottom:10px"><b>🔖 תפריט סימניה בסרגל העליון</b></div>
-    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• כפתור 🔖 ליד ההגדרות — תמיד זמין, גם כשגללתם רחוק בטקסט</div>
-    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• הוספה: בוחרים "הוסף סימניה" ואז מקישים על המקום בטקסט (אפשר לגלול קודם). אפשר גם להוסיף במרכז המסך בלחיצה אחת</div>
-    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• מעבר למקום הסימניה, מחיקה, ורשימה של הסימניות בטאבים האחרים עם מעבר ישיר אליהן</div>
+    <div style="margin-bottom:10px"><b>🔖 תזכורות לסימניות</b></div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• ⏰ בסרגל הסימניה ובתפריט: תזכורת בפתיחה הבאה של האפליקציה, בכל פתיחה, או בשעה קבועה (פעם אחת או יומית)</div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• התזכורת קופצת בכניסה לאפליקציה עם כפתור "עבור לסימניה" שמוביל ישר למקום; אפשר לערוך, למחוק ולבטל מחיקה</div>
+    <div style="margin-bottom:6px;font-size:12px;color:var(--muted)">• בתפריט הסימניה נוסף גם "נקה את כל הסימניות" (עם אפשרות ביטול)</div>
   </div>
   <button onclick="closeWhatsNew()" style="display:block;width:100%;margin-top:14px;background:var(--gold);color:#000;border:none;border-radius:10px;padding:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Heebo',sans-serif">👍 הבנתי</button>
 </div>
@@ -1558,7 +1582,7 @@
     💡 לכיול המצפן: הזז את הטלפון בתנועת ∞ (שמונה שוכב) מספר פעמים
   </div>
   <div style="text-align:center;color:var(--muted);font-size:11px;padding:12px 0 4px">
-    גרסה 5.134 · עיתים · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
+    גרסה 5.135 · עיתים · <a href="https://www.sefaria.org" target="_blank" style="color:var(--gold-dim)">ספריא</a>
   </div>
 </div>
 
@@ -1617,24 +1641,24 @@
      JavaScript modules (load order matters)
      v4.3 – querystring busts browser/SW cache
      ═══════════════════════════════════════ -->
-<script src="js/network-log.js?v=5.134"></script>
-<script src="js/utils.js?v=5.134"></script>
-<script src="js/cache.js?v=5.134"></script>
-<script src="js/settings.js?v=5.134"></script>
-<script src="js/app.js?v=5.134"></script>
-<script src="js/tehilim.js?v=5.134"></script>
-<script src="js/prayer-names.js?v=5.134"></script>
-<script src="js/autoscroll.js?v=5.134"></script>
-<script src="js/bookmarks.js?v=5.134"></script>
-<script src="js/calendar.js?v=5.134"></script>
-<script src="js/content.js?v=5.134"></script>
-<script src="js/tefilot.js?v=5.134"></script>
-<script src="js/siddur-inserts.js?v=5.134"></script>
-<script src="js/siddur.js?v=5.134"></script>
-<script src="js/omer.js?v=5.134"></script>
-<script src="js/brachot.js?v=5.134"></script>
-<script src="js/misc.js?v=5.134"></script>
-  <script src="js/emuna.js?v=5.134"></script>
-  <script src="js/init.js?v=5.134"></script>
+<script src="js/network-log.js?v=5.135"></script>
+<script src="js/utils.js?v=5.135"></script>
+<script src="js/cache.js?v=5.135"></script>
+<script src="js/settings.js?v=5.135"></script>
+<script src="js/app.js?v=5.135"></script>
+<script src="js/tehilim.js?v=5.135"></script>
+<script src="js/prayer-names.js?v=5.135"></script>
+<script src="js/autoscroll.js?v=5.135"></script>
+<script src="js/bookmarks.js?v=5.135"></script>
+<script src="js/calendar.js?v=5.135"></script>
+<script src="js/content.js?v=5.135"></script>
+<script src="js/tefilot.js?v=5.135"></script>
+<script src="js/siddur-inserts.js?v=5.135"></script>
+<script src="js/siddur.js?v=5.135"></script>
+<script src="js/omer.js?v=5.135"></script>
+<script src="js/brachot.js?v=5.135"></script>
+<script src="js/misc.js?v=5.135"></script>
+  <script src="js/emuna.js?v=5.135"></script>
+  <script src="js/init.js?v=5.135"></script>
 </body>
 </html>

@@ -347,6 +347,13 @@ const REMINDER_NAV = {
 
 // Expose nav actions globally so onclick strings can call them
 function _reminderNav(key) {
+  if (key.startsWith('bmrem_')) {
+    const tab = key.slice('bmrem_'.length);
+    closeReminderModal();
+    toggleReminderDone(key, true);        // acting on it counts as done (one-time ones are then spent)
+    if (typeof bookmarkGo === 'function') bookmarkGo(tab);
+    return;
+  }
   if (key.startsWith('favrem_')) {
     const favId = key.slice('favrem_'.length);
     closeReminderModal();
@@ -381,8 +388,7 @@ const REMINDER_ITEMS = [
 // "mark done" treatment as the built-in daily reminders, for free — see
 // CLAUDE.md rule 4 (reuse existing helpers, don't duplicate this logic).
 function _allReminderItems() {
-  if (typeof getTehilimFavorites !== 'function') return REMINDER_ITEMS;
-  const favItems = getTehilimFavorites()
+  const favItems = typeof getTehilimFavorites !== 'function' ? [] : getTehilimFavorites()
     .filter(f => f.reminder?.enabled)
     .map(f => ({
       key: `favrem_${f.id}`,
@@ -390,13 +396,16 @@ function _allReminderItems() {
       daily: !!f.reminder.recurring,
       favId: f.id,
     }));
-  return [...REMINDER_ITEMS, ...favItems];
+  // One item per bookmark that has a reminder (js/bookmarks.js) — same pipeline again.
+  const bmItems = typeof getBookmarkReminderItems === 'function' ? getBookmarkReminderItems() : [];
+  return [...REMINDER_ITEMS, ...favItems, ...bmItems];
 }
 
 // Reads the {time, enabled} pair for an item regardless of whether it's a
 // static REMINDER_ITEMS entry (stored in appState.reminders[key]) or a
 // Tehilim-favorite item (stored on the favorite itself, fav.reminder).
 function _reminderSettingsFor(item) {
+  if (item.bmTab) return typeof _bmReminderSettings === 'function' ? _bmReminderSettings(item.bmTab) : {};
   if (item.favId) {
     return (typeof _favoriteById === 'function' ? _favoriteById(item.favId) : null)?.reminder || {};
   }
@@ -408,6 +417,10 @@ function _reminderSettingsFor(item) {
 // no such concept (all are daily/weekly/event-conditional), so this only
 // applies to favorite items. See toggleReminderDone below.
 function _autoDisableIfOneTime(item) {
+  if (item.bmTab) {                       // a one-time bookmark reminder is spent once acted on
+    if (!item.daily && typeof _bmReminderSpent === 'function') _bmReminderSpent(item.bmTab);
+    return;
+  }
   if (!item.favId || item.daily) return; // daily favorites recur like any other
   const fav = typeof _favoriteById === 'function' ? _favoriteById(item.favId) : null;
   if (fav?.reminder) {
@@ -469,12 +482,12 @@ function _buildReminderList(pending) {
 
   listEl.innerHTML = pending.map(item => {
     const isDone = !!todayDone[item.key];
-    const navBtn = item.favId
+    const navBtn = (item.favId || item.bmTab)
       ? `<button onclick="_reminderNav('${item.key}')"
            style="background:var(--gold);color:#000;border:none;border-radius:8px;
                   padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;
                   font-family:'Heebo',sans-serif;white-space:nowrap;flex-shrink:0">
-           פתח עכשיו ▶
+           ${item.bmTab ? 'עבור לסימניה ▶' : 'פתח עכשיו ▶'}
          </button>`
       : REMINDER_NAV[item.key]
       ? `<button onclick="_reminderNav('${item.key}')"

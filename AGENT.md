@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.134 (Oct 11, 2026)
+**Last updated:** v5.135 (Oct 12, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -468,6 +468,31 @@ v5.124 specifically so both Sukkot items sit in the same place).
   viewport center before/after and scrolls by the difference. A fixed
   compensation double-shifted in Chrome (its scroll anchoring already
   compensates; Safari's doesn't) — measuring works in both.
+- **Reminders on a bookmark (v5.135)**: `bm.reminder = {enabled, mode:'open'|'time',
+  time, recurring}`, edited in `#bm-rem-modal` (from the bar's ⏰, the menu, or a
+  row in the other-tabs list): *next app open* (once), *every app open* (daily,
+  until marked done that day) or *a fixed hour* (once/daily). It plugs into the
+  EXISTING reminder system in js/settings.js — `_allReminderItems` appends
+  `getBookmarkReminderItems()` (keys `bmrem_<tab>`), `_reminderSettingsFor` →
+  `_bmReminderSettings` (open mode reports `time:'00:00'` so the existing
+  "has the hour passed" check always passes), `_autoDisableIfOneTime` →
+  `_bmReminderSpent`, `_buildReminderList` shows "עבור לסימניה ▶", and
+  `_reminderNav('bmrem_…')` closes the popup, marks it done (so a one-time one is
+  spent) and calls `bookmarkGo(tab)`. So bell badge, on-open popup and
+  mark-done come for free; no second pipeline (same pattern as the Tehilim
+  favorites' reminders). The reminder lives ON the bookmark: deleting the
+  bookmark removes it, undo restores it, moving the bookmark (placing it
+  elsewhere) keeps it, `_bmSave` refreshes the bell on every change.
+  **(Re)saving a reminder clears that item's "done today" mark** — found by the
+  tests: acting on a one-time reminder marks it done today, so re-enabling it
+  the same day would otherwise stay silent until tomorrow. A spent one-time
+  reminder is only switched off (settings kept), so editing pre-fills it.
+  Names go through `escapeHtml` in the popup (bookmark labels are page text;
+  verified with a hostile label). `scheduleBookmarkReminder` is the same
+  best-effort one-shot device notification as the others (only if the app stays
+  open) — the on-open popup is the reliable path.
+- **Clear all** (`bookmarkClearAll`): native confirm + toast "בטל" that restores
+  every bookmark with its reminder.
 - **Top-bar menu (v5.134)**: a 🔖 button next to ⚙ (the top bar is sticky, so it
   is reachable however far down the page you are — the reason it exists).
   Items act on the CURRENT tab: ➕ add by tapping a spot, 📍 add at the centre of
@@ -623,6 +648,29 @@ could be more precise for edge cases.
 ---
 
 ## Recently Fixed
+
+### v5.135 (Oct 12, 2026) – Bookmark reminders + clear all
+- ✅ ⏰ reminder on a bookmark (next open / every open / fixed hour, once or
+  daily) that pops up on app open with a "go to bookmark" button, shows in the
+  bell, and can be edited, deleted (with undo) from the bar, the menu and the
+  other-tabs rows. 🧹 "נקה את כל הסימניות (N)" with confirm + undo. "Go to
+  bookmark" was already in the menu (v5.134) and stays there.
+- Verified in real headless Chromium, 40 checks (+ full re-run of bookmarks 43,
+  menu 34, hold 18, auto-scroll 82, cache 37+25 and the old favorites-reminder
+  harness): reminder dialog states, stored shape, bell/badge, popup on the next
+  open with the nav button, the button restores the exact spot and spends a
+  one-time reminder, no re-pop afterwards; edit → every-open: pops on each open
+  until ticked done, then silent for the day and back "tomorrow"; fixed hour
+  (passed = pending, not yet = not pending, daily summary text); delete reminder
+  + undo, dialog delete; moving the bookmark keeps the reminder; deleting the
+  bookmark drops it from the system and undo restores both; other-tab ⏰ row;
+  clear all + undo restores both with reminders; a hostile label is escaped;
+  tehilim-favorite and static reminders coexist. Screenshots in both themes.
+- Bug found by the tests and fixed: re-enabling a spent reminder the same day
+  stayed silent (stale "done today" mark) — now cleared on save.
+- Test-harness notes: `bookmarkAddAt` on a short page lands outside the content
+  and returns false — use a long bracha (ushpizin) or pass `{nearest:true}`.
+- `Tests/test_runner.py`: 270/288 (unchanged baseline).
 
 ### v5.134 (Oct 11, 2026) – Bookmark menu in the top bar (+ extras)
 - ✅ 🔖 dropdown next to ⚙: add (tap-to-place with a floating hint), go, delete,

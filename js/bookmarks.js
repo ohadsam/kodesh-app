@@ -39,6 +39,7 @@ function _bmSave(tab, bm) {
   appState.bookmarks = { ...(appState.bookmarks || {}) };
   if (bm) appState.bookmarks[tab] = bm; else delete appState.bookmarks[tab];
   saveState();
+  if (typeof _updateNotifBadge === 'function') _updateNotifBadge();   // a bookmark's reminder lives and dies with it
 }
 
 // ── Small helpers ───────────────────────────────────────────────────────
@@ -413,9 +414,11 @@ function bookmarkAddAt(x, y, opts) {
   if (!el && root && opts && opts.nearest) el = _bmNearestChild(root, y);
   const state = ad.capture();
   if (!el || !state) { _bmToast('אי אפשר לשמור סימניה כאן'); return false; }
-  const had = !!getBookmark(tab);
+  const prev = getBookmark(tab), had = !!prev;
   const anchor = _bmCaptureAnchor(root, el, x, y);
-  _bmSave(tab, { v: 1, ts: Date.now(), tab, state, anchor, label: ad.describe(state), snip: anchor.snip });
+  const nb = { v: 1, ts: Date.now(), tab, state, anchor, label: ad.describe(state), snip: anchor.snip };
+  if (prev && prev.reminder) nb.reminder = prev.reminder;            // moving a bookmark keeps its reminder
+  _bmSave(tab, nb);
   if (navigator.vibrate) { try { navigator.vibrate(35); } catch (e) {} }
   try { window.getSelection().removeAllRanges(); } catch (e) {}
   _bmToast(had ? '🔖 הסימניה עודכנה למקום החדש' : '🔖 הסימניה נשמרה');
@@ -501,10 +504,12 @@ function _bmEnsureUI() {
     <span class="bm-bar-icon" aria-hidden="true">${_BM_SVG_FLAG}</span>
     <div class="bm-bar-text"><div id="bm-bar-label" class="bm-bar-label"></div><div id="bm-bar-snip" class="bm-bar-snip"></div></div>
     <button id="bm-bar-go" type="button" class="bm-btn bm-btn-go">עבור לסימניה</button>
+    <button id="bm-bar-rem" type="button" class="bm-btn bm-btn-clear bm-btn-rem" aria-label="תזכורת לסימניה" title="תזכורת לסימניה">⏰</button>
     <button id="bm-bar-clear" type="button" class="bm-btn bm-btn-clear" aria-label="נקה סימניה" title="נקה סימניה">✕</button>`;
   document.body.appendChild(bar);
   _bmEl('bm-bar-go').addEventListener('click', () => bookmarkGo(currentTab));
   _bmEl('bm-bar-clear').addEventListener('click', () => bookmarkDelete(currentTab));
+  _bmEl('bm-bar-rem').addEventListener('click', () => openBookmarkReminder(currentTab));
 
   const flag = document.createElement('button');
   flag.id = 'bm-flag'; flag.type = 'button'; flag.className = 'bm-flag'; flag.setAttribute('data-bm-ui', '');
@@ -582,8 +587,11 @@ function bookmarksRefresh() {
 
   if (bar.parentElement !== page || page.firstElementChild !== bar) page.insertBefore(bar, page.firstChild);
   _bmEl('bm-bar-label').textContent = '🔖 ' + (bm.label || _bmTabLabel(tab));
-  _bmEl('bm-bar-snip').textContent = bm.snip ? '«' + bm.snip.slice(0, 48) + (bm.snip.length > 48 ? '…' : '') + '»' : '';
+  _bmEl('bm-bar-snip').textContent = (bm.snip ? '«' + bm.snip.slice(0, 48) + (bm.snip.length > 48 ? '…' : '') + '»' : '') + (_bmReminderSummary(bm.reminder) ? '  ⏰ ' + _bmReminderSummary(bm.reminder) : '');
   _bmShowBar(true);
+  const remBtn = _bmEl('bm-bar-rem'), remSum = _bmReminderSummary(bm.reminder);
+  remBtn.classList.toggle('has-rem', !!remSum);
+  remBtn.title = remSum ? 'תזכורת: ' + remSum : 'הוסף תזכורת לסימניה';
 
   const ad = _bmAdapter(tab);
   let el = null;
@@ -712,13 +720,18 @@ function _bmBuildMenu() {
   if (bm) {
     const info = document.createElement('div');
     info.className = 'bm-menu-info';
-    info.textContent = (bm.label || '') + (bm.snip ? '  «' + bm.snip.slice(0, 36) + (bm.snip.length > 36 ? '…' : '') + '»' : '');
+    const sum = _bmReminderSummary(bm.reminder);
+    info.textContent = (bm.label || '') + (bm.snip ? '  «' + bm.snip.slice(0, 36) + (bm.snip.length > 36 ? '…' : '') + '»' : '') + (sum ? '  ⏰ ' + sum : '');
     menu.appendChild(info);
   }
   menu.appendChild(_bmMenuItem('➕', 'הוסף סימניה — בחר מקום בטקסט', startBookmarkPick));
   menu.appendChild(_bmMenuItem('📍', 'הוסף סימניה במרכז המסך', () => bookmarkAddAt(window.innerWidth / 2, Math.round(window.innerHeight * 0.45), { nearest: true })));
   menu.appendChild(_bmMenuItem('↗', 'עבור לסימניה', () => bookmarkGo(tab), !bm));
+  menu.appendChild(_bmMenuItem('⏰', _bmReminderSummary(bm && bm.reminder) ? 'ערוך תזכורת לסימניה' : 'הוסף תזכורת לסימניה', () => openBookmarkReminder(tab), !bm));
+  if (bm && _bmReminderSummary(bm.reminder)) menu.appendChild(_bmMenuItem('🔕', 'מחק תזכורת', () => deleteBookmarkReminder(tab)));
   menu.appendChild(_bmMenuItem('🗑', 'מחק סימניה', () => bookmarkDelete(tab), !bm));
+  const total = Object.keys(appState.bookmarks || {}).length;
+  if (total) menu.appendChild(_bmMenuItem('🧹', `נקה את כל הסימניות (${total})`, bookmarkClearAll));
 
   const others = Object.keys(appState.bookmarks || {}).filter(t => t !== tab && _bmEligible(t));
   if (others.length) {
@@ -736,11 +749,15 @@ function _bmBuildMenu() {
       go.querySelector('b').textContent = _bmTabLabel(t);
       go.querySelector('small').textContent = o.label || '';
       go.addEventListener('click', () => { closeBookmarkMenu(); bookmarkGo(t); });
+      const rem = document.createElement('button');
+      rem.type = 'button'; rem.className = 'bm-menu-x' + (_bmReminderSummary(o.reminder) ? ' has-rem' : ''); rem.textContent = '⏰';
+      rem.setAttribute('aria-label', 'תזכורת לסימניה ב' + _bmTabLabel(t)); rem.title = _bmReminderSummary(o.reminder) || 'הוסף תזכורת';
+      rem.addEventListener('click', () => { closeBookmarkMenu(); openBookmarkReminder(t); });
       const del = document.createElement('button');
       del.type = 'button'; del.className = 'bm-menu-x'; del.textContent = '✕';
       del.setAttribute('aria-label', 'מחק סימניה ב' + _bmTabLabel(t)); del.title = 'מחק';
       del.addEventListener('click', () => { closeBookmarkMenu(); bookmarkDelete(t); });
-      row.appendChild(go); row.appendChild(del);
+      row.appendChild(go); row.appendChild(rem); row.appendChild(del);
       menu.appendChild(row);
     });
   }
@@ -791,4 +808,153 @@ function _bmOnPickClick(e) {
   if (!root || !root.contains(e.target)) return;          // tabs / top bar / nav keep working
   e.preventDefault(); e.stopPropagation();
   if (bookmarkAddAt(e.clientX, e.clientY)) _bmEndPick();  // on a button/blank spot: toast, stay in the mode
+}
+
+// ── Clear everything ────────────────────────────────────────────────────
+function bookmarkClearAll() {
+  const prev = appState.bookmarks || {};
+  const n = Object.keys(prev).length;
+  if (!n) return;
+  if (!confirm(`למחוק את כל הסימניות (${n})? גם התזכורות שלהן יימחקו.`)) return;
+  appState.bookmarks = {};
+  saveState();
+  if (typeof _updateNotifBadge === 'function') _updateNotifBadge();
+  bookmarksRefresh();
+  _bmToast(`נמחקו ${n} סימניות`, { label: 'בטל', fn: () => {
+    appState.bookmarks = prev; saveState();
+    if (typeof _updateNotifBadge === 'function') _updateNotifBadge();
+    bookmarksRefresh();
+  } });
+}
+
+// ── Reminders on a bookmark ─────────────────────────────────────────────
+// bm.reminder = { enabled, mode: 'open' | 'time', time: 'HH:MM', recurring }
+//  • open, once      → pops up the next time the app is opened, until acted on
+//  • open, recurring → pops up on app open every day, until marked done that day
+//  • time            → from that hour on, at app open (+ a best-effort device notification
+//                      if the app happens to stay open), once or daily
+// It plugs into the EXISTING reminder system in js/settings.js (bell badge, on-open popup with a
+// "go to bookmark" button, mark-done) through getBookmarkReminderItems / _bmReminderSettings /
+// _bmReminderSpent — no second reminder pipeline.
+let _bmRemTab = null;
+
+function _bmNormalizeReminder(r) {
+  return { enabled: !!r.enabled, mode: r.mode === 'time' ? 'time' : 'open',
+    time: /^\d{2}:\d{2}$/.test(r.time) ? r.time : '08:00', recurring: !!r.recurring };
+}
+
+function _bmReminderSummary(r) {
+  if (!r || !r.enabled) return '';
+  if (r.mode === 'time') return `${/^\d{2}:\d{2}$/.test(r.time) ? r.time : '08:00'}${r.recurring ? ' (יומי)' : ''}`;
+  return r.recurring ? 'בכל פתיחה של האפליקציה' : 'בפתיחה הבאה של האפליקציה';
+}
+
+function getBookmarkReminderItems() {
+  const out = [];
+  const all = appState.bookmarks || {};
+  Object.keys(all).forEach(tab => {
+    const bm = all[tab], r = bm && bm.reminder;
+    if (r && r.enabled && _bmEligible(tab)) out.push({ key: 'bmrem_' + tab, name: '🔖 ' + (bm.label || _bmTabLabel(tab)), daily: !!r.recurring, bmTab: tab });
+  });
+  return out;
+}
+
+// "open" mode has no hour: 00:00 makes the existing time check always pass.
+function _bmReminderSettings(tab) {
+  const bm = getBookmark(tab), r = bm && bm.reminder;
+  return r ? { enabled: !!r.enabled, time: r.mode === 'time' ? (r.time || '08:00') : '00:00' } : {};
+}
+
+// A one-time reminder that was acted on: switched off but its settings are kept, so editing it
+// pre-fills the same choices.
+function _bmReminderSpent(tab) {
+  const bm = getBookmark(tab);
+  if (!bm || !bm.reminder) return;
+  bm.reminder.enabled = false;
+  saveState();
+  bookmarksRefresh();
+}
+
+function openBookmarkReminder(tab) {
+  const bm = getBookmark(tab || currentTab);
+  if (!bm) { _bmToast('אין סימניה בטאב הזה'); return; }
+  _bmRemTab = bm.tab || tab || currentTab;
+  const r = bm.reminder ? _bmNormalizeReminder(bm.reminder) : null;
+  _bmEl('bm-rem-label').textContent = '🔖 ' + (bm.label || _bmTabLabel(_bmRemTab));
+  _bmEl('bm-rem-kind').value = r && r.mode === 'time' ? 'time' : (r && r.recurring ? 'open-daily' : 'open-once');
+  _bmEl('bm-rem-time').value = r ? r.time : '08:00';
+  _bmEl('bm-rem-recurring').checked = r ? r.recurring : true;
+  _bmEl('bm-rem-delete').style.display = r && r.enabled ? 'block' : 'none';
+  _bmEl('bm-rem-title').textContent = r && r.enabled ? '⏰ עריכת תזכורת לסימניה' : '⏰ תזכורת לסימניה';
+  bmRemToggleFields();
+  _bmEl('bm-rem-modal').style.display = 'flex';
+}
+
+function bmRemToggleFields() {
+  _bmEl('bm-rem-time-wrap').style.display = _bmEl('bm-rem-kind').value === 'time' ? 'flex' : 'none';
+}
+
+function closeBookmarkReminder() {
+  const m = _bmEl('bm-rem-modal');
+  if (m) m.style.display = 'none';
+  _bmRemTab = null;
+}
+
+function saveBookmarkReminder() {
+  const tab = _bmRemTab, bm = tab && getBookmark(tab);
+  if (!bm) { closeBookmarkReminder(); return; }
+  const kind = _bmEl('bm-rem-kind').value;
+  bm.reminder = _bmNormalizeReminder({
+    enabled: true,
+    mode: kind === 'time' ? 'time' : 'open',
+    time: _bmEl('bm-rem-time').value,
+    recurring: kind === 'open-daily' ? true : kind === 'time' ? _bmEl('bm-rem-recurring').checked : false,
+  });
+  // (Re)setting a reminder starts it fresh: an earlier "done today" tick (e.g. from acting on the
+  // previous one-time reminder) must not silence the new one until tomorrow.
+  const today = formatDate(new Date());
+  if (appState._remindersDone && appState._remindersDone[today]) delete appState._remindersDone[today]['bmrem_' + tab];
+  saveState();
+  if (typeof _updateNotifBadge === 'function') _updateNotifBadge();
+  if (bm.reminder.mode === 'time') scheduleBookmarkReminder(tab);
+  const sum = _bmReminderSummary(bm.reminder);
+  closeBookmarkReminder();
+  bookmarksRefresh();
+  _bmToast('⏰ התזכורת נשמרה: ' + sum);
+}
+
+function deleteBookmarkReminder(tab) {
+  tab = tab || _bmRemTab;
+  const bm = getBookmark(tab);
+  if (!bm || !bm.reminder) { closeBookmarkReminder(); return; }
+  const prev = bm.reminder;
+  delete bm.reminder;
+  saveState();
+  if (typeof _updateNotifBadge === 'function') _updateNotifBadge();
+  closeBookmarkReminder();
+  bookmarksRefresh();
+  _bmToast('התזכורת נמחקה', { label: 'בטל', fn: () => {
+    const b = getBookmark(tab);
+    if (b) { b.reminder = prev; saveState(); if (typeof _updateNotifBadge === 'function') _updateNotifBadge(); bookmarksRefresh(); }
+  } });
+}
+
+// Best-effort device notification — same one-shot setTimeout limitation as scheduleReminder()
+// (js/settings.js): only fires if the app stays open past that hour. The reliable path is the
+// on-open popup above.
+function scheduleBookmarkReminder(tab) {
+  if (!('Notification' in window)) return;
+  Notification.requestPermission().then(perm => {
+    if (perm !== 'granted') return;
+    const bm = getBookmark(tab);
+    if (!bm || !bm.reminder || !bm.reminder.enabled || bm.reminder.mode !== 'time') return;
+    const [h, m] = bm.reminder.time.split(':').map(Number);
+    const now = new Date(), target = new Date();
+    target.setHours(h, m, 0, 0);
+    if (target <= now) target.setDate(target.getDate() + 1);
+    setTimeout(() => {
+      const cur = getBookmark(tab);
+      if (cur && cur.reminder && cur.reminder.enabled) new Notification('סימניה 🔖', { body: cur.label || '', icon: 'icons/icon-192.png' });
+    }, target - now);
+  });
 }
