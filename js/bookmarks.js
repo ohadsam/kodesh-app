@@ -386,6 +386,7 @@ function _bmOnPointerDown(e) {
   if (e.pointerType === 'mouse' && e.button !== 0) return;
   if (e.isPrimary === false) { _bmCancelPress(); return; }
   _bmCancelPress();
+  if (_bmPickMode) return;                               // tap-to-place mode handles its own taps
   const flag = e.target.closest && e.target.closest('#bm-flag');
   let mode = null;
   if (flag) mode = 'delete';
@@ -404,10 +405,12 @@ function _bmOnPointerMove(e) {
   if (_bmPress && Math.hypot(e.clientX - _bmPress.x, e.clientY - _bmPress.y) > BM_MOVE_TOLERANCE_PX) _bmCancelPress();
 }
 
-function bookmarkAddAt(x, y) {
+function bookmarkAddAt(x, y, opts) {
   const tab = currentTab, ad = _bmAdapter(tab);
   if (!ad) return false;
-  const root = ad.root(), el = root && _bmPickElement(root, x, y);
+  const root = ad.root();
+  let el = root && _bmPickElement(root, x, y);
+  if (!el && root && opts && opts.nearest) el = _bmNearestChild(root, y);
   const state = ad.capture();
   if (!el || !state) { _bmToast('אי אפשר לשמור סימניה כאן'); return false; }
   const had = !!getBookmark(tab);
@@ -511,6 +514,19 @@ function _bmEnsureUI() {
   flag.addEventListener('click', () => _bmToast('🔖 לחיצה ארוכה על הסימניה מוחקת אותה'));
   document.body.appendChild(flag);
 
+  const hint = document.createElement('div');
+  hint.id = 'bm-pick-hint'; hint.className = 'bm-pick-hint'; hint.setAttribute('data-bm-ui', ''); hint.setAttribute('role', 'status');
+  hint.style.display = 'none';
+  hint.innerHTML = '<span>🔖 הקש על המקום לסימניה</span><button type="button" class="bm-toast-btn" id="bm-pick-cancel">ביטול</button>';
+  document.body.appendChild(hint);
+  _bmEl('bm-pick-cancel').addEventListener('click', _bmEndPick);
+
+  const menu = document.createElement('div');
+  menu.id = 'bm-menu'; menu.className = 'bm-menu'; menu.setAttribute('data-bm-ui', ''); menu.setAttribute('role', 'menu');
+  menu.setAttribute('aria-label', 'סימניה');
+  menu.style.display = 'none';
+  document.body.appendChild(menu);
+
   const toast = document.createElement('div');
   toast.id = 'bm-toast'; toast.className = 'bm-toast'; toast.setAttribute('data-bm-ui', ''); toast.setAttribute('role', 'status');
   toast.style.display = 'none';
@@ -555,6 +571,11 @@ function bookmarksRefresh() {
   _bmEnsureUI();
   const tab = currentTab, bar = _bmEl('bm-bar'), flag = _bmEl('bm-flag');
   document.querySelectorAll('.bm-target').forEach(n => n.classList.remove('bm-target'));
+  const menuBtn = _bmEl('bm-menu-btn');
+  if (menuBtn) {
+    menuBtn.style.display = _bmEligible(tab) ? '' : 'none';
+    menuBtn.classList.toggle('has-bm', _bmEligible(tab) && !!getBookmark(tab));
+  }
   const bm = _bmEligible(tab) ? getBookmark(tab) : null;
   const page = _bmEl('page-' + tab);
   if (!bm || !page) { _bmShowBar(false); flag.style.display = 'none'; return; }
@@ -578,6 +599,8 @@ function bookmarksRefresh() {
 
 function bookmarksOnTabChange() {
   _bmCancelPress();
+  _bmEndPick();
+  closeBookmarkMenu();
   bookmarksRefresh();
   _bmObserveRoot();
   setTimeout(bookmarksRefresh, 400);
@@ -608,6 +631,17 @@ function initBookmarks() {
   document.addEventListener('contextmenu', e => {
     if (_bmPress || performance.now() - _bmRecentPress < 900) e.preventDefault();       // long-press raised the browser menu
   });
+  const mb = _bmEl('bm-menu-btn');
+  if (mb) mb.addEventListener('click', toggleBookmarkMenu);
+  document.addEventListener('click', _bmOnPickClick, true);            // capture: runs before the page's own handlers
+  document.addEventListener('click', e => {                           // click elsewhere closes the menu
+    if (_bmMenuOpen() && !e.target.closest('#bm-menu, #bm-menu-btn')) closeBookmarkMenu();
+  });
+  window.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    if (_bmPickMode) _bmEndPick(); else if (_bmMenuOpen()) closeBookmarkMenu();
+  });
+  window.addEventListener('resize', () => { if (_bmMenuOpen()) _bmPositionMenu(); });
   if ('ResizeObserver' in window) new ResizeObserver(() => { const f = _bmEl('bm-flag'); if (f && f.style.display !== 'none') _bmScheduleRefresh(); }).observe(document.body);
   bookmarksOnTabChange();
 }
@@ -632,4 +666,129 @@ function resetBookmarkSettings() {
   delete appState.bookmarkSettings;
   saveState();
   initBookmarkSettingsUI();
+}
+
+// ── Top-bar menu: add / go / delete without scrolling back to the top ───────
+// A 🔖 button next to ⚙ (always visible: the top bar is sticky). "Add" does not
+// save instantly: it arms a tap-to-place mode (floating hint, content outlined) and
+// the NEXT plain tap on text drops the bookmark there — scrolling to find the spot
+// first is fine, a scroll is not a tap.
+let _bmPickMode = false, _bmPickTimer = 0;
+
+function _bmMenuOpen() { const m = _bmEl('bm-menu'); return !!m && m.style.display !== 'none'; }
+
+function _bmPositionMenu() {
+  const btn = _bmEl('bm-menu-btn'), menu = _bmEl('bm-menu');
+  if (!btn || !menu) return;
+  const r = btn.getBoundingClientRect();
+  const w = Math.min(menu.offsetWidth || 280, window.innerWidth - 16);
+  menu.style.top = Math.round(r.bottom + 6) + 'px';
+  menu.style.left = Math.round(Math.max(8, Math.min(r.left - 6, window.innerWidth - w - 8))) + 'px';
+}
+
+function closeBookmarkMenu() {
+  const m = _bmEl('bm-menu'), b = _bmEl('bm-menu-btn');
+  if (m) m.style.display = 'none';
+  if (b) b.setAttribute('aria-expanded', 'false');
+}
+
+function _bmMenuItem(icon, text, fn, disabled) {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'bm-menu-item'; b.setAttribute('role', 'menuitem');
+  b.innerHTML = `<span class="bm-menu-ico" aria-hidden="true">${icon}</span><span></span>`;
+  b.lastChild.textContent = text;
+  if (disabled) b.disabled = true; else b.addEventListener('click', () => { closeBookmarkMenu(); fn(); });
+  return b;
+}
+
+function _bmBuildMenu() {
+  _bmEnsureUI();
+  const menu = _bmEl('bm-menu'), tab = currentTab, bm = getBookmark(tab);
+  menu.textContent = '';
+  const head = document.createElement('div');
+  head.className = 'bm-menu-head';
+  head.textContent = '🔖 סימניה — ' + _bmTabLabel(tab);
+  menu.appendChild(head);
+  if (bm) {
+    const info = document.createElement('div');
+    info.className = 'bm-menu-info';
+    info.textContent = (bm.label || '') + (bm.snip ? '  «' + bm.snip.slice(0, 36) + (bm.snip.length > 36 ? '…' : '') + '»' : '');
+    menu.appendChild(info);
+  }
+  menu.appendChild(_bmMenuItem('➕', 'הוסף סימניה — בחר מקום בטקסט', startBookmarkPick));
+  menu.appendChild(_bmMenuItem('📍', 'הוסף סימניה במרכז המסך', () => bookmarkAddAt(window.innerWidth / 2, Math.round(window.innerHeight * 0.45), { nearest: true })));
+  menu.appendChild(_bmMenuItem('↗', 'עבור לסימניה', () => bookmarkGo(tab), !bm));
+  menu.appendChild(_bmMenuItem('🗑', 'מחק סימניה', () => bookmarkDelete(tab), !bm));
+
+  const others = Object.keys(appState.bookmarks || {}).filter(t => t !== tab && _bmEligible(t));
+  if (others.length) {
+    const sec = document.createElement('div');
+    sec.className = 'bm-menu-sec';
+    sec.textContent = `בטאבים אחרים (${others.length})`;
+    menu.appendChild(sec);
+    others.forEach(t => {
+      const o = getBookmark(t);
+      const row = document.createElement('div');
+      row.className = 'bm-menu-row';
+      const go = document.createElement('button');
+      go.type = 'button'; go.className = 'bm-menu-item bm-menu-go'; go.setAttribute('role', 'menuitem');
+      go.innerHTML = '<span class="bm-menu-ico" aria-hidden="true">↗</span><span class="bm-menu-two"><b></b><small></small></span>';
+      go.querySelector('b').textContent = _bmTabLabel(t);
+      go.querySelector('small').textContent = o.label || '';
+      go.addEventListener('click', () => { closeBookmarkMenu(); bookmarkGo(t); });
+      const del = document.createElement('button');
+      del.type = 'button'; del.className = 'bm-menu-x'; del.textContent = '✕';
+      del.setAttribute('aria-label', 'מחק סימניה ב' + _bmTabLabel(t)); del.title = 'מחק';
+      del.addEventListener('click', () => { closeBookmarkMenu(); bookmarkDelete(t); });
+      row.appendChild(go); row.appendChild(del);
+      menu.appendChild(row);
+    });
+  }
+}
+
+function toggleBookmarkMenu(e) {
+  if (e) e.stopPropagation();
+  if (_bmMenuOpen()) { closeBookmarkMenu(); return; }
+  if (!_bmEligible(currentTab)) return;
+  _bmEndPick();
+  _bmBuildMenu();
+  const menu = _bmEl('bm-menu'), btn = _bmEl('bm-menu-btn');
+  menu.style.display = 'block';
+  btn.setAttribute('aria-expanded', 'true');
+  _bmPositionMenu();
+}
+
+function startBookmarkPick() {
+  const ad = _bmAdapter(currentTab), root = ad && ad.root();
+  if (!root || !ad.capture()) { _bmToast('אין עדיין תוכן שאפשר לשים בו סימניה'); return; }
+  _bmEnsureUI();
+  _bmPickMode = true;
+  document.body.classList.add('bm-picking');
+  root.classList.add('bm-pick-root');
+  const hint = _bmEl('bm-pick-hint');
+  const top = _bmEl('topbar');
+  hint.style.top = Math.round((top ? top.getBoundingClientRect().bottom : 50) + 8) + 'px';
+  hint.style.display = 'flex';
+  clearTimeout(_bmPickTimer);
+  _bmPickTimer = setTimeout(_bmEndPick, 45000);         // never leave the page in a special mode indefinitely
+}
+
+function _bmEndPick() {
+  if (!_bmPickMode && !document.querySelector('.bm-pick-root')) return;
+  _bmPickMode = false;
+  clearTimeout(_bmPickTimer);
+  document.body.classList.remove('bm-picking');
+  document.querySelectorAll('.bm-pick-root').forEach(n => n.classList.remove('bm-pick-root'));
+  const hint = _bmEl('bm-pick-hint');
+  if (hint) hint.style.display = 'none';
+}
+
+// Capture-phase click: while placing, a tap inside the content is a placement, never a click
+// on whatever is there (a "next aliya" button must not fire).
+function _bmOnPickClick(e) {
+  if (!_bmPickMode || e.target.closest('[data-bm-ui]')) return;
+  const ad = _bmAdapter(currentTab), root = ad && ad.root();
+  if (!root || !root.contains(e.target)) return;          // tabs / top bar / nav keep working
+  e.preventDefault(); e.stopPropagation();
+  if (bookmarkAddAt(e.clientX, e.clientY)) _bmEndPick();  // on a button/blank spot: toast, stay in the mode
 }

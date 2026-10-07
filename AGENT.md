@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.133 (Oct 10, 2026)
+**Last updated:** v5.134 (Oct 11, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -468,6 +468,23 @@ v5.124 specifically so both Sukkot items sit in the same place).
   viewport center before/after and scrolls by the difference. A fixed
   compensation double-shifted in Chrome (its scroll anchoring already
   compensates; Safari's doesn't) — measuring works in both.
+- **Top-bar menu (v5.134)**: a 🔖 button next to ⚙ (the top bar is sticky, so it
+  is reachable however far down the page you are — the reason it exists).
+  Items act on the CURRENT tab: ➕ add by tapping a spot, 📍 add at the centre of
+  the screen (one tap; nearest paragraph if the centre isn't on text), ↗ go,
+  🗑 delete, plus a "בטאבים אחרים (N)" list with a jump row and a ✕ per other
+  tab's bookmark (jumping goes through `bookmarkGo(tab)`, which switches tab
+  first). A gold dot on the button = this tab has a bookmark; the button is
+  hidden on excluded tabs (qibla/logs/network).
+- **Tap-to-place mode** (`startBookmarkPick`): "add" does NOT save at once — it
+  arms a mode (floating hint under the top bar + dashed outline on the content
+  root + `body.bm-picking`) and the NEXT plain tap on text saves there. Scrolling
+  to find the spot is fine (a scroll isn't a click). The capture-phase `click`
+  listener swallows that tap so a "next aliya"/psalm-nav button under the finger
+  doesn't fire (a button or blank spot → toast, mode stays on); taps outside the
+  content (tabs, top bar, bottom nav) still work, and switching tab / Esc /
+  "ביטול" / 45s idle end the mode so the page is never left in it. The
+  long-press handler ignores pointerdowns while the mode is on.
 - **Hold time is configurable** (v5.133): Settings → 🔖 סימניות, slider
   0.25–1.5s (`appState.bookmarkSettings.holdMs`, default `BM_HOLD_DEFAULT_MS` =
   500), applies to BOTH adding (long-press on text) and deleting (long-press on
@@ -606,6 +623,31 @@ could be more precise for edge cases.
 ---
 
 ## Recently Fixed
+
+### v5.134 (Oct 11, 2026) – Bookmark menu in the top bar (+ extras)
+- ✅ 🔖 dropdown next to ⚙: add (tap-to-place with a floating hint), go, delete,
+  for the current tab, reachable from anywhere on a long page. Extras added on
+  top of the request: add-at-centre-of-screen in one tap, jump-to/delete other
+  tabs' bookmarks from the same menu, a dot on the button when the tab has a
+  bookmark, the bookmark's label/snippet shown in the menu, Esc / outside-click
+  to close, ARIA (`aria-haspopup`, `aria-expanded`, `role=menu/menuitem`).
+- Verified in real headless Chromium, 34 checks: button beside ⚙ and hidden on
+  qibla; menu on screen; go/delete disabled with no bookmark; Esc and outside
+  click close; hint under the top bar; scrolling while placing neither places
+  nor cancels; ONE plain tap places at that exact block (`vy` = tap Y) with the
+  full state; hint/mode/outline end, dot + flag appear; a tap on an in-content
+  button doesn't fire it and saves nothing; "ביטול", Esc and a tab switch end
+  the mode; add-at-centre; menu shows label + other-tab list; "go" from far
+  down restores aliya + the same block at the same height; other-tab row
+  switches tab and restores; ✕ deletes the other tab's only (with undo); delete
+  from the menu; button still on screen at the very bottom of the page;
+  long-press regression. Screenshots in both themes.
+  Re-run, no regressions: bookmarks (43), hold time (18), auto-scroll (82), cache
+  (37 + 25).
+- Test-harness notes: the hint's "ביטול" shares the `.bm-toast-btn` class, so
+  select the toast's undo as `#bm-toast .bm-toast-btn`; `text=עבור לסימניה`
+  also matches the in-page bar's button — scope menu clicks with `#bm-menu >>`.
+- `Tests/test_runner.py`: 270/288 (unchanged baseline).
 
 ### v5.133 (Oct 10, 2026) – Bookmark hold time in Settings
 - ✅ Settings → 🔖 סימניות: slider for how long to hold to add/delete a bookmark
