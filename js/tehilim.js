@@ -592,11 +592,34 @@ function _tehilimChipLabel(ch) {
 // Row of chips for every chapter in the active context (the day's schedule, a
 // favorite's own list, or the manual-selection history), with the active chapter
 // highlighted. Shared by both the top and bottom nav rows, and by all three modes.
-function _tehilimDayChapterRow(nav, currentKeyStr) {
-  if (!nav) return '';
-  const chapters = nav.isFavorite ? (_favoriteById(nav.favId)?.chapters || [])
+function _tehilimNavChapters(nav) {
+  if (!nav) return [];
+  return nav.isFavorite ? (_favoriteById(nav.favId)?.chapters || [])
     : nav.isManual ? tehilimManualHistory
     : (TEHILIM_SCHEDULE[nav.day] || []);
+}
+
+// "פרק 5 מתוך 8" – position inside the active context; '' when there is only one chapter
+function _tehilimPositionText(nav, currentKeyStr) {
+  const chapters = _tehilimNavChapters(nav);
+  const i = chapters.findIndex(ch => String(ch) === currentKeyStr);
+  return (chapters.length > 1 && i !== -1) ? `פרק ${i + 1} מתוך ${chapters.length}` : '';
+}
+
+// Scroll each chip row sideways so the active chip is centred (long days, e.g. the
+// 27th, overflow the row and the active chip would otherwise stay off-screen).
+function _tehilimCenterActiveChip() {
+  document.querySelectorAll('#tehilim-content .tehilim-chip-row').forEach(row => {
+    const chip = row.querySelector('.tehilim-chip-active');
+    if (!chip) return;
+    const r = row.getBoundingClientRect(), c = chip.getBoundingClientRect();
+    row.scrollLeft += (c.left + c.width / 2) - (r.left + r.width / 2);
+  });
+}
+
+function _tehilimDayChapterRow(nav, currentKeyStr) {
+  if (!nav) return '';
+  const chapters = _tehilimNavChapters(nav);
   if (chapters.length <= 1) return '';
   const chips = chapters.map((ch, idx) => {
     const isCurrent = String(ch) === currentKeyStr;
@@ -606,11 +629,11 @@ function _tehilimDayChapterRow(nav, currentKeyStr) {
     const action = nav.isFavorite ? `viewTehilimFavorite('${nav.favId}', ${idx})`
       : nav.isManual ? `viewTehilimManual(${ch})`
       : _tehilimAction(ch);
-    return `<button onclick="scrollTehilimTop();${action}" ` +
+    return `<button${isCurrent ? ' class="tehilim-chip-active"' : ''} onclick="scrollTehilimTop();${action}" ` +
       `style="${style};padding:4px 11px;border-radius:14px;font-size:11.5px;cursor:pointer;` +
       `font-family:'Heebo',sans-serif;white-space:nowrap;flex:none">${_tehilimChipLabel(ch)}</button>`;
   }).join('');
-  return `<div style="display:flex;gap:6px;overflow-x:auto;padding:2px 2px 10px;` +
+  return `<div class="tehilim-chip-row" style="display:flex;gap:6px;overflow-x:auto;padding:2px 2px 10px;` +
     `-webkit-overflow-scrolling:touch;scrollbar-width:none">${chips}</div>`;
 }
 
@@ -690,16 +713,19 @@ async function loadTehilim(chapterOrRange) {
     // Chapter chips for today's learning, current chapter highlighted — shown near
     // both the top and bottom prev/next buttons.
     const dayChapterRow = _tehilimDayChapterRow(nav, String(isRange ? chapterOrRange : chapter));
+    const posText = _tehilimPositionText(nav, String(isRange ? chapterOrRange : chapter));
+    const posLine = posText ? `<div style="text-align:center;font-size:12px;color:var(--gold);margin-bottom:6px">${posText}</div>` : '';
 
     // Show verse numbers relative to the full chapter (offset by verseFrom)
     const offset = isRange ? (verseFrom - 1) : 0;
     el.className = 'content-text';
-    el.innerHTML = navRow + dayInfo + dayChapterRow +
+    el.innerHTML = navRow + dayInfo + posLine + dayChapterRow +
       flat.map((v,i) => `<div style="margin-bottom:6px"><span style="color:var(--gold-dim);font-size:11px">${i+1+offset} </span>${v}</div>`).join('') +
       `<div style="display:flex;justify-content:space-between;gap:8px;margin-top:16px">${prevBtn}${nextBtn}</div>` +
       dayChapterRow;
 
     sub.textContent = `${flat.length} פסוקים${isRange ? ` (${rangeLabel})` : ''}`;
+    _tehilimCenterActiveChip();
     updateDoneButton('tehilim', chapter);
     renderTehilimFavoriteStar();
     renderTehilimFavoritesList();

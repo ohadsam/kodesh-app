@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.135 (Oct 12, 2026)
+**Last updated:** v5.136 (Oct 8, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -570,6 +570,15 @@ v5.124 specifically so both Sukkot items sit in the same place).
 
 ## Known Issues / Open Items
 
+### 🟡 Lashon refs unverified against live Sefaria (Oct 8, 2026)
+`LASHON_PARTS` refs (`Chafetz_Chaim,_Part_One,…,_Principle_N`, 10 + 9 klalim) are
+unchanged from before v5.136 but the sandbox blocks sefaria.org, so they were not
+re-fetched. If any klal returns empty, the whole tab shows an error (the plan needs
+all 19 lengths). TODO: verify source / refs and the seif count per klal on a networked
+machine; the 1000-char portion size (`LASHON_CHUNK_CHARS`) is a judgement call.
+Also: possible new Sefaria content to evaluate (not verified, search was thin) –
+the Sefaria calendar API lists more daily cycles than the app uses.
+
 ### 🟡 Siddur tab is BETA and hidden by default (Sep 22, 2026)
 Owner-reported: the siddur pipeline's logic doesn't always behave as expected —
 no specific repro captured yet. Made `siddur` `defaultHidden: true` in
@@ -648,6 +657,22 @@ could be more precise for edge cases.
 ---
 
 ## Recently Fixed
+
+### v5.136 (Oct 8, 2026) – Tehilim chip scroll + position, Lashon schedule
+- ✅ Tehilim: on long days (day 27 = 15 chapters) the chip rows (`.tehilim-chip-row`)
+  now centre the active chip (`_tehilimCenterActiveChip`, uses getBoundingClientRect
+  so it is RTL-safe) and a "פרק N מתוך M" line (`_tehilimPositionText`) sits above
+  the text. Works for daily, favorites and manual contexts.
+- ✅ Lashon: the old schedule was `(dayOfYear-1) % 20` over one whole klal per day
+  (plus a duplicated klal א entry), so the cycle was 20 days and jumped at every
+  year end. New `js/lashon-data.js`: `lashonBuildPlan` packs consecutive seifim of
+  ONE klal into ~1000-char daily portions across all 19 klalim (36+ days, real
+  length driven), `lashonPickEntry` indexes by a continuous day counter
+  (`lashonDayNumber`, no year seam). `_lashonLoadAllKlalim` fetches the 19 klalim
+  once (IndexedDB-cached under the new `lashon` cache tab). Done-key is now
+  `<ref>:<first seif>`.
+- ⚠️ Sandbox blocks Sefaria: the Lashon refs are the pre-existing ones and were
+  NOT re-fetched; behaviour verified against a mocked Sefaria. See Known Issues.
 
 ### v5.135 (Oct 12, 2026) – Bookmark reminders + clear all
 - ✅ ⏰ reminder on a bookmark (next open / every open / fixed hour, once or

@@ -22,6 +22,7 @@ const CACHE_STORE = 'entries';
 const CACHE_TABS = [
   { id: 'parasha', name: 'פרשת שבוע' },
   { id: 'tehilim', name: 'תהילים' },
+  { id: 'lashon', name: 'שמירת הלשון' },
 ];
 
 let _cacheDbPromise = null;

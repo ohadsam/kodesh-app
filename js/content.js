@@ -1232,54 +1232,37 @@ async function showAliya(index, btn) {
 // ═══════════════════════════════════════════
 // LASHON HARA – Chofetz Chaim
 // ═══════════════════════════════════════════
+// Fetch every klal once per session (IndexedDB-cached via the 'lashon' tab) so the
+// daily plan can be derived from real text lengths.
+async function _lashonLoadAllKlalim() {
+  if (window._lashonTexts) return window._lashonTexts;
+  const klalim = lashonKlalim();
+  const texts = await Promise.all(klalim.map(async k => heFlat(await sefariaText(k.ref, 0, 'lashon'))));
+  const empty = klalim.findIndex((k, i) => !texts[i].length);
+  if (empty !== -1) throw new Error(`אין טקסט עברי עבור ${klalim[empty].ref}`);
+  window._lashonTexts = { klalim, texts };
+  return window._lashonTexts;
+}
+
 async function loadLashon() {
   const el = document.getElementById('lashon-content');
   const secEl = document.getElementById('lashon-section');
   el.className = 'content-text loading'; el.textContent = 'טוען...';
-
-  // Correct Sefaria refs (verified from sefaria.org URLs)
-  const CC1 = 'Chafetz_Chaim,_Part_One,_The_Prohibition_Against_Lashon_Hara,_Principle_';
-  const CC2 = 'Chafetz_Chaim,_Part_Two,_The_Prohibition_Against_Rechilut,_Principle_';
-  const LASHON_SCHEDULE = [
-    { ref: 'Chafetz_Chaim,_Part_One,_The_Prohibition_Against_Lashon_Hara,_Principle_1', label: 'חלק א – כלל א (ראשון)' },
-    { ref: CC1+'1',  label: 'חלק א – כלל א (איסור לשון הרע)' },
-    { ref: CC1+'2',  label: 'חלק א – כלל ב' },
-    { ref: CC1+'3',  label: 'חלק א – כלל ג' },
-    { ref: CC1+'4',  label: 'חלק א – כלל ד' },
-    { ref: CC1+'5',  label: 'חלק א – כלל ה' },
-    { ref: CC1+'6',  label: 'חלק א – כלל ו' },
-    { ref: CC1+'7',  label: 'חלק א – כלל ז' },
-    { ref: CC1+'8',  label: 'חלק א – כלל ח' },
-    { ref: CC1+'9',  label: 'חלק א – כלל ט' },
-    { ref: CC1+'10', label: 'חלק א – כלל י' },
-    { ref: CC2+'1',  label: 'חלק ב – כלל א (איסור רכילות)' },
-    { ref: CC2+'2',  label: 'חלק ב – כלל ב' },
-    { ref: CC2+'3',  label: 'חלק ב – כלל ג' },
-    { ref: CC2+'4',  label: 'חלק ב – כלל ד' },
-    { ref: CC2+'5',  label: 'חלק ב – כלל ה' },
-    { ref: CC2+'6',  label: 'חלק ב – כלל ו' },
-    { ref: CC2+'7',  label: 'חלק ב – כלל ז' },
-    { ref: CC2+'8',  label: 'חלק ב – כלל ח' },
-    { ref: CC2+'9',  label: 'חלק ב – כלל ט' },
-  ];
-
-  const dayOfYear = getDayOfYear(getTargetDate());
-  const idx = (dayOfYear - 1) % LASHON_SCHEDULE.length;
-  const entry = LASHON_SCHEDULE[idx];
-  console.log('[Lashon] dayOfYear:', dayOfYear, '→ idx:', idx, '→ ref:', entry.ref);
-  secEl.textContent = entry.label;
-
   try {
-    const data = await sefariaText(entry.ref);
-    const flat = heFlat(data);
-    if (!flat.length) throw new Error(`אין טקסט עברי עבור ${entry.ref}`);
+    const { klalim, texts } = await _lashonLoadAllKlalim();
+    const plan = lashonBuildPlan(klalim, texts);
+    const entry = lashonPickEntry(plan, getTargetDate());
+    const seifim = texts[klalim.findIndex(k => k.ref === entry.ref)].slice(entry.from, entry.to);
+    const dayIdx = plan.indexOf(entry) + 1;
+    secEl.textContent = `${entry.label} · סעיפים ${entry.from + 1}–${entry.to} · יום ${dayIdx} מתוך ${plan.length} במחזור`;
     el.className = 'content-text';
-    el.innerHTML = flat.map((v,i) => `<div style="margin-bottom:8px"><span style="color:var(--gold-dim);font-size:11px">${i+1} </span>${v}</div>`).join('');
-    updateDoneButton('lashon', entry.ref);
-    console.log(`[Lashon] OK – ${flat.length} sections`);
+    el.innerHTML = seifim.map((v,i) => `<div style="margin-bottom:8px"><span style="color:var(--gold-dim);font-size:11px">${entry.from+i+1} </span>${v}</div>`).join('');
+    updateDoneButton('lashon', `${entry.ref}:${entry.from + 1}`);
+    console.log(`[Lashon] OK – plan ${dayIdx}/${plan.length}, ${entry.ref} ${entry.from + 1}-${entry.to}`);
   } catch(e) {
-    console.error('[Lashon] FAILED:', e.message, '| ref:', entry.ref);
+    console.error('[Lashon] FAILED:', e.message);
     el.textContent = 'שגיאה בטעינה: ' + e.message;
+    if (typeof offerCacheClearOnFailure === 'function') offerCacheClearOnFailure('lashon', () => loadLashon());
   }
 }
 

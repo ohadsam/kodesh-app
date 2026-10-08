@@ -1,7 +1,7 @@
 # STRUCTURE.md – Kodesh App Code Map
 
 **Always consult this file before scanning source files.**
-Last updated: v5.99 (May 10, 2026)
+Last updated: v5.136 (Oct 8, 2026)
 
 ---
 
@@ -164,6 +164,13 @@ pre-reorg leftover, not loaded by `index.html` (verified: only `js/*.js` is
 "keep both in sync" note here was wrong and wasted real effort — do not resurrect it.
 Add `<button id="tf-{key}" class="aliya-tab" onclick="showTefila('{key}')">` in `index.html` inside `#tefila-buttons`.
 
+### js/lashon-data.js
+| Function | Description |
+|---|---|
+| `LASHON_PARTS`, `lashonKlalim()` | The 19 klalim (part 1: 10, part 2: 9) with Sefaria refs |
+| `lashonBuildPlan(klalim, texts, maxChars)` | Packs consecutive seifim of one klal into ~1000-char daily portions → `[{ref,label,from,to}]` |
+| `lashonDayNumber(date)`, `lashonPickEntry(plan, date)` | Continuous day counter (no year seam) → today's portion |
+
 ### js/content.js
 | Function | Description |
 |---|---|
@@ -172,6 +179,7 @@ Add `<button id="tf-{key}" class="aliya-tab" onclick="showTefila('{key}')">` in 
 | `loadRashiForRef(ref)` | 3-strategy Rashi loader. Per-chapter `s1WorthRetrying`/`s2WorthRetrying` flags skip re-fetching a strategy on retry once it deterministically fails (HTTP ok, insufficient data) — only genuine exceptions stay retryable. Strategy 3 only accepts a zero-entry result on the final attempt |
 | `loadDafYomi()` | Fetch daily Daf from Sefaria calendar |
 | `switchDafView(mode)` | Toggle Rashi inline view |
+| `loadLashon()` / `_lashonLoadAllKlalim()` | Shmirat HaLashon daily portion from the plan in lashon-data.js (all 19 klalim fetched once per session) |
 | `loadMishnaYomi()` | Fetch Mishna Yomit |
 | `loadRambamYomi()` | Fetch Rambam daily |
 | `switchRambamView(mode)` | Toggle Steinsaltz inline (per-halacha, uses raw array index) |
@@ -193,6 +201,7 @@ Add `<button id="tf-{key}" class="aliya-tab" onclick="showTefila('{key}')">` in 
 | `loadTehilim(chapter)` | Fetch + render Psalm, scroll to top |
 | `TEHILIM_SCHEDULE` | Map: Hebrew day-of-month → chapter list |
 | `getTehilimNavInfo(chapterOrRange)` | Prev/next chapter + day-boundary nav info. Branches on `tehilimContext` — day-mode (default, unchanged), favorite-mode, or manual-mode |
+| `_tehilimPositionText(nav, key)` / `_tehilimCenterActiveChip()` | "פרק N מתוך M" line; centres the active chip in each `.tehilim-chip-row` after render |
 | `_tehilimDayChapterRow(nav, currentKeyStr)` | Chip row of the active context's chapters (day, favorite, or manual-history), current one highlighted; rendered near both top and bottom nav buttons |
 | `parseTehilimSearch(q)` | Parse number or Hebrew gematria |
 | `hebrewToNumber(str)` | Convert Hebrew letters to numeric value |
