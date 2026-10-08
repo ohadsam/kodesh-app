@@ -576,8 +576,17 @@ unchanged from before v5.136 but the sandbox blocks sefaria.org, so they were no
 re-fetched. If any klal returns empty, the whole tab shows an error (the plan needs
 all 19 lengths). TODO: verify source / refs and the seif count per klal on a networked
 machine; the 1000-char portion size (`LASHON_CHUNK_CHARS`) is a judgement call.
-Also: possible new Sefaria content to evaluate (not verified, search was thin) –
-the Sefaria calendar API lists more daily cycles than the app uses.
+
+### 🟡 Candidate emuna books NOT added yet: חובת הלבבות, חובת התלמידים (Oct 8, 2026)
+Both exist on Sefaria (web search, not API): `Duties_of_the_Heart` – 10 treatises
+(Unity, Examination, Service of God, Trust, Devotion, Submission, Repentance,
+Examining the Soul, Abstinence, Devotion to God); `Chovat_HaTalmidim` (author R'
+Kalonymus Kalman Shapira, the Piaseczno Rebbe; Introduction + chapters ≥10). The
+sandbox blocks sefaria.org (curl AND WebFetch, also sefaria.org.il), so Hebrew
+availability, exact node refs for treatises 3/7/8/9 and chapter counts are
+unverified – not added to `EMUNA_BOOKS` per CLAUDE.md §1. Run
+`python3 Tests/probe_sefaria.py` on a networked machine (also lists Sefaria's daily
+calendars and Tanya's linked commentaries) and build the data tables from its output.
 
 ### 🟡 Siddur tab is BETA and hidden by default (Sep 22, 2026)
 Owner-reported: the siddur pipeline's logic doesn't always behave as expected —
