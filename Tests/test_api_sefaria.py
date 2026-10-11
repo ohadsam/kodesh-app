@@ -115,11 +115,11 @@ def run() -> TestSuite:
         he = ps.get('he', [])
         s.check('Psalm 119 has 176 verses', len(he) == 176, f'got {len(he)}')
 
-        # Verify slicing for day 25 (verses 1-88) and day 26 (89-176)
-        day25 = he[:88]
-        day26 = he[88:]
-        s.check('Day 25 slice has 88 verses', len(day25) == 88)
-        s.check('Day 26 slice has 88 verses', len(day26) == 88)
+        # Verify slicing for day 25 (verses 1-96, א–ל) and day 26 (97-176, מ–ת)
+        day25 = he[:96]
+        day26 = he[96:]
+        s.check('Day 25 slice has 96 verses', len(day25) == 96)
+        s.check('Day 26 slice has 80 verses', len(day26) == 80)
 
     except Exception as e:
         s.fail('Tehilim Psalm 119 API', str(e))

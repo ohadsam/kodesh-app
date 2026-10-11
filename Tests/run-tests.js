@@ -314,18 +314,18 @@ suite('📕 עונות – מוריד הטל / ותן ברכה', () => {
 // ═══════════════════════════════════════════════════════════════════════
 suite('📖 לוח תהילים', () => {
   const src = readFile('js/tehilim.js');
-  assertContains(src, "'119:1-88'", 'Day 25 range entry');
-  assertContains(src, "'119:89-176'", 'Day 26 range entry');
+  assertContains(src, "'119:1-96'", 'Day 25 range entry');
+  assertContains(src, "'119:97-176'", 'Day 26 range entry');
 
-  test('119:1-88 = 88 פסוקים', () => {
-    const [,vr] = '119:1-88'.split(':');
+  test('119:1-96 = 96 פסוקים', () => {
+    const [,vr] = '119:1-96'.split(':');
     const [f,t] = vr.split('-').map(Number);
-    assertEqual(t-f+1, 88);
+    assertEqual(t-f+1, 96);
   });
-  test('119:89-176 = 88 פסוקים', () => {
-    const [,vr] = '119:89-176'.split(':');
+  test('119:97-176 = 80 פסוקים', () => {
+    const [,vr] = '119:97-176'.split(':');
     const [f,t] = vr.split('-').map(Number);
-    assertEqual(t-f+1, 88);
+    assertEqual(t-f+1, 80);
   });
   test('getTehilimNavInfo מועבר עם range string', () =>
     assertContains(src, 'getTehilimNavInfo(isRange ? chapterOrRange : chapter)'));

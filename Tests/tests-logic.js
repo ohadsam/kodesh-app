@@ -165,7 +165,7 @@ suite('📖 לוח תהילים – ימים וחלוקה', () => {
     3:[18,19,20,21,22], 4:[23,24,25,26,27,28],
     5:[29,30,31,32,33,34], 6:[35,36,37,38],
     24:[113,114,115,116,117,118],
-    25:['119:1-88'], 26:['119:89-176'],
+    25:['119:1-96'], 26:['119:97-176'],
     27:[120,121,122,123,124,125,126,127,128,129,130,131,132,133,134],
     30:[145,146,147,148,149,150]
   };
@@ -174,12 +174,12 @@ suite('📖 לוח תהילים – ימים וחלוקה', () => {
     assertEqual(SCHEDULE[1][0], 1); assertEqual(SCHEDULE[1][8], 9);
   }, ['logic','tehilim']);
 
-  test('יום 25 – חצי ראשון קי"ט (1-88)', () => {
-    assertEqual(SCHEDULE[25][0], '119:1-88', 'Day 25 first half');
+  test('יום 25 – קי"ט א–ל (1-96)', () => {
+    assertEqual(SCHEDULE[25][0], '119:1-96', 'Day 25 א–ל');
   }, ['logic','tehilim']);
 
-  test('יום 26 – חצי שני קי"ט (89-176)', () => {
-    assertEqual(SCHEDULE[26][0], '119:89-176', 'Day 26 second half');
+  test('יום 26 – קי"ט מ–ת (97-176)', () => {
+    assertEqual(SCHEDULE[26][0], '119:97-176', 'Day 26 מ–ת');
   }, ['logic','tehilim']);
 
   test('יום 30 – פרקים 145-150', () => {
@@ -190,18 +190,18 @@ suite('📖 לוח תהילים – ימים וחלוקה', () => {
     assertEqual(SCHEDULE[27].length, 15, '15 shir hamaalot psalms');
   }, ['logic','tehilim']);
 
-  test('חלוקת פסוקים 119:1-88 = 88 פסוקים', () => {
-    const range = '119:1-88';
+  test('חלוקת פסוקים 119:1-96 = 96 פסוקים (א–ל)', () => {
+    const range = '119:1-96';
     const [, vr] = range.split(':');
     const [from, to] = vr.split('-').map(Number);
-    assertEqual(to - from + 1, 88, '88 verses in first half');
+    assertEqual(to - from + 1, 96, '96 verses (12 stanzas) in first part');
   }, ['logic','tehilim']);
 
-  test('חלוקת פסוקים 119:89-176 = 88 פסוקים', () => {
-    const range = '119:89-176';
+  test('חלוקת פסוקים 119:97-176 = 80 פסוקים (מ–ת)', () => {
+    const range = '119:97-176';
     const [, vr] = range.split(':');
     const [from, to] = vr.split('-').map(Number);
-    assertEqual(to - from + 1, 88, '88 verses in second half');
+    assertEqual(to - from + 1, 80, '80 verses (10 stanzas) in second part');
   }, ['logic','tehilim']);
 });
 

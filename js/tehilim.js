@@ -28,8 +28,8 @@ const TEHILIM_SCHEDULE = {
   22: [106,107],
   23: [108,109,110,111,112],
   24: [113,114,115,116,117,118],
-  25: ['119:1-88'],   // First half of Psalm 119 (א–כ, stanzas 1-88)
-  26: ['119:89-176'], // Second half of Psalm 119 (כ-ת, stanzas 89-176)
+  25: ['119:1-96'],   // Psalm 119 stanzas א–ל (12 stanzas × 8 verses = 1-96)
+  26: ['119:97-176'], // Psalm 119 stanzas מ–ת (10 stanzas = 97-176)
   27: [120,121,122,123,124,125,126,127,128,129,130,131,132,133,134],
   28: [135,136,137,138,139],
   29: [140,141,142,143,144],
@@ -177,7 +177,7 @@ async function loadTodayTehilim() {
 }
 
 // Build a reverse map: chapter → [day, indexInDay]
-// Now handles both numeric chapters and string ranges like '119:1-88'
+// Now handles both numeric chapters and string ranges like '119:1-96'
 const CHAPTER_TO_DAY = {};
 for (let day = 1; day <= 30; day++) {
   const chapters = TEHILIM_SCHEDULE[day] || [];
@@ -651,8 +651,12 @@ function scrollTehilimTop() {
   }, 80);
 }
 
+// Before v5.137 day 25/26 were split 1-88 / 89-176; saved bookmarks may still hold the old strings.
+const _TEHILIM_LEGACY_RANGES = { '119:1-88': '119:1-96', '119:89-176': '119:97-176' };
+
 async function loadTehilim(chapterOrRange) {
-  // chapterOrRange: number like 23, or string like '119:1-88'
+  chapterOrRange = _TEHILIM_LEGACY_RANGES[chapterOrRange] || chapterOrRange;
+  // chapterOrRange: number like 23, or string like '119:1-96'
   const isRange = typeof chapterOrRange === 'string' && chapterOrRange.includes(':');
   window._lastTehilimArg = chapterOrRange;   // what bookmarks.js needs to reopen exactly this view
   let chapter, verseFrom, verseTo, rangeLabel;

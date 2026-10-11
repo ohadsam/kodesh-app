@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.136 (Oct 8, 2026)
+**Last updated:** v5.137 (Oct 11, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -672,6 +672,13 @@ Backed up in git; to reuse in another project copy the folder to `<project>/.cla
 `~/.claude/skills/`. Update the catalog whenever a ref is added/verified (CLAUDE.md §1).
 
 ## Recently Fixed
+
+### v5.137 (Oct 11, 2026) – Psalm 119 split on days 25/26
+- ✅ Owner-reported: day 25 must be 119 stanzas א–ל = verses **1-96** (12 stanzas × 8),
+  day 26 stanzas מ–ת = **97-176** (80 verses). The old split was 1-88 / 89-176 (equal
+  halves, wrong mid-stanza). Changed `TEHILIM_SCHEDULE` 25/26; `_TEHILIM_LEGACY_RANGES`
+  maps the old strings (saved bookmarks) in `loadTehilim`. Tests updated (88→96/80):
+  test_business_logic, test_api_sefaria, run-tests.js, tests-logic.js, tests-omer.js.
 
 ### v5.136 (Oct 8, 2026) – Tehilim chip scroll + position, Lashon schedule
 - ✅ Tehilim: on long days (day 27 = 15 chapters) the chip rows (`.tehilim-chip-row`)

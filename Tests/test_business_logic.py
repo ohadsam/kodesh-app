@@ -178,13 +178,13 @@ def run() -> TestSuite:
 
     # ── Tehilim day schedule sanity ───────────────────────────────────
     SCHEDULE = {
-        25: ['119:1-88'],
-        26: ['119:89-176'],
+        25: ['119:1-96'],
+        26: ['119:97-176'],
         1:  [1,2,3,4,5,6,7,8,9],
         30: [145,146,147,148,149,150],
     }
-    s.check('Day 25 is Psalm 119 first half', SCHEDULE[25] == ['119:1-88'])
-    s.check('Day 26 is Psalm 119 second half', SCHEDULE[26] == ['119:89-176'])
+    s.check('Day 25 is Psalm 119 א–ל (1-96)', SCHEDULE[25] == ['119:1-96'])
+    s.check('Day 26 is Psalm 119 מ–ת (97-176)', SCHEDULE[26] == ['119:97-176'])
     s.check('Day 1 starts with Psalm 1', SCHEDULE[1][0] == 1)
     s.check('Day 30 ends with Psalm 150', SCHEDULE[30][-1] == 150)
 

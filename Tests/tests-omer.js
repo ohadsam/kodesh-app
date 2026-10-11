@@ -74,18 +74,18 @@ suite('📖 תהילים – API ותכנים', () => {
     assertEqual(flat.length, 176, 'Psalm 119 has exactly 176 verses');
   }, ['api','tehilim']);
 
-  test('תהילים קי"ט חצי ראשון – פסוקים 1-88', async () => {
+  test('תהילים קי"ט א–ל – פסוקים 1-96', async () => {
     const d = await httpGet(`${SEFARIA}/texts/Psalms.119?lang=he&commentary=0&context=0`);
     const flat = (d.he || []).flat(Infinity).filter(Boolean);
-    const firstHalf = flat.slice(0, 88);
-    assertEqual(firstHalf.length, 88, 'First half has 88 verses');
+    const firstHalf = flat.slice(0, 96);
+    assertEqual(firstHalf.length, 96, 'א–ל has 96 verses');
   }, ['api','tehilim']);
 
-  test('תהילים קי"ט חצי שני – פסוקים 89-176', async () => {
+  test('תהילים קי"ט מ–ת – פסוקים 97-176', async () => {
     const d = await httpGet(`${SEFARIA}/texts/Psalms.119?lang=he&commentary=0&context=0`);
     const flat = (d.he || []).flat(Infinity).filter(Boolean);
-    const secondHalf = flat.slice(88, 176);
-    assertEqual(secondHalf.length, 88, 'Second half has 88 verses');
+    const secondHalf = flat.slice(96, 176);
+    assertEqual(secondHalf.length, 80, 'מ–ת has 80 verses');
   }, ['api','tehilim']);
 
   test('תהילים קנ – פרק אחרון (150)', async () => {
@@ -110,7 +110,7 @@ suite('📖 תהילים – API ותכנים', () => {
       19:[90,91,92,93,94,95,96], 20:[97,98,99,100,101,102,103],
       21:[104,105], 22:[106,107],
       23:[108,109,110,111,112], 24:[113,114,115,116,117,118],
-      25:['119:1-88'], 26:['119:89-176'],
+      25:['119:1-96'], 26:['119:97-176'],
       27:[120,121,122,123,124,125,126,127,128,129,130,131,132,133,134],
       28:[135,136,137,138,139], 29:[140,141,142,143,144],
       30:[145,146,147,148,149,150]
@@ -128,7 +128,7 @@ suite('📖 תהילים – API ותכנים', () => {
     }
   }, ['logic','tehilim']);
 
-  test('ניווט תהילים – CHAPTER_TO_DAY מכיל 119:1-88', async () => {
+  test('ניווט תהילים – CHAPTER_TO_DAY מכיל 119:1-96', async () => {
     const src = await fetch('../js/tehilim.js').then(r => r.text());
     assertContains(src, "getTehilimNavInfo(isRange ? chapterOrRange : chapter)",
       'Nav info uses full range string');
