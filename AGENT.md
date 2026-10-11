@@ -665,6 +665,12 @@ could be more precise for edge cases.
 
 ---
 
+## Project skill: sefaria-api (Oct 11, 2026)
+`.claude/skills/sefaria-api/` – portable Sefaria API guide (SKILL.md, references/refs-catalog.md
+with provenance tags for every ref this app uses, references/pitfalls.md, scripts/sefaria_probe.py).
+Backed up in git; to reuse in another project copy the folder to `<project>/.claude/skills/` or
+`~/.claude/skills/`. Update the catalog whenever a ref is added/verified (CLAUDE.md §1).
+
 ## Recently Fixed
 
 ### v5.136 (Oct 8, 2026) – Tehilim chip scroll + position, Lashon schedule

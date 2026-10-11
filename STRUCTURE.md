@@ -164,6 +164,9 @@ pre-reorg leftover, not loaded by `index.html` (verified: only `js/*.js` is
 "keep both in sync" note here was wrong and wasted real effort — do not resurrect it.
 Add `<button id="tf-{key}" class="aliya-tab" onclick="showTefila('{key}')">` in `index.html` inside `#tefila-buttons`.
 
+### .claude/skills/sefaria-api/
+SKILL.md (how to use the Sefaria API), references/refs-catalog.md (all known refs + provenance), references/pitfalls.md, scripts/sefaria_probe.py (generic ref/structure/calendar/links verifier; `tocheck-all` probes the project's refs).
+
 ### Tests/probe_sefaria.py
 Manual network probe (not run by test_runner): daily calendars, structure/Hebrew size of Duties of the Heart + Chovat HaTalmidim, Tanya commentary links.
 
