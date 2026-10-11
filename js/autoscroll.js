@@ -296,6 +296,24 @@ function _asRefresh() {
   _asRenderUI();
 }
 
+// A finger tap on a button (next chapter, chips…) nearly always drifts a few px and fires
+// touchmove — that must not count as "the user took over". Only a deliberate, mostly
+// vertical drag does; a horizontal swipe (chip rows) does not scroll the page at all.
+const _AS_TOUCH_SLOP = 12;   // px
+let _asTouch0 = null;
+function _asOnTouchStart(e) {
+  const t = e.touches && e.touches[0];
+  _asTouch0 = t ? { x: t.clientX, y: t.clientY } : null;
+}
+function _asOnTouchMove(e) {
+  const t = e.touches && e.touches[0];
+  if (_asTouch0 && t) {
+    const dy = Math.abs(t.clientY - _asTouch0.y), dx = Math.abs(t.clientX - _asTouch0.x);
+    if (dy < _AS_TOUCH_SLOP || dx > dy) return;
+  }
+  _asOnManualScroll(e);
+}
+
 function _asOnManualScroll(e) {
   if (_asState !== 'playing' || !getAutoScrollSettings().pauseOnTouch) return;
   if (e.target && e.target.closest && e.target.closest('#as-toolbar')) return;
@@ -315,7 +333,8 @@ function initAutoScroll() {
   _asMigrateSettings();
   _asEnsureUI();
   window.addEventListener('wheel', _asOnManualScroll, { passive: true });
-  window.addEventListener('touchmove', _asOnManualScroll, { passive: true });
+  window.addEventListener('touchstart', _asOnTouchStart, { passive: true });
+  window.addEventListener('touchmove', _asOnTouchMove, { passive: true });
   window.addEventListener('keydown', e => {
     if (e.key === 'Escape' && _asState !== 'idle') { autoScrollStop(); return; }
     const tag = (e.target && e.target.tagName) || '';

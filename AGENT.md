@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.137 (Oct 11, 2026)
+**Last updated:** v5.138 (Oct 11, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -672,6 +672,16 @@ Backed up in git; to reuse in another project copy the folder to `<project>/.cla
 `~/.claude/skills/`. Update the catalog whenever a ref is added/verified (CLAUDE.md §1).
 
 ## Recently Fixed
+
+### v5.138 (Oct 11, 2026) – Auto-scroll no longer pauses when tapping "next"
+- ✅ Owner-reported (Tehilim "next chapter"): tapping a button while auto-scroll plays
+  paused it and the next screen never resumed. Cause: the window `touchmove` listener
+  paused on ANY touchmove; iOS Safari fires touchmove for a few px of finger wobble
+  during a tap (Chromium suppresses it inside its touch slop, which is why a plain
+  Playwright tap did not reproduce it — synthetic TouchEvents did). Fix in
+  `js/autoscroll.js`: `_asOnTouchStart` records the start point, `_asOnTouchMove`
+  pauses only for a vertical drag ≥ `_AS_TOUCH_SLOP` (12px) that is mostly vertical,
+  so taps and horizontal swipes (the chip row) are ignored. Wheel/keys unchanged.
 
 ### v5.137 (Oct 11, 2026) – Psalm 119 split on days 25/26
 - ✅ Owner-reported: day 25 must be 119 stanzas א–ל = verses **1-96** (12 stanzas × 8),

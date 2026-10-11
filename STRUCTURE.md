@@ -244,6 +244,7 @@ Manual network probe (not run by test_runner): daily calendars, structure/Hebrew
 ### js/autoscroll.js
 | Function/Const | Description |
 |---|---|
+| `_asOnTouchStart` / `_asOnTouchMove` / `_AS_TOUCH_SLOP` | Pause on touch only for a deliberate vertical drag (≥12px, dy>dx); tap wobble (iOS) and horizontal chip-row swipes are ignored |
 | `AUTOSCROLL_DEFAULTS` | `{speed:4, keepAwake:true, pauseOnTouch:true, newSectionDelay:2}` (+ `v:2` scale marker once saved) — "original defaults" for Settings → reset. Overrides live in `appState.autoScroll` |
 | `autoScrollPxPerSec(level)` | Level 1–15 → 8…120 px/s (`8*level`; default 4 = 32). `_asMigrateSettings()` shifts speeds saved under the old 1–10 scale up one level |
 | `_asState` | `idle`, `playing`, `paused` or `ended`. `ended` = hit the bottom but the SESSION stays alive: `_asRefresh` resumes it when new content appears below (next aliya finishing its load) |
