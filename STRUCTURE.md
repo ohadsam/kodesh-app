@@ -70,6 +70,7 @@ js/app.js           → showTab, loadTab, navigation
 js/calendar.js      → Hebrew dates, zmanim, events
 js/content.js       → Parasha, Daf Yomi, Mishna, Rambam
 js/tehilim.js       → Tehilim by day
+js/search.js        → Global search (🔍 top bar) + js/search-data.js vocabulary
 js/autoscroll.js    → Auto-scroll: ▶ button on long pages + toolbar (init from init.js, hook in showTab)
 js/bookmarks.js     → Per-tab bookmarks: long-press to save, bar + flag to return (init from init.js, hook in showTab)
 js/prayer-names.js  → Shared health/memorial name list, rendered on both
@@ -169,6 +170,16 @@ SKILL.md (how to use the Sefaria API), references/refs-catalog.md (all known ref
 
 ### Tests/probe_sefaria.py
 Manual network probe (not run by test_runner): daily calendars, structure/Hebrew size of Duties of the Heart + Chovat HaTalmidim, Tanya commentary links.
+
+### js/search.js (+ js/search-data.js)
+| Function | Description |
+|---|---|
+| `srNormalize` / `srStem` / `srHebNum` | Text helpers: fold nikud/quotes/final letters, light stemmer, Hebrew numeral → number (null for words) |
+| `srParse(query)` | → `{words, ctxNums, current, aliya, pview, cview[], hints[]}` |
+| `srBuildIndex()` | All searchable entries (tabs, parashot, tefilot, brachot, emuna books, tractates, settings, actions, bookmarks, tehilim favorites) |
+| `srSearch(query)` | Ranked results `{kind,title,sub,tag,score,go}` |
+| `searchGo(go)` | Navigation per kind, token-cancelled; `openSearch` / `closeSearch` / `initSearch` UI (`#sr-panel`, `#sr-input`, `#sr-results`) |
+| `SEARCH_TABS`, `SEARCH_SETTINGS`, `SEARCH_ACTIONS`, `SEARCH_SUGGESTIONS`, … | Vocabulary in search-data.js |
 
 ### js/lashon-data.js
 | Function | Description |

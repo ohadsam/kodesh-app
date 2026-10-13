@@ -72,6 +72,8 @@ async function init() {
 
     _status('initBookmarks...');
     if (typeof initBookmarks === 'function') initBookmarks();
+    _status('initSearch...');
+    if (typeof initSearch === 'function') initSearch();
 
     _status('✅ הצלחה! מסיר splash...');
     setTimeout(_removeSplash, 800);

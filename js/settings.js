@@ -133,7 +133,7 @@ function setFont(size) {
 // localStorage 'theme' key this function writes. Do not move theme-application
 // logic here only; a script running this late would still flash the wrong
 // theme for one frame on every page load.
-const THEME_COLOR = { dark: '#1a0e05', light: '#faf6ee' };
+const THEME_COLOR = { dark: '#1a0e05', light: '#faf6ee' };   // meta theme-color per theme
 
 function setTheme(mode) {
   const isLight = mode === 'light';
@@ -144,7 +144,7 @@ function setTheme(mode) {
   appState.theme = mode; saveState();
 
   const mc = document.querySelector('meta[name="theme-color"]');
-  if (mc) mc.setAttribute('content', THEME_COLOR[mode] || THEME_COLOR.dark);
+  if (mc) mc.setAttribute('content', THEME_COLOR[mode] || THEME_COLOR.light);
 
   ['dark','light'].forEach(m => {
     const btn = document.getElementById('theme-btn-'+m);
@@ -157,8 +157,8 @@ function setTheme(mode) {
 // was already set (or left absent) by the inline HEAD script before any of this
 // ran — this only syncs appState + highlights the correct settings button.
 function initThemeUI() {
-  let saved = 'dark';
-  try { saved = localStorage.getItem('theme') || 'dark'; } catch(e) {}
+  let saved = 'light';   // light is the default; dark only after an explicit choice
+  try { saved = localStorage.getItem('theme') === 'dark' ? 'dark' : 'light'; } catch(e) {}
   appState.theme = saved;
   ['dark','light'].forEach(m => {
     const btn = document.getElementById('theme-btn-'+m);

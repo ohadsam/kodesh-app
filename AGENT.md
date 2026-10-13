@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.138 (Oct 11, 2026)
+**Last updated:** v5.139 (Oct 13, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -672,6 +672,26 @@ Backed up in git; to reuse in another project copy the folder to `<project>/.cla
 `~/.claude/skills/`. Update the catalog whenever a ref is added/verified (CLAUDE.md §1).
 
 ## Recently Fixed
+
+### v5.139 (Oct 13, 2026) – Global smart search + light theme by default
+- ✅ 🔍 `#search-btn` in the top bar (next to the bookmark button) opens `#sr-panel`
+  under the bar: input + drop-down of highlighted results; tap/Enter navigates.
+  `js/search-data.js` (vocabulary: tab synonyms, modifiers, settings, actions) +
+  `js/search.js`. Pipeline: `srNormalize` (no nikud/quotes, final letters folded) →
+  `srParse` (aliya "עליה ג", views רש"י/אונקלוס/הפטרה/זקס, "נוכחית", numbers after a
+  context word, Hebrew numerals via `srHebNum` that rejects words like בא/דג) →
+  `srSearch` (parasha / tehilim chapter+day+119 halves / daf+amud / mishna / emuna
+  maamar+seif / daily-with-commentary, then plain text over tabs, tefilot, brachot,
+  settings, actions, bookmarks, tehilim favorites; stemming תפילה=תפילת=תפילות, one
+  typo tolerated with the same first letter). `searchGo` reuses each tab's own
+  loaders (loadSpecificParasha, showAliya, setParashaView, _loadPickedDaf, …) and
+  cancels itself when a newer navigation starts (`_srGoToken`).
+- ✅ Theme default is now LIGHT: head script applies light unless localStorage
+  `theme === 'dark'` (only an explicit choice stores it), `initThemeUI`, meta
+  theme-color and manifest colors follow. Users who never chose a theme flip to light;
+  explicit dark/light choices are kept.
+- Not done / ideas: full-text search inside loaded texts, English/transliterated
+  queries, searching Sefaria's own search API.
 
 ### v5.138 (Oct 11, 2026) – Auto-scroll no longer pauses when tapping "next"
 - ✅ Owner-reported (Tehilim "next chapter"): tapping a button while auto-scroll plays
