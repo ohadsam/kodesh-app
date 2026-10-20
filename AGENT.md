@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.139 (Oct 13, 2026)
+**Last updated:** v5.140 (Oct 20, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -614,25 +614,13 @@ safely `git rm` the root-level duplicates after a final confirm-nothing-referenc
 them pass, but should NOT touch `manifest.json`/`reset.html` without checking those
 specifically (didn't audit them as thoroughly as the `.js` files).
 
-### 🟡 Rashi – exact-verse-coverage check not relaxed for chapter-end verses (v5.112)
-`loadRashiForRef`'s Strategy 1/2 require the fetched response to cover exactly
-up to the aliya's `endV`. If a chapter's true LAST verse legitimately has no
-Rashi of its own (common — Rashi sometimes covers a closing verse inside the
-previous verse's comment) AND the aliya's `endV` happens to BE that chapter's
-actual last verse, this still needlessly discards good data and cascades into
-slower strategies. A same-session fix for this was reverted after code review
-found it couldn't distinguish "aliya ends at the true chapter boundary" from
-"aliya ends mid-chapter" for single-chapter aliyot — `_torahChLengths` (which
-could tell them apart) is only populated when Sefaria returns a multi-chapter
-array-of-arrays response, never for a single-chapter aliya. A correct fix needs
-either: (a) the real per-chapter verse count from a source available even for
-single-chapter aliyot (e.g. compare against the NEXT aliya's start verse in
-`PARASHA_ALIYOT`, threaded into `loadRashiForRef`), or (b) live verification
-against Sefaria of whether its Rashi response is actually right-trimmed when a
-trailing verse has no comment (unverified — Sefaria API calls are blocked in
-this sandbox; see CLAUDE.md §1). The retry-skip fix from the same version
-(`s1WorthRetrying`/`s2WorthRetrying`) already cuts the cost of hitting this
-case substantially even though it isn't eliminated.
+### 🟡 Rashi – coverage heuristic (v5.140, replaces the v5.112 exact-coverage item)
+Strategy 1/2 now accept a per-verse Rashi response that reaches ≥60% of the aliya's
+end verse (≥ min(endV, 8)), because Sefaria right-trims trailing uncommented verses.
+The 60% threshold is a judgement call chosen so section-level responses (the v5.102
+failure: 3 entries for a 27-verse chapter) are still rejected; it was verified only
+against mocks. TODO: verify on a networked machine what `Rashi on Genesis 17` and
+`Rashi on Numbers 6` actually return (shape/length) and tighten if needed.
 
 ### 🟡 Compass – iOS declination reference unverified (v5.110)
 `MAGNETIC_DECLINATION` (+4.5°E) is added to Android sources but NOT to iOS
@@ -672,6 +660,20 @@ Backed up in git; to reuse in another project copy the folder to `<project>/.cla
 `~/.claude/skills/`. Update the catalog whenever a ref is added/verified (CLAUDE.md §1).
 
 ## Recently Fixed
+
+### v5.140 (Oct 20, 2026) – Rashi on aliyot whose last verses have no Rashi
+- ✅ Owner-reported: Lech Lecha aliya 7 (Genesis 17:7-17:27) + Rashi never loaded.
+  This is the "exact-verse-coverage" Known Issue (v5.112): Sefaria right-trims the
+  per-verse Rashi array, so `chapLen` / `coveredThrough` (≈24-26) was < `endV` (27) and
+  Strategy 1 and 2 discarded good data, leaving only the heavy `commentary=1` fallback
+  (35 s timeout, huge payload — fails on phones). New `_rashiMinCoverage(ch, endCh, endV)`
+  in js/content.js: end chapter needs `max(ceil(0.6·endV), min(endV, 8))` (strict for
+  short ends, tolerant of trailing uncommented verses, still rejects section-level
+  responses of a handful of entries); intermediate chapters use `_torahChLengths` when
+  known (short chapters like Lev 12 no longer need ≥10).
+- Verified with mocked Sefaria (right-trimmed, section-level, empty/tiny responses):
+  old code ran S1→S2→S3, new code takes S1 only; section-level still falls to S2; tiny
+  falls to S3. NOT verified against live Sefaria (sandbox-blocked) – see Known Issues.
 
 ### v5.139 (Oct 13, 2026) – Global smart search + light theme by default
 - ✅ 🔍 `#search-btn` in the top bar (next to the bookmark button) opens `#sr-panel`

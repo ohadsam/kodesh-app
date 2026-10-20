@@ -868,6 +868,18 @@ async function loadAliyaText(ref) {
 }
 
 let _rashiLoading = false;
+// How far a per-verse Rashi response must reach before it is trusted. Sefaria RIGHT-TRIMS
+// these arrays (the last verses of a chapter often have no Rashi of their own, e.g. Lech Lecha
+// 17:24-27), so demanding length >= endV rejected good data and sent aliyot such as
+// Lech Lecha 7 down the slow commentary=1 path. What must still be rejected is a
+// section-level response (a handful of entries for a 20+ verse chapter), so: strict for very
+// short ends, 60% for longer ones; intermediate chapters use the Torah's real length when known.
+function _rashiMinCoverage(ch, endCh, endV) {
+  if (ch === endCh) return Math.max(Math.ceil(endV * 0.6), Math.min(endV, 8));
+  const tl = _torahChLengths[ch];
+  return tl ? Math.min(10, Math.max(Math.ceil(tl * 0.6), Math.min(tl, 8))) : 10;
+}
+
 async function loadRashiForRef(torahRef) {
   if (_rashiLoading) return;
   _rashiLoading = true;
@@ -991,7 +1003,7 @@ async function loadRashiForRef(torahRef) {
                 chEntries++;
               }
             }
-            const minRequiredChapLen = (ch === endCh) ? endV : 10;
+            const minRequiredChapLen = _rashiMinCoverage(ch, endCh, endV);
             if (chapLen >= minRequiredChapLen && chEntries > 0) {
               console.log('[Rashi] S1 OK, chapLen:', chapLen, '| entries:', chEntries);
               success = true;
@@ -1049,7 +1061,7 @@ async function loadRashiForRef(torahRef) {
               // mis-aligns Rashi indices for subsequent chapters.
               chapterLengths[ch] = Math.max(chapterLengths[ch] || 0, maxVerseFound);
               const coveredThrough = maxVerseFound;
-              const s2minRequired = (ch === endCh) ? endV : 10;
+              const s2minRequired = _rashiMinCoverage(ch, endCh, endV);
               if (coveredThrough >= s2minRequired && chEntries > 0) {
                 console.log('[Rashi] S2 OK: covered to', coveredThrough, '| entries:', chEntries);
                 success = true;
