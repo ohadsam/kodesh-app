@@ -171,6 +171,17 @@ SKILL.md (how to use the Sefaria API), references/refs-catalog.md (all known ref
 ### Tests/probe_sefaria.py
 Manual network probe (not run by test_runner): daily calendars, structure/Hebrew size of Duties of the Heart + Chovat HaTalmidim, Tanya commentary links.
 
+### js/rambam-data.js + js/rambam-books.js (ספרי הרמב"ם sub-tab)
+| Function | Description |
+|---|---|
+| `RAMBAM_SEFARIM`, `RAMBAM_HIL` | 14 sefarim / 84 sets `{idx, en (Sefaria title), he, ch, slug, seferHe}` |
+| `rambamRef(h,ch)`, `rambamSteinsaltzRef(h,ch,n)`, `rambamDoneKey`, `rambamNeighbor(hIdx,ch,±1)` | Refs ("Mishneh Torah, Sabbath 5", "Steinsaltz on …:1-N"), read-marker key, prev/next across sets |
+| `rambamAlignSteinsaltz(halachot, data)` | Pure: structural placement he[i]↔halacha, verified by lemma, shift repair, lemma fallback, `approx` flags |
+| `loadRambamTab`, `setRambamMode`, `rbOpen`, `rbGoto`, `rbStep`, `rbSetView`, `rbDoneAndNext` | Entry point, mode switch, token-guarded chapter loading/navigation |
+| `rbRenderNav/Header/Bottom`, `rbRender` | Selects + chips + nav, subtitle + done button, chapter view (text / steinsaltz / steinsaltz_only) |
+| `rbSearchInput`, `rbFind`, `rbFindStep` | Hilchot search box (uses `srSearchRambam`) and find-in-chapter highlighting |
+| `rbCapture`, `rbRestore` | Bookmark adapter hooks |
+
 ### js/search.js (+ js/search-data.js)
 | Function | Description |
 |---|---|

@@ -23,6 +23,8 @@ Items matched by `title.en`/`title.he` substring: Daf Yomi ([prod][test]), Mishn
 - Mishnah: calendar ref; commentary `Bartenura on {mishnaRef}` (e.g. `Bartenura on Mishnah Berakhot 1:1`) [prod][test].
 - Rambam: `Mishneh Torah, Prayer and the Priestly Blessing 4` [prod][test]; Steinsaltz `Steinsaltz on Mishneh Torah, Prayer and the Priestly Blessing 4:1-{halachotCount}` [prod][test]; plain-chapter Steinsaltz ref returns a single halacha – use the range.
 
+- **All of Mishneh Torah (v5.141)**: `Mishneh Torah, {Title} {chapter}` for 84 sets, e.g. `Mishneh Torah, Sabbath 5`, `Mishneh Torah, Rest on the Tenth of Tishrei 2` [prod-code, untested live]. Titles + chapter counts: Hebcal `mishnehTorah.json` (snapshot `Tests/data/hebcal_mishnehTorah.json`; Hebcal links to `sefaria.org/Mishneh_Torah,_<Title>.<perek>`). Steinsaltz: `Steinsaltz on Mishneh Torah, {Title} {ch}:1-{N}` (N = the chapter's halacha count) → he[halacha][comment], comments open with `<b>lemma</b>`. Verify with `sefaria_probe.py rambam-check`.
+
 ## Prayer (siddur engine, `js/siddur.js`, `js/siddur-inserts.js`)
 Bases: Sfard `Weekday_Siddur_Sefard_Linear`, Ashkenaz `Siddur_Ashkenaz`, Edot HaMizrach `Siddur_Edot_HaMizrach`. Ref = `{Base},_{Path}` with underscores and commas, e.g.
 - `Weekday_Siddur_Sefard_Linear,_The_Morning_Prayers,_Shemoneh_Esrei` [prod][test]

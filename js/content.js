@@ -1731,6 +1731,7 @@ async function loadRambamYomi() {
       (i.title?.he || '').includes('רמב"ם') ||
       (i.title?.en || '').toLowerCase().includes('rambam')
     );
+    if (_rbMode === 'books') return;                  // the user moved to "ספרי הרמב"ם" meanwhile: do not overwrite it
     if (!item) throw new Error('לא נמצא רמב"ם יומי בלוח');
     _rambamRef = item.ref;
     console.log('[RambamYomi] FULL item:', JSON.stringify(item, null, 2).slice(0, 800));
@@ -1762,12 +1763,14 @@ async function loadRambamYomi() {
     }
 
     if (!_rambamFlat.length) throw new Error('אין טקסט עברי');
+    if (_rbMode === 'books') return;
     _renderRambamButtons();
     _renderRambamContent();
     updateDoneButton('rambam', item.ref);
     console.log(`[RambamYomi] OK – ${_rambamFlat.length} sections from ${refs.length} chapters`);
   } catch(e) {
     console.error('[RambamYomi] error:', e);
+    if (_rbMode === 'books') return;
     el.textContent = 'שגיאה בטעינה: ' + e.message;
   }
 }

@@ -223,17 +223,26 @@ const BM_ADAPTERS = {
 
   rambam: {
     root: () => _bmEl('rambam-content'),
-    capture() { return _rambamRef ? { date: _bmDateStr(), ref: _rambamRef, view: _rambamView } : null; },
-    same: (a, b) => !!a && !!b && a.ref === b.ref && a.view === b.view,
+    capture() {
+      if (_rbMode === 'books') return rbCapture();                      // ספרי הרמב"ם: set + chapter + view
+      return _rambamRef ? { mode: 'daily', date: _bmDateStr(), ref: _rambamRef, view: _rambamView } : null;
+    },
+    same: (a, b) => !!a && !!b && (a.mode || 'daily') === (b.mode || 'daily') && (a.mode === 'books'
+      ? a.hil === b.hil && a.ch === b.ch && a.view === b.view
+      : a.ref === b.ref && a.view === b.view),
     idle: _bmNotLoading('rambam-content'),
     async restore(s) {
+      if (s.mode === 'books') { loaded['rambam'] = true; await rbRestore(s); return; }
+      if (_rbMode === 'books') { _rbMode = 'daily'; appState.rambamMode = 'daily'; _rbApplyModeUI(); }
       _bmGoDate(s.date);
       loaded['rambam'] = true;
       loadRambamYomi();
       await _bmWait(this.idle, 20000);
       if (s.view && s.view !== 'text') await switchRambamView(s.view);
     },
-    describe: s => [_bmNorm((_bmEl('rambam-subtitle') || {}).textContent), s.view !== 'text' ? 'עם פירוש' : ''].filter(Boolean).join(' · '),
+    describe: s => (s.mode === 'books'
+      ? [(RAMBAM_HIL.find(x => x.slug === s.hil) || {}).he, 'פרק ' + s.ch]
+      : [_bmNorm((_bmEl('rambam-subtitle') || {}).textContent)]).concat(s.view !== 'text' ? ['עם פירוש'] : []).filter(Boolean).join(' · '),
   },
 
   tefilot: {

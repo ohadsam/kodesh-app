@@ -106,6 +106,7 @@ if __name__ == '__main__':
         'test_html_structure',
         'test_siddur_seasonal',
         'test_omer',
+        'test_rambam_books',
         'test_zmanim',
         'test_parasha',
     ]

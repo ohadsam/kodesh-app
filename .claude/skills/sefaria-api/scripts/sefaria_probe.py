@@ -8,6 +8,7 @@
   python3 sefaria_probe.py links  "Sanhedrin 2a" [CollectiveTitle]   # e.g. Rashi, Tosafot
   python3 sefaria_probe.py commentaries "Tanya,_Part_I;_Likkutei_Amarim.1"
   python3 sefaria_probe.py tocheck-all                       # the project's known refs (see references/refs-catalog.md)
+  python3 sefaria_probe.py rambam-check [js/rambam-data.js]  # all 84 Mishneh Torah sets: chapter counts + Steinsaltz coverage (≈340 requests)
 
 Env: SEFARIA_BASE overrides https://www.sefaria.org/api/ (for mocks / sefaria.org.il).
 Exit code 0 = every probed ref had Hebrew text; 1 = something failed (so it can gate CI).
@@ -120,10 +121,47 @@ def cmd_known():
     cmd_text(refs)
 
 
+def cmd_rambam_check(path=None):
+    """Verify js/rambam-data.js against Sefaria: for every set, the last chapter exists with Hebrew,
+    chapter last+1 does not, and Steinsaltz answers for the first and last chapter (range ref)."""
+    import re, time, pathlib
+    global failed
+    p = pathlib.Path(path) if path else next((q / 'js' / 'rambam-data.js' for q in [pathlib.Path.cwd(), *pathlib.Path.cwd().parents, *pathlib.Path(__file__).resolve().parents] if (q / 'js' / 'rambam-data.js').exists()), None)
+    if not p:
+        print('js/rambam-data.js not found – pass its path'); sys.exit(2)
+    sets = re.findall(r"\[\s*(['\"])(.+?)\1\s*,\s*'([^']+)'\s*,\s*(\d+)\s*\]", p.read_text(encoding='utf-8'))
+    sets = [(t, he, int(n)) for _, t, he, n in sets]
+    print(f'{len(sets)} sets from {p}')
+    bad = 0; st_none = []
+    def seg(ref):
+        d = get(f'texts/{quote(ref)}?lang=he&commentary=0&context=0')
+        if '_error' in d or d.get('error'): return None, d
+        out = walk(d.get('he'), [])
+        return out, d
+    for title, he, n in sets:
+        row = []
+        last, d = seg(f'Mishneh Torah, {title} {n}')
+        row.append(f'ch{n}:{"ok" if last else "MISSING"}')
+        if not last: bad += 1
+        beyond, _ = seg(f'Mishneh Torah, {title} {n + 1}')
+        if beyond: row.append(f'ch{n + 1}:EXISTS (count too small)'); bad += 1
+        for ch in (1, n):
+            txt, _ = seg(f'Mishneh Torah, {title} {ch}')
+            cnt = len(txt) if txt else 0
+            st, sd = seg(f'Steinsaltz on Mishneh Torah, {title} {ch}:1-{max(cnt, 1)}')
+            row.append(f'St{ch}:{len(st) if st else 0}')
+            if not st: st_none.append(f'{title} {ch}')
+        print(f'{"OK  " if not any(("MISSING" in r or "EXISTS" in r) for r in row) else "FAIL"} {title:62} {he:34} ' + ' '.join(row))
+        time.sleep(0.15)
+    print(f'\nchapter-count problems: {bad}; chapters without Steinsaltz (first/last sampled): {len(st_none)}')
+    for x in st_none[:40]: print('   no Steinsaltz:', x)
+    failed |= bool(bad)
+
+
 if __name__ == '__main__':
     if len(sys.argv) < 2: print(__doc__); sys.exit(2)
     c, a = sys.argv[1], sys.argv[2:]
     {'text': lambda: cmd_text(a), 'calendar': lambda: cmd_calendar(a), 'index': lambda: cmd_index(a),
      'shape': lambda: cmd_shape(a), 'links': lambda: cmd_links(*a[:2]), 'commentaries': lambda: cmd_links(a[0]),
-     'tocheck-all': cmd_known}.get(c, lambda: (print(__doc__), sys.exit(2)))()
+     'tocheck-all': cmd_known, 'rambam-check': lambda: cmd_rambam_check(a[0] if a else None)}.get(c, lambda: (print(__doc__), sys.exit(2)))()
     sys.exit(1 if failed else 0)

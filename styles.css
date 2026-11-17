@@ -784,3 +784,44 @@ body.bm-pressing, body.bm-pressing * {
 .sr-go { flex: none; color: var(--muted); font-size: 18px; }
 .sr-flash { animation: srflash 2.2s ease-out 1; }
 @keyframes srflash { 0%, 55% { box-shadow: 0 0 0 3px var(--gold); background: rgba(201,165,74,.22); } 100% { box-shadow: 0 0 0 0 transparent; background: transparent; } }
+
+/* ─── RAMBAM BOOKS (ספרי הרמב"ם) ───────────────────── */
+.rb-search { position: relative; margin-bottom: 8px; }
+.rb-input { width: 100%; box-sizing: border-box; background: var(--card); border: 1.5px solid var(--border); color: var(--text); border-radius: 10px; padding: 9px 12px; font-family: 'Heebo', sans-serif; font-size: 15px; direction: rtl; outline: none; -webkit-appearance: none; appearance: none; }
+.rb-input:focus { border-color: var(--gold); }
+.rb-input::placeholder { color: var(--muted); font-size: 12.5px; }
+.rb-res { position: absolute; z-index: 30; top: 100%; right: 0; left: 0; margin-top: 3px; background: var(--surface); border: 1px solid var(--gold-dim); border-radius: 10px; box-shadow: 0 10px 26px rgba(0,0,0,.3); max-height: 260px; overflow-y: auto; }
+.rb-res-row { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; padding: 9px 12px; cursor: pointer; color: var(--cream); font-size: 14px; }
+.rb-res-row + .rb-res-row { border-top: 1px solid var(--border); }
+.rb-res-row:active, .rb-res-row:hover { background: rgba(201,165,74,.14); }
+.rb-res-sub { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.rb-res-empty { padding: 12px; color: var(--muted); font-size: 13px; text-align: center; }
+.rb-selects { display: flex; gap: 8px; margin-bottom: 6px; }
+.rb-select { flex: 1; min-width: 0; background: var(--card); border: 1px solid var(--border); color: var(--text); border-radius: 10px; padding: 8px 8px; font-family: 'Heebo', sans-serif; font-size: 13.5px; direction: rtl; }
+.rb-progress { font-size: 11px; color: var(--muted); margin: 2px 2px 6px; }
+.rb-chips { display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 10px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.rb-chip { flex: none; min-width: 34px; background: var(--surface); color: var(--gold); border: 1px solid var(--border); border-radius: 14px; padding: 4px 10px; font-size: 12px; font-family: 'Heebo', sans-serif; cursor: pointer; }
+.rb-chip-done { color: var(--muted); border-color: var(--gold-dim); }
+.rb-chip-on { background: var(--gold); color: #000; border-color: var(--gold); font-weight: 700; }
+.rb-navrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 6px 0; }
+.rb-pos { font-size: 12px; color: var(--gold); white-space: nowrap; }
+.rb-btn { background: var(--surface); border: 1px solid var(--border); color: var(--gold); padding: 6px 12px; border-radius: 20px; font-size: 12px; cursor: pointer; font-family: 'Heebo', sans-serif; max-width: 42%; }
+.rb-btn[disabled] { opacity: .35; cursor: default; }
+.rb-btn[disabled]:empty { visibility: hidden; }
+.rb-btn-gold { background: rgba(201,165,74,.14); border-color: var(--gold-dim); max-width: 46%; }
+.rb-sq { padding: 5px 9px; max-width: none; }
+.rb-findrow { display: flex; align-items: center; gap: 6px; margin: 4px 0 10px; }
+.rb-findrow .rb-input { flex: 1; padding: 7px 10px; font-size: 14px; }
+.rb-findn { font-size: 11px; color: var(--muted); min-width: 56px; text-align: center; }
+.rb-hal { margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid rgba(128,128,128,.14); }
+.rb-hal-h { font-size: 12px; font-weight: 700; color: var(--gold); margin-bottom: 4px; }
+.rb-num { color: var(--gold-dim); font-size: 11px; margin-left: 5px; }
+.rb-note { font-size: 11.5px; color: var(--muted); margin-bottom: 10px; padding: 8px 10px; background: rgba(201,165,74,.06); border-radius: 8px; }
+.rb-note-ok { border-right: 3px solid var(--addition); }
+.rb-st { margin-top: 6px; padding: 6px 10px; background: rgba(126,214,160,.07); border-right: 2px solid var(--addition); border-radius: 0 5px 5px 0; color: var(--addition); font-size: calc(var(--font-size) * .84); font-style: italic; line-height: 1.85; }
+.rb-st-lbl { display: block; font-size: 9px; font-weight: 700; margin-bottom: 2px; opacity: .8; font-style: normal; }
+.rb-st-e + .rb-st-e { margin-top: 4px; }
+.rb-st b { color: var(--cream); font-style: normal; }
+.rb-approx { font-size: 10px; opacity: .75; font-style: normal; }
+mark.rb-hit { background: rgba(201,165,74,.32); color: inherit; border-radius: 3px; padding: 0 1px; }
+mark.rb-hit.rb-hit-on { background: var(--gold); color: #000; }

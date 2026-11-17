@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.140 (Oct 20, 2026)
+**Last updated:** v5.141 (Nov 17, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -570,6 +570,19 @@ v5.124 specifically so both Sukkot items sit in the same place).
 
 ## Known Issues / Open Items
 
+### 🟡 ספרי הרמב"ם – not verified against live Sefaria (v5.141)
+The sandbox cannot reach sefaria.org, so the data was cross-checked only against Hebcal's table.
+Unverified: (1) each set's chapter count as Sefaria has it – notably "The Order of Prayer" (4 in
+Hebcal, whose Chabad-style schedule also writes "4-5") ; (2) that Sefaria's Hebrew text exists for
+every set; (3) Steinsaltz coverage – it may exist for only some sets (the UI then says so and shows
+the Rambam alone); (4) the exact shape of the Steinsaltz range response (assumed he[halacha][comment]
+with `sections` = [chapter, 1]; the aligner verifies and repairs, and degrades to lemma matching).
+Run `python3 .claude/skills/sefaria-api/scripts/sefaria_probe.py rambam-check` on a networked
+machine (checks every set: last chapter exists, last+1 does not, Steinsaltz first/last chapter).
+Also open: the 4 introductory items of Hebcal's cycle (Transmission of the Oral Law, Positive/
+Negative Mitzvot lists, Overview) are not in the browser; the daily Rambam could adopt
+`rambamAlignSteinsaltz` for the same exact placement.
+
 ### 🟡 Lashon refs unverified against live Sefaria (Oct 8, 2026)
 `LASHON_PARTS` refs (`Chafetz_Chaim,_Part_One,…,_Principle_N`, 10 + 9 klalim) are
 unchanged from before v5.136 but the sandbox blocks sefaria.org, so they were not
@@ -660,6 +673,29 @@ Backed up in git; to reuse in another project copy the folder to `<project>/.cla
 `~/.claude/skills/`. Update the catalog whenever a ref is added/verified (CLAUDE.md §1).
 
 ## Recently Fixed
+
+### v5.141 (Nov 17, 2026) – ספרי הרמב"ם: all of Mishneh Torah + Steinsaltz
+- ✅ New sub-mode in the רמב"ם tab (`#rb-mode-daily` / `#rb-mode-books`, `setRambamMode`).
+  `js/rambam-data.js`: 14 sefarim → 84 hilchot sets (English titles + chapter counts from
+  Hebcal's `mishnehTorah.json`, snapshot in `Tests/data/hebcal_mishnehTorah.json`, which Hebcal
+  uses to build Sefaria links; Hebrew names mine). `js/rambam-books.js`: sefer / hilchot selects,
+  chapter chips with ✓ read markers, prev/next across sets, "mark read and continue",
+  progress per set, local hilchot search ("שבת ה") via `srSearchRambam`, find-in-chapter with
+  highlighting, views text / + Steinsaltz inline / Steinsaltz only. State: `appState.rambamMode`,
+  `appState.rambamBooks {hil: slug, ch, view}`; done keys `rb_<slug>_<ch>` (ASCII slug: a title
+  with an apostrophe would break `toggleDone`'s onclick). Cache tab `rambam` (IndexedDB).
+- ✅ Steinsaltz placement (`rambamAlignSteinsaltz`): Steinsaltz on Mishneh Torah is addressed
+  [chapter][halacha][comment], so `Steinsaltz on Mishneh Torah, <Set> <ch>:1-<N>` returns
+  he[halacha][comment] and he[i] ↔ halacha `sections.last + i` — the structural address is used
+  as THE placement, then verified against each comment's bold lemma (repairs a constant ±1/2
+  shift, falls back to lemma matching, flags what it cannot place "(מיקום משוער)"). The daily
+  Rambam still uses its older lemma-only matching (open item below).
+- ✅ Integration: bookmarks (rambam adapter stores mode books + set + chapter + view; old
+  bookmarks stay daily), global search (`rambambook` results: "הלכות שבת פרק ג", "רמב״ם שבת פרק ה
+  שטיינזלץ"), `loadRambamTab()` entry point (js/app.js), the daily loader no longer overwrites a
+  books chapter if the user switched while it was loading.
+- Tests: `Tests/test_rambam_books.py` (data vs Hebcal table + alignment logic, in test_runner),
+  `Tests/browser/rambam_books.js` (Playwright, mocked Sefaria, 54 checks, both themes).
 
 ### v5.140 (Oct 20, 2026) – Rashi on aliyot whose last verses have no Rashi
 - ✅ Owner-reported: Lech Lecha aliya 7 (Genesis 17:7-17:27) + Rashi never loaded.

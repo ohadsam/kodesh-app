@@ -192,6 +192,7 @@ function srBuildIndex() {
   if (typeof MISHNA_TRACTATES !== 'undefined') MISHNA_TRACTATES.forEach(t => {
     idx.push(_srEntry('mishna', { id: 'mishna:' + t.name, title: 'משנה – מסכת ' + t.he, icon: '⚖️', tag: 'משנה', tabKey: 'mishna', kw: ['משנה', 'משניות'], sub: 'עיון בפרק ובמשנה', go: { kind: 'mishna', tractate: t.name, he: t.he } }));
   });
+  _srRambamEntries().forEach(e => idx.push(e));
   SEARCH_SETTINGS.forEach(s => idx.push(_srEntry('setting', { id: 'set:' + s.id, title: 'הגדרות · ' + s.title, icon: '⚙️', tag: 'הגדרות', kw: s.kw.concat(['הגדרות']), go: { kind: 'setting', el: s.el } })));
   SEARCH_ACTIONS.forEach(a => idx.push(_srEntry('action', { id: 'act:' + a.id, title: a.title, icon: a.icon, tag: 'פעולה', kw: a.kw, go: { kind: 'action', action: a.id } })));
 
@@ -247,6 +248,38 @@ function _srBest(entries, words, allowNums, limit) {
 
 const _SR_AMUD = { 'עא': 'a', 'עב': 'b' };
 function _srNameOf(go) { return go.name || go.he || ''; }
+
+// ── Rambam: every set of hilchot (js/rambam-data.js), optional chapter + Steinsaltz ───────
+let _SR_RB = null;
+function _srRambamEntries() {
+  if (_SR_RB) return _SR_RB;
+  _SR_RB = typeof RAMBAM_HIL === 'undefined' ? [] : RAMBAM_HIL.map(h => _srEntry('rambambook', {
+    id: 'rb:' + h.slug, title: h.he, icon: '📗', tag: 'רמב"ם', tabKey: 'rambam', kw: ['רמב"ם', 'משנה תורה', h.seferHe, h.en],
+    sub: h.seferHe + ' · ' + h.ch + ' פרקים', go: { kind: 'rambambook', hil: h.idx } }));
+  return _SR_RB;
+}
+function _srRambamResults(P, entries, limit) {
+  const stop = srNormalize('רמב"ם');
+  const words = P.words.filter(w => w !== stop && w !== 'ספר');
+  if (!words.length) return [];
+  const cn = P.ctxNums;
+  const rm = P.words.includes(stop) || P.words.includes('הלכות');
+  return _srBest(entries, words, true, limit).map((x, i) => {
+    const h = RAMBAM_HIL[x.e.go.hil];
+    const left = x.m.left.map(srHebNum).filter(n => n != null);
+    const ch = cn['פרק'] != null ? cn['פרק'] : left[0];
+    const go = { kind: 'rambambook', hil: h.idx };
+    let sub = h.seferHe;
+    if (ch != null && ch >= 1 && ch <= h.ch) { go.ch = ch; sub += ' · פרק ' + _srG(ch); }
+    if (P.cview.includes('steinsaltz')) { go.view = 'steinsaltz'; sub += ' · עם שטיינזלץ'; }
+    return { kind: 'rambambook', icon: '📗', tag: 'רמב"ם', toks: P.words, id: x.e.id + ':smart', title: h.he + (go.ch ? ' פרק ' + _srG(go.ch) : ''), sub, score: 80 + x.m.s - i + (rm ? 15 : 0) + (go.ch ? 6 : 0), go };
+  });
+}
+// the Rambam tab's own search box: hilchot only, more results
+function srSearchRambam(query) {
+  const P = srParse(query);
+  return P.norm ? _srRambamResults(P, _srRambamEntries(), 12) : [];
+}
 
 // ── Search ──────────────────────────────────────────────────────────────
 const _SRK = { teh: srNormalize('תהילים'), tehl: srNormalize('תהלים'), miz: srNormalize('מזמור'), perek: 'פרק', yom: srNormalize('יום'), daf: srNormalize('דף'), mishna: 'משנה', seif: srNormalize('סעיף'), maamar: 'מאמר', psika: 'פסקה' };
@@ -337,7 +370,8 @@ function srSearch(query, idx) {
   // 4. the daily daf / mishna / rambam with a commentary view ("דף יומי רש"י")
   if (P.cview.length && !res.some(r => r.kind === 'daf' || r.kind === 'mishna') && !parashot.length) {
     const rambamWord = P.words.some(w => _srWordQuality(w, srNormalize('רמב"ם')) > 0);
-    const dailyTab = dafHint ? 'daf' : mishHint ? 'mishna' : rambamWord ? 'rambam' : null;
+    const bareRambam = rambamWord && P.words.every(w => _srWordQuality(w, srNormalize('רמב"ם')) > 0 || w === 'ספר');   // "רמב״ם שטיינזלץ" alone; with a set's name it is a book chapter
+    const dailyTab = dafHint ? 'daf' : mishHint ? 'mishna' : bareRambam ? 'rambam' : null;
     if (dailyTab) {
       const vv = dailyTab === 'daf' ? (P.cview.includes('rashi') && P.cview.includes('tosafot') ? 'rashi_tosafot' : P.cview[0])
         : dailyTab === 'mishna' ? (P.cview.includes('bartenura') ? 'bartenura' : null) : (P.cview.includes('steinsaltz') ? 'steinsaltz' : null);
@@ -358,9 +392,12 @@ function srSearch(query, idx) {
     });
   }
 
+  // 5b. Mishneh Torah: a set of hilchot (+ chapter, + Steinsaltz)
+  _srRambamResults(P, idx.filter(e => e.kind === 'rambambook'), 3).forEach(r => res.push(r));
+
   // 6. everything else by plain text (all words must match)
   if (P.words.length) idx.forEach(e => {
-    if (['parasha', 'daf', 'mishna', 'emuna'].includes(e.kind)) return;
+    if (['parasha', 'daf', 'mishna', 'emuna', 'rambambook'].includes(e.kind)) return;
     let s = _srScoreEntry(e, P.words);
     if (!s) return;
     if (P.hints.includes(e.tabKey)) s += 6;
@@ -549,6 +586,11 @@ async function searchGo(go, title) {
           row.classList.remove('sr-flash'); void row.offsetWidth; row.classList.add('sr-flash');
           setTimeout(() => row.classList.remove('sr-flash'), 2400);
         }
+        break;
+      }
+      case 'rambambook': {
+        await _srOpenTab('rambam', token); if (stale()) return;
+        await rbOpen(go.hil, go.ch || 1, go.view || _rbState.view);
         break;
       }
       case 'bookmark': await bookmarkGo(go.tab); break;
