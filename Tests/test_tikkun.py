@@ -16,8 +16,11 @@ const fs = require('fs'), vm = require('vm');
 const ctx = { console, escapeHtml: s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])), appState: {}, saveState(){} };
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync('js/taamim-data.js','utf8') + ';this.T={TAAMIM_DISJUNCTIVE,TAAMIM_CONJUNCTIVE,TAAMIM_OTHER,taamimSign};', ctx);
-vm.runInContext(fs.readFileSync('js/tikkun.js','utf8') + ';this.K={tikkunTransform,tikkunParseMedia};', ctx);
-const K = ctx.K, T = ctx.T, out = {};
+const u = fs.readFileSync('js/utils.js','utf8'); const gi = u.indexOf('function toGematria'); let d = 0, k = u.indexOf('{', gi); const gs = k; for (; k < u.length; k++) { if (u[k] === '{') d++; else if (u[k] === '}') { d--; if (!d) { k++; break; } } }
+vm.runInContext(u.slice(gi, k) + ';', ctx);                       // the real toGematria
+vm.runInContext(fs.readFileSync('js/tikkun.js','utf8') + ';this.K={tikkunTransform};', ctx);
+vm.runInContext(fs.readFileSync('js/tikkun-audio.js','utf8') + ';this.A={tikkunParseMedia,tikkunDurAt,tikkunTotal,tikkunLocate,tikkunAbs,tikkunFmtTime,tikkunRefHe,tikkunJumpItems,tikkunJumpFilter,TK_RATES};', ctx);
+const K = ctx.K, T = ctx.T, A = ctx.A, out = {};
 const V = 'בְּרֵאשִׁ֖ית בָּרָ֣א אֱלֹהִ֑ים אֵ֥ת הַשָּׁמַ֖יִם וְאֵ֥ת הָאָֽרֶץ׃';
 out.plain = K.tikkunTransform(V, {}).text; out.nikud = K.tikkunTransform(V, { nikud: true }).text; out.teamim = K.tikkunTransform(V, { teamim: true }).text; out.both = K.tikkunTransform(V, { nikud: true, teamim: true }).text; out.src = V;
 const M = 'אֶת־הַשָּׁמַ֖יִם ׀ וְאֶת־הָאָֽרֶץ׃';
@@ -35,8 +38,16 @@ const rel = { media: [
   { media_url: 'http://x.org/insecure.mp3', source: 'PocketTorah', anchorRef: 'Genesis 1:3' },
   { media_url: 'https://x.org/page.html', source: 'PocketTorah', anchorRef: 'Genesis 1:3' },
   { media_url: 'https://x.org/gen1_4.mp3', source: 'Torah Readings', anchorRef: 'Genesis 1:4' } ] };
-out.media = K.tikkunParseMedia(rel, ['1:1', '1:2', '1:3', '1:4']);
-out.mediaNone = K.tikkunParseMedia({ links: [] }, ['1:1']);
+out.media = A.tikkunParseMedia(rel, ['1:1', '1:2', '1:3', '1:4']);
+out.mediaNone = A.tikkunParseMedia({ links: [] }, ['1:1']);
+// timeline helpers
+const durs = [2, 3, 0, 5];                                   // the third clip is not measured yet → the average (10/3)
+out.tl = { n3: A.tikkunDurAt(durs, 2), total: A.tikkunTotal(durs, 4), loc: [0, 1.9, 2, 4.9, 5, 8.3, 8.4, 13.4, 999].map(s => A.tikkunLocate(durs, 4, s)), abs: A.tikkunAbs(durs, 3, 1.5), none: A.tikkunTotal([], 3), fmt: [0, 5, 65, 3599.6, -3, null].map(A.tikkunFmtTime) };
+out.rates = A.TK_RATES;
+out.refs = ['Genesis 17:24-17:27', 'Genesis 12:14-13:4', 'Leviticus 8:30-8:36', 'garbage'].map(A.tikkunRefHe);
+const items = A.tikkunJumpItems({ aliyot: ['Genesis 1:1-2:3', 'Genesis 2:4-2:19', null, 'x', 'x', 'x', 'x', 'Genesis 6:5-6:8'], currentAliya: 1, verseKeys: ['2:4', '2:5', '2:6'], hasClip: { '2:4': true, '2:5': true }, texts: ['ויכלו השמים', 'ויהי ערב', 'ויקרא'] });
+out.jump = { n: items.length, kinds: items.map(i => i.kind[0]).join(''), first: items[0].label, maftir: items.find(i => i.idx === 7).label, cur: items.filter(i => i.current).map(i => i.idx), noClip: items.filter(i => i.kind === 'verse' && !i.has).map(i => i.key),
+  f1: A.tikkunJumpFilter(items, 'עליה ב').map(i => i.label), f2: A.tikkunJumpFilter(items, '2:5').map(i => i.key), f3: A.tikkunJumpFilter(items, 'ערב').map(i => i.key), f4: A.tikkunJumpFilter(items, 'מפטיר').map(i => i.idx), f5: A.tikkunJumpFilter(items, 'zzz').length, f6: A.tikkunJumpFilter(items, '').length };
 console.log(JSON.stringify(out));
 """
 
@@ -79,6 +90,19 @@ def run() -> TestSuite:
     s.check('audio parser: only https audio files from Torah-reading sources, in reading order, others ignored, missing counted',
             [i['key'] for i in m['items']] == ['1:1', '1:2', '1:4'] and m['missing'] == 1 and m['items'][0]['url'].endswith('gen1_1.mp3'), m)
     s.check('audio parser: a response without media → no items', d['mediaNone']['items'] == [] and d['mediaNone']['missing'] == 1)
+    # ── timeline / jump helpers
+    tl = d['tl']
+    s.check('timeline: unmeasured clip = average of the measured ones; total adds up', abs(tl['n3'] - 10 / 3) < 1e-9 and abs(tl['total'] - (2 + 3 + 10 / 3 + 5)) < 1e-9 and tl['none'] == 12, tl)
+    s.check('locate(second) → clip + offset (a boundary goes to the next clip, the end clamps to the last clip)',
+            [(x['i'], round(x['t'], 2)) for x in tl['loc']] == [(0, 0), (0, 1.9), (1, 0), (1, 2.9), (2, 0), (2, 3.3), (3, 0.07), (3, 5.0), (3, 5.0)], [(x['i'], round(x['t'], 2)) for x in tl['loc']])
+    s.check('absolute position = durations before + offset; mm:ss formatting incl. odd input', abs(tl['abs'] - (2 + 3 + 10 / 3 + 1.5)) < 1e-9 and tl['fmt'] == ['0:00', '0:05', '1:05', '60:00', '0:00', '0:00'], tl['fmt'])
+    s.check('speed list: 0.5× … 2× in 11 steps, includes 1×, slower and faster', d['rates'][0] == 0.5 and d['rates'][-1] == 2 and 1 in d['rates'] and len(d['rates']) == 11, d['rates'])
+    s.check('Hebrew reference text for the jump list', d['refs'] == ['בראשית י״ז:כ״ד–כ״ז', 'בראשית י״ב:י״ד–י״ג:ד׳', 'ויקרא ח׳:ל׳–ל״ו', 'garbage'], d['refs'])
+    j = d['jump']
+    s.check('jump list: 7 aliyot entries (the null one skipped, maftir labelled) then the 3 verses', j['kinds'] == 'aaaaaaavvv' and j['n'] == 10 and j['first'] == 'עליה א – בראשית א׳:א׳–ב׳:ג׳' and j['maftir'] == 'מפטיר – בראשית ו׳:ה׳–ח׳', j)
+    s.check('jump list: current aliya marked, a verse without a clip flagged', j['cur'] == [1] and j['noClip'] == ['2:6'], j)
+    s.check('jump filter: "עליה ב" → that aliya, "2:5" → the verse, words of the text, "מפטיר", no match → [], empty → everything',
+            j['f1'] == ['עליה ב – בראשית ב׳:ד׳–י״ט'] and j['f2'] == ['2:5'] and j['f3'] == ['2:5'] and j['f4'] == [7] and j['f5'] == 0 and j['f6'] == j['n'], j)
     # ── fonts
     for f in ('ItimStamAshkenaz', 'ItimStamSefarad'):
         p = ROOT / 'fonts' / f'{f}.woff2'

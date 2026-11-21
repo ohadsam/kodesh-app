@@ -108,9 +108,12 @@ const BM_ADAPTERS = {
     capture() {
       if (!currentParashaRef && !_currentAliyaRef) return null;
       return { ref: currentParashaRef, name: (_bmEl('parasha-name') || {}).textContent || '',
-        aliyot: aliyot.slice(), aliya: currentAliya, aliyaRef: _currentAliyaRef, view: parashaView, haftara: _haftaraRef };
+        aliyot: aliyot.slice(), aliya: currentAliya, aliyaRef: _currentAliyaRef, view: parashaView, haftara: _haftaraRef,
+        // an open recorded reading (תיקון קוראים) is part of the place: reading position + speed + follow-along scroll
+        audio: parashaView === 'tikkun' && typeof tikkunAudioCapture === 'function' ? tikkunAudioCapture() : undefined };
     },
-    same: (a, b) => !!a && !!b && a.ref === b.ref && a.aliya === b.aliya && a.aliyaRef === b.aliyaRef && a.view === b.view,
+    same: (a, b) => !!a && !!b && a.ref === b.ref && a.aliya === b.aliya && a.aliyaRef === b.aliyaRef && a.view === b.view
+      && (!b.audio || (!!a.audio && a.audio.key === b.audio.key)),      // a saved reading position must be restored too
     idle() {
       const ld = _bmEl('parasha-loading');
       const err = ld && _bmNorm(ld.textContent).startsWith('שגיאה');
@@ -145,10 +148,11 @@ const BM_ADAPTERS = {
       if (s.haftara) _kickoffHaftara(s.haftara); else if (HAFTARA_REFS[s.ref]) _kickoffHaftara(HAFTARA_REFS[s.ref]);
       await loadAliyaText(s.aliyaRef || s.ref);
       setParashaView(s.view || 'text');
+      if (s.audio && s.view === 'tikkun' && typeof tikkunRestoreAudio === 'function') await tikkunRestoreAudio(s.audio);
     },
     describe(s) {
       const al = s.aliya === 'all' ? 'כל העליות' : `עליה ${_BM_ALIYA_NAMES[s.aliya] || (Number(s.aliya) + 1)}`;
-      return [s.name, al, _BM_PARASHA_VIEWS[s.view]].filter(Boolean).join(' · ');
+      return [s.name, al, _BM_PARASHA_VIEWS[s.view], s.audio ? '🎧 עם ההקראה' : ''].filter(Boolean).join(' · ');
     },
   },
 

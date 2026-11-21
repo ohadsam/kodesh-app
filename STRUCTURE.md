@@ -178,7 +178,7 @@ Manual network probe (not run by test_runner): daily calendars, structure/Hebrew
 | `tikkunTransform(raw, {nikud, teamim})` | Pure: Sefaria verse → `{html, pe, se, text}` for the chosen layers (strips marks / maqaf, `{פ}`/`{ס}` flags, big/small tokens, escapes) |
 | `renderTikkun(el, helpers)` | Called by `renderParasha()` when `parashaView === 'tikkun'`; scroll block or the ta'amim table |
 | `tikkunToggle`, `tikkunSetScript`, `tikkunShowTaamim`, `tikkunBackToText` | Toolbar (`#tikkun-opts`), options in `appState.tikkun` |
-| `tikkunParseMedia(related, verseKeys)`, `_tkClipList`, `_tkClipSrc`, `_tkWarm`, `tikkunAudioToggle/Stop/Rate` | Best-effort recorded reading (Sefaria "Torah Readings"); see Known Issues |
+| js/tikkun-audio.js: `tikkunParseMedia`, `tikkunLocate/Total/Abs/DurAt/FmtTime`, `tikkunRefHe`, `tikkunJumpItems/Filter` (pure); `_tkClipList`, `_tkClipSrc`, `_tkWarm`, `_tkStart`, `_tkPlayAt`, `tikkunAudioToggle/Pause/Resume/Stop/SetRate/ToggleSync`, `_tkSyncTick`, `tikkunSeekPreview/Commit`, `tikkunJump*`, `tikkunAudioCapture/RestoreAudio` | Best-effort recorded reading (Sefaria "Torah Readings"); see Known Issues |
 | `TAAMIM_DISJUNCTIVE/CONJUNCTIVE/OTHER`, `taamimSign` | taamim-data.js: names, code points, position, notes |
 | `fonts/ItimStam{Ashkenaz,Sefarad}.{woff2,ttf}` | Built by `tools/build_stam_pointed.py` from Culmus fonts (see fonts/README.md) |
 

@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.143 (Nov 22, 2026)
+**Last updated:** v5.144 (Nov 23, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -703,6 +703,24 @@ Backed up in git; to reuse in another project copy the folder to `<project>/.cla
 `~/.claude/skills/`. Update the catalog whenever a ref is added/verified (CLAUDE.md §1).
 
 ## Recently Fixed
+
+### v5.144 (Nov 23, 2026) – Maftir button on the current parasha, full reading controls
+- ✅ **Maftir button missing** on the CURRENT parasha: the app asks Hebcal without `leyning=on` (no `M`), falls
+  back to Sefaria's calendar `extraDetails.aliyot` which has only 7 aliyot → no maftir tab (the dropdown path had
+  it since v5.142). New `_withMaftir(arr, ref)` (js/content.js) adds the maftir from the static table when its 7th
+  aliya ends where ours ends (else none, never a wrong one). The 7 combined weeks (Vayakhel-Pekudei … Nitzavim-
+  Vayeilech) are now in `PARASHA_ALIYOT` too (keyed by the ref loadParasha builds), from Hebcal's combined data.
+- ✅ **Reading controls** (`js/tikkun-audio.js`, split out of tikkun.js): speeds 0.5×…2× (`preservesPitch`);
+  "גלילה עם ההקראה" – a rAF loop keeps the reading point (progress through the current verse) at 38% of the
+  screen, so scroll speed = reading speed; play/pause/stop/seek act on both; manual scroll holds it 4 s;
+  generic auto-scroll is stopped meanwhile; progress bar over the whole aliya (clip durations measured while
+  the clips are cached, unmeasured ones = average); jump drop-down with search (aliyot incl. maftir + verses,
+  by "עליה ג", "כו", "17:26" or words of the verse; picking another aliya loads it and starts the reading);
+  prefs in `appState.tikkunAudio {rate, sync}`.
+- ✅ **Bookmarks keep the reading**: parasha adapter state gets `audio {key, t, rate, sync}`; `same()` requires it
+  to match, `restore()` ends with `tikkunRestoreAudio` (paused, ready, with a message); describe adds "🎧".
+- Tests: `Tests/test_tikkun.py` 29 (timeline/jump helpers), `Tests/test_parasha_aliyot.py` 5 (combined weeks),
+  `Tests/browser/tikkun.js` 106 (all of the above, both themes).
 
 ### v5.143 (Nov 22, 2026) – תיקון קוראים: everything cached, recorded reading included
 - ✅ Audit of the v5.142 features: parasha / maftir / Rashi / Onkelos text already used the IndexedDB

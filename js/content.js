@@ -413,6 +413,14 @@ const PARASHA_ALIYOT = {
   'Deuteronomy 31:1-31:30':['Deuteronomy 31:1-31:3','Deuteronomy 31:4-31:6','Deuteronomy 31:7-31:9','Deuteronomy 31:10-31:13','Deuteronomy 31:14-31:19','Deuteronomy 31:20-31:24','Deuteronomy 31:25-31:30','Deuteronomy 31:28-31:30'],
   'Deuteronomy 32:1-32:52':['Deuteronomy 32:1-32:6','Deuteronomy 32:7-32:12','Deuteronomy 32:13-32:18','Deuteronomy 32:19-32:28','Deuteronomy 32:29-32:39','Deuteronomy 32:40-32:43','Deuteronomy 32:44-32:52','Deuteronomy 32:48-32:52'],
   'Deuteronomy 33:1-34:12':['Deuteronomy 33:1-33:7','Deuteronomy 33:8-33:12','Deuteronomy 33:13-33:17','Deuteronomy 33:18-33:21','Deuteronomy 33:22-33:26','Deuteronomy 33:27-33:29','Deuteronomy 34:1-34:12'],
+  // combined weeks (the ref is built as in loadParasha: start of the first + end of the second parasha)
+  'Exodus 35:1-40:38':['Exodus 35:1-35:29','Exodus 35:30-37:16','Exodus 37:17-37:29','Exodus 38:1-39:1','Exodus 39:2-39:21','Exodus 39:22-39:43','Exodus 40:1-40:38','Exodus 40:34-40:38'],  // Vayakhel-Pekudei
+  'Leviticus 12:1-15:33':['Leviticus 12:1-13:23','Leviticus 13:24-13:39','Leviticus 13:40-13:54','Leviticus 13:55-14:20','Leviticus 14:21-14:32','Leviticus 14:33-15:15','Leviticus 15:16-15:33','Leviticus 15:31-15:33'],  // Tazria-Metzora
+  'Leviticus 16:1-20:27':['Leviticus 16:1-16:24','Leviticus 16:25-17:7','Leviticus 17:8-18:21','Leviticus 18:22-19:14','Leviticus 19:15-19:32','Leviticus 19:33-20:7','Leviticus 20:8-20:27','Leviticus 20:25-20:27'],  // Achrei Mot-Kedoshim
+  'Leviticus 25:1-27:34':['Leviticus 25:1-25:18','Leviticus 25:19-25:28','Leviticus 25:29-25:38','Leviticus 25:39-26:9','Leviticus 26:10-26:46','Leviticus 27:1-27:15','Leviticus 27:16-27:34','Leviticus 27:32-27:34'],  // Behar-Bechukotai
+  'Numbers 19:1-25:9':['Numbers 19:1-20:6','Numbers 20:7-20:21','Numbers 20:22-21:20','Numbers 21:21-22:12','Numbers 22:13-22:38','Numbers 22:39-23:26','Numbers 23:27-25:9','Numbers 25:7-25:9'],  // Chukat-Balak
+  'Numbers 30:2-36:13':['Numbers 30:2-31:12','Numbers 31:13-31:54','Numbers 32:1-32:19','Numbers 32:20-33:49','Numbers 33:50-34:15','Numbers 34:16-35:8','Numbers 35:9-36:13','Numbers 36:11-36:13'],  // Matot-Masei
+  'Deuteronomy 29:9-31:30':['Deuteronomy 29:9-29:28','Deuteronomy 30:1-30:6','Deuteronomy 30:7-30:14','Deuteronomy 30:15-31:6','Deuteronomy 31:7-31:13','Deuteronomy 31:14-31:19','Deuteronomy 31:20-31:30','Deuteronomy 31:28-31:30'],  // Nitzavim-Vayeilech
 };
 
 function populateParashaDropdown(currentRef) {
@@ -430,6 +438,17 @@ function _buildAliyaTabs(tabsEl, aliyotArr) {
     `<div class="aliya-tab${i === 0 ? ' active' : ''}" onclick="showAliya(${i}, this)">${aliyaNames[i] || String(i+1)}</div>`
   ).filter((_, i) => aliyotArr[i]).join('') +
   `<div class="aliya-tab" onclick="showAliya('all', this)">הכל</div>`;
+}
+
+// Some sources (Sefaria's calendar, Hebcal without `M`) give only the 7 aliyot. Add the maftir from the static table
+// (Hebcal's data, incl. the combined weeks) when its 7th aliya ends where ours ends – otherwise leave it out
+// rather than show a wrong maftir.
+function _withMaftir(arr, ref) {
+  if (!Array.isArray(arr) || arr.length !== 7) return arr;
+  const st = PARASHA_ALIYOT[ref];
+  if (!st || st.length < 8) return arr;
+  const endOf = r => (String(r).trim().match(/(\d+:\d+)\s*$/) || [])[1];
+  return endOf(arr[6]) && endOf(arr[6]) === endOf(st[6]) ? arr.concat([st[7]]) : arr;
 }
 
 async function loadSpecificParasha(ref) {
@@ -473,6 +492,7 @@ async function loadSpecificParasha(ref) {
     _kickoffHaftara(HAFTARA_REFS[ref]);
   }
 
+  aliyot = _withMaftir(aliyot, ref);
   currentParashaRef = ref;
   currentAliya = 0;
   _buildAliyaTabs(tabsEl, aliyot);
@@ -643,6 +663,7 @@ async function loadParasha() {
       aliyot = PARASHA_ALIYOT[matchP.ref].slice();
       console.log('[Parasha] static aliyot fallback:', aliyot.length);
     }
+    aliyot = _withMaftir(aliyot, matchP.ref);
 
     // Start haftara loading in background
     haftaraLoaded = false; haftaraVerses = []; _haftaraRef = null; _sacksLoaded = false; _sacksContent = "";

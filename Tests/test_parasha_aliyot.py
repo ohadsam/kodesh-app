@@ -56,4 +56,13 @@ def run() -> TestSuite:
             if not ((last[1], last[2]) <= (m[1], m[2]) and (m[3], m[4]) == (last[3], last[4])):   # the maftir repeats the END of the 7th aliya
                 probs.append((p['he'], 'maftir not inside aliya 7'))
     s.check('aliyot start at the parasha start, aliya 7 ends at its end, order increasing, maftir ⊂ aliya 7', not probs, fail_detail=str(probs[:3]))
+    # combined weeks (Hebcal's own combined readings): keyed by the ref loadParasha builds (start of first + end of second)
+    comb = json.loads((ROOT / 'Tests/data/hebcal_aliyot.json').read_text(encoding='utf-8'))['combined']
+    badc = []
+    for name, cdat in comb.items():
+        n1, n2 = cdat['nums']
+        key = allp[n1 - 1]['ref'].split('-')[0] + '-' + allp[n2 - 1]['ref'].split('-')[1]
+        exp = [f"{BOOKS[cdat['book']]} {cdat['fullkriyah'][k][0]}-{cdat['fullkriyah'][k][1]}" for k in '1234567M']
+        if table.get(key) != exp: badc.append((name, key))
+    s.check('the 7 combined weeks are in the table (7 aliyot + maftir, equal to Hebcal)', len(comb) == 7 and not badc, fail_detail=str(badc[:2]))
     return s
