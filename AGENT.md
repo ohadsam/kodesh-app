@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.142 (Nov 21, 2026)
+**Last updated:** v5.143 (Nov 22, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -570,6 +570,12 @@ v5.124 specifically so both Sukkot items sit in the same place).
 
 ## Known Issues / Open Items
 
+### ℹ️ Offline note (v5.143, existing behaviour, not changed)
+`sw.js` never stores the app shell (index.html / js / css): same-origin requests are network-first and the
+fallback `caches.match` finds nothing, so a cold start with no network cannot load the page itself. Only the
+fonts, Sefaria/Hebcal responses (SW) and the IndexedDB text/audio cache survive offline. Precaching the shell
+would fix it (version-keyed cache, bump = refresh) – a separate, risky change since pushing to main is the deploy.
+
 ### 🟡 תיקון קוראים – recorded reading unverified; no Sephardi/other nusach (v5.142)
 Sefaria's help center says every verse of the Five Books can be heard chanted in the resource panel
 ("Torah Readings"): human recordings from the PocketTorah app, **Ashkenazi trope only**, CC-BY-SA, one clip per
@@ -697,6 +703,23 @@ Backed up in git; to reuse in another project copy the folder to `<project>/.cla
 `~/.claude/skills/`. Update the catalog whenever a ref is added/verified (CLAUDE.md §1).
 
 ## Recently Fixed
+
+### v5.143 (Nov 22, 2026) – תיקון קוראים: everything cached, recorded reading included
+- ✅ Audit of the v5.142 features: parasha / maftir / Rashi / Onkelos text already used the IndexedDB
+  cache (tab `parasha`, `sefariaText`/`cacheFetch`); the תיקון קוראים view re-renders the same verses (no
+  extra fetch); the Stam fonts are precached by the service worker (`LOCAL_FONTS`, cache-first for /fonts/);
+  the ta'amim list is static. **Not cached:** the recorded reading — `/api/related` was fetched every time
+  and the clips streamed with no stored copy.
+- ✅ New cache tab `tikkun` (js/cache.js, "הקראות תיקון קוראים"): `cacheGetBlob` / `cachePutBlob` (binary rows
+  in the same store), per-tab byte budget `CACHE_TAB_MAX_BYTES` (120 MB, oldest evicted first, `_cacheTrimTab`),
+  `cacheWorthStoring` accepts `{audioItems}`. Flow in js/tikkun.js: clip LIST per aliya = session map →
+  IndexedDB → network (/api/related), then stored (only the small parsed list, never the big payload; an aliya
+  without recordings is not cached so a retry can reach the network); each CLIP = IndexedDB → download (CORS) +
+  store → else stream the URL (host without CORS headers); the clips after the current one are fetched ahead
+  (so one play caches the whole aliya). Object URLs are revoked on stop. Empty bodies never stored; settings
+  toggle / global switch respected; size + clear button in Settings → מטמון for free.
+- Tests: `Tests/browser/tikkun.js` now 76 checks (cache hit after reload = zero network requests, 5 rows /
+  byte counts, text from cache, Settings row, clear, eviction, empty body, CORS fallback, cache off).
 
 ### v5.142 (Nov 21, 2026) – Maftir button, תיקון קוראים view, ta'amim list, aliyot table fix
 - ✅ **Static aliyot table was wrong for ~a dozen parshiot.** `PARASHA_ALIYOT` (used when a parasha is

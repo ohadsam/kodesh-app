@@ -2,7 +2,7 @@
 //   python3 -m http.server 8791 &   (from the repo root)   then   node Tests/browser/rambam_books.js
 // Env: PW=/path/to/playwright (default /opt/node22/lib/node_modules/playwright), CHROME=/opt/pw-browsers/chromium, V=<app version>
 const { chromium } = require(process.env.PW || '/opt/node22/lib/node_modules/playwright');
-const V = process.env.V || '5.141';
+const V = process.env.V || '5.143';
 const URL = 'http://127.0.0.1:8791/index.html';
 let n = 0, f = 0;
 const ok = (d, c, x) => { n++; if (c) console.log('OK:', d); else { f++; console.log('FAIL:', d, x !== undefined ? JSON.stringify(x) : ''); } };

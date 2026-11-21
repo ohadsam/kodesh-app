@@ -124,6 +124,8 @@ function renderTikkun(el, h) {
 // Ashkenazi trope, CC-BY-SA, one clip per verse. Whether Sefaria's public API returns them is NOT verified
 // (the sandbox cannot reach sefaria.org): we ask /api/related for the aliya, keep only audio files whose source
 // looks like those recordings, and say so when nothing is found. No synthesized speech is ever used.
+// Caching (tab 'tikkun' in js/cache.js, IndexedDB): the parsed clip list per aliya and every clip's audio bytes are
+// stored the first time (cache hit → no network); the clips after the current one are fetched ahead.
 // Verify with: python3 .claude/skills/sefaria-api/scripts/sefaria_probe.py media-check "Genesis 1:1-2:3"
 // ═══════════════════════════════════════════════════════════════════════
 const TK_AUDIO = { state: 'idle', ref: null, items: [], i: -1, el: null, rate: 1, msg: '', source: '' };
@@ -161,6 +163,51 @@ function _tkHighlight(i) {
   if (v) { v.classList.add('tk-playing'); v.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
 }
 
+// The list of clips for an aliya: session map → IndexedDB (tab 'tikkun') → network (/api/related), then stored.
+// Only the small parsed list is cached (the /api/related payload is large); an aliya without recordings is
+// remembered for the session only, so a later attempt can still reach the network.
+const _tkListMem = {};
+async function _tkClipList(ref) {
+  const key = 'tikkun-audio-list:' + ref;
+  if (_tkListMem[ref]) return _tkListMem[ref];
+  if (typeof cacheGetJson === 'function') {
+    const hit = await cacheGetJson(key, 'tikkun');
+    if (hit && Array.isArray(hit.audioItems)) { console.log('[Cache] HIT tikkun clip list', ref); return (_tkListMem[ref] = hit); }
+  }
+  const data = await fetchWithDelay('https://www.sefaria.org/api/related/' + encodeURI(ref), 0);
+  const found = tikkunParseMedia(data, _aliyaVerseNums.filter(Boolean));
+  const list = { audioItems: found.items, missing: found.missing, source: found.source };
+  if (found.items.length) { _tkListMem[ref] = list; if (typeof cachePutJson === 'function') cachePutJson(key, list, 'tikkun'); }
+  return list;
+}
+
+// One clip → something an <audio> can play: IndexedDB copy → else download (CORS) and store → else stream the URL.
+const _tkObjUrls = {};
+async function _tkClipSrc(item) {
+  if (_tkObjUrls[item.url]) return _tkObjUrls[item.url];
+  try {
+    let blob = typeof cacheGetBlob === 'function' ? await cacheGetBlob(item.url, 'tikkun') : undefined;
+    if (!blob) {
+      const resp = await fetch(item.url);
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      blob = await resp.blob();
+      if (typeof cachePutBlob === 'function') cachePutBlob(item.url, blob, 'tikkun');
+    } else console.log('[Cache] HIT tikkun clip', item.key);
+    return (_tkObjUrls[item.url] = URL.createObjectURL(blob));
+  } catch (e) {
+    console.warn('[Tikkun] clip not cacheable (' + e.message + '), streaming it');       // e.g. the host sends no CORS headers
+    return item.url;
+  }
+}
+// while a clip plays, fetch (and thereby cache) the clips that follow it
+let _tkWarmToken = 0;
+async function _tkWarm(from, token) {
+  for (let j = from; j < TK_AUDIO.items.length; j++) {
+    if (token !== _tkWarmToken || TK_AUDIO.state === 'idle') return;
+    await _tkClipSrc(TK_AUDIO.items[j]);
+  }
+}
+
 async function tikkunAudioToggle() {
   const a = TK_AUDIO;
   if (a.state === 'loading') return;
@@ -171,31 +218,36 @@ async function tikkunAudioToggle() {
   a.state = 'loading'; a.ref = ref; _tkSetMsg('');
   let found;
   try {
-    const data = await fetchWithDelay('https://www.sefaria.org/api/related/' + encodeURI(ref), 0);
+    found = await _tkClipList(ref);
     if (a.ref !== _currentAliyaRef) { a.state = 'idle'; return; }
-    found = tikkunParseMedia(data, _aliyaVerseNums.filter(Boolean));
   } catch (e) {
     a.state = 'idle'; _tkSetMsg('לא ניתן לבדוק הקראה כרגע (' + e.message + ')'); return;
   }
-  if (!found.items.length) { a.state = 'idle'; a.ref = null; _tkSetMsg('לא נמצאה בספריא הקראה מוקלטת (עם טעמים) לעליה זו.'); return; }
-  a.items = found.items; a.i = 0; a.source = found.source;
+  if (!found.audioItems.length) { a.state = 'idle'; a.ref = null; _tkSetMsg('לא נמצאה בספריא הקראה מוקלטת (עם טעמים) לעליה זו.'); return; }
+  a.items = found.audioItems; a.i = 0; a.source = found.source;
   a.el = a.el || new Audio();
   a.el.playbackRate = a.rate;
   a.el.onended = () => { if (a.i + 1 < a.items.length) _tkPlayAt(a.i + 1); else tikkunAudioStop(); };
   a.el.onerror = () => { if (a.state !== 'idle') { _tkSetMsg('קובץ ההקראה לא נטען'); tikkunAudioStop(true); } };
   _tkSetMsg(`הקראה אנושית · ${a.source || 'ספריא'} · נוסח אשכנז` + (found.missing ? ` · חסרים ${found.missing} פסוקים` : ''));
+  _tkWarmToken++;
   _tkPlayAt(0);
 }
-function _tkPlayAt(i) {
+async function _tkPlayAt(i) {
   const a = TK_AUDIO; a.i = i;
-  a.el.src = a.items[i].url; a.el.playbackRate = a.rate;
+  const token = ++_tkWarmToken;
   a.state = 'playing'; _tikkunRenderOpts(); _tkHighlight(i);
+  const src = await _tkClipSrc(a.items[i]);
+  if (a.i !== i || a.state === 'idle') return;                     // stopped / jumped while the clip was being fetched
+  a.el.src = src; a.el.playbackRate = a.rate;
   const p = a.el.play(); if (p && p.catch) p.catch(() => { a.state = 'paused'; _tikkunRenderOpts(); });
+  _tkWarm(i + 1, token);
 }
 function tikkunAudioStop(keepMsg) {
   const a = TK_AUDIO;
   if (a.el) { a.el.onended = null; a.el.pause(); }
-  a.state = 'idle'; a.i = -1; a.items = []; a.ref = null;
+  a.state = 'idle'; a.i = -1; a.items = []; a.ref = null; _tkWarmToken++;
+  Object.keys(_tkObjUrls).forEach(u => { URL.revokeObjectURL(_tkObjUrls[u]); delete _tkObjUrls[u]; });   // the bytes stay in IndexedDB
   if (!keepMsg) a.msg = '';
   _tkHighlight(-1); _tikkunRenderOpts();
 }

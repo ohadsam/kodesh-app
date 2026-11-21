@@ -24,7 +24,9 @@ const CACHE_TABS = [
   { id: 'tehilim', name: 'תהילים' },
   { id: 'lashon', name: 'שמירת הלשון' },
   { id: 'rambam', name: 'ספרי הרמב"ם' },
+  { id: 'tikkun', name: 'הקראות תיקון קוראים' },
 ];
+const CACHE_TAB_MAX_BYTES = { tikkun: 120 * 1024 * 1024 };   // audio is big: the oldest clips are dropped past this
 
 let _cacheDbPromise = null;
 
@@ -50,6 +52,7 @@ function cacheWorthStoring(data) {
   if (!data || typeof data !== 'object' || data.error) return false;
   if ('he' in data) return _cacheHasContent(data.he);          // Sefaria texts API
   if (Array.isArray(data.items)) return data.items.length > 0; // Hebcal
+  if (Array.isArray(data.audioItems)) return data.audioItems.length > 0;   // תיקון קוראים: the parsed list of recorded clips
   return false;
 }
 
@@ -98,6 +101,29 @@ async function cachePutJson(key, data, tab) {
   if (!cacheEnabledFor(tab) || !cacheWorthStoring(data)) return false;
   const size = new TextEncoder().encode(JSON.stringify(data)).length;
   return _cacheTx('readwrite', s => s.put({ key, tab, data, size, ts: Date.now() }), false);
+}
+
+// Binary entries (audio clips of the תיקון קוראים reading) live in the same store: {key, tab, blob, size, ts}.
+async function cacheGetBlob(key, tab) {
+  if (!cacheEnabledFor(tab)) return undefined;
+  const row = await _cacheTx('readonly', s => s.get(key), undefined);
+  return row && row.blob instanceof Blob && row.blob.size > 0 ? row.blob : undefined;
+}
+async function cachePutBlob(key, blob, tab) {
+  if (!cacheEnabledFor(tab) || !(blob instanceof Blob) || !blob.size) return false;          // never store an empty body
+  await _cacheTrimTab(tab, blob.size);
+  return _cacheTx('readwrite', s => s.put({ key, tab, blob, size: blob.size, ts: Date.now() }), false);
+}
+// Keep a tab under its byte budget (CACHE_TAB_MAX_BYTES) by dropping its oldest entries first.
+async function _cacheTrimTab(tab, incoming) {
+  const max = CACHE_TAB_MAX_BYTES[tab]; if (!max) return;
+  const rows = await _cacheTx('readonly', s => s.index('tab').getAll(IDBKeyRange.only(tab)), []);
+  let total = (rows || []).reduce((a, r) => a + (r.size || 0), 0) + incoming;
+  if (total <= max) return;
+  const oldest = (rows || []).slice().sort((a, b) => (a.ts || 0) - (b.ts || 0));
+  const drop = [];
+  for (const r of oldest) { if (total <= max) break; drop.push(r.key); total -= r.size || 0; }
+  if (drop.length) await _cacheTx('readwrite', s => { drop.forEach(k => s.delete(k)); return null; }, false);
 }
 
 // Drop-in for fetch(url, init) on a cacheable URL. On a hit returns a minimal

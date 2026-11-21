@@ -2,7 +2,7 @@
 //   python3 -m http.server 8791 &   (repo root)   then   node Tests/browser/tikkun.js
 // Env: PW, CHROME, V (app version), OUT (screenshot dir)
 const { chromium } = require(process.env.PW || '/opt/node22/lib/node_modules/playwright');
-const V = process.env.V || '5.142';
+const V = process.env.V || '5.143';
 const OUT = process.env.OUT || '/tmp';
 let n = 0, f = 0;
 const ok = (d, c, x) => { n++; if (c) console.log('OK:', d); else { f++; console.log('FAIL:', d, x !== undefined ? JSON.stringify(x) : ''); } };
@@ -14,15 +14,17 @@ const verses = k => [V1, V2, V3][k % 3];
 
 (async () => {
   const browser = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium' });
-  const run = async (theme, w, fn) => {
+  const run = async (theme, w, fn, cacheOn) => {
     const ctx = await browser.newContext({ viewport: { width: w, height: 800 }, serviceWorkers: 'block' });
-    await ctx.addInitScript(([v, t]) => {
-      if (!sessionStorage.getItem('s')) { sessionStorage.setItem('s', '1'); localStorage.setItem('theme', t); localStorage.setItem('kodesh_app_v1', JSON.stringify({ _lastSeenVersion: v, cacheSettings: { enabled: false } })); }
+    await ctx.addInitScript(([v, t, cacheOn]) => {
+      if (!sessionStorage.getItem('s')) { sessionStorage.setItem('s', '1'); localStorage.setItem('theme', t); localStorage.setItem('kodesh_app_v1', JSON.stringify({ _lastSeenVersion: v, cacheSettings: { enabled: !!cacheOn } })); }
       // a fake <audio>: records what would be played, lets the test finish a clip
       window.__played = [];
       window.Audio = class { constructor() { this.paused = true; this.playbackRate = 1; } play() { this.paused = false; window.__played.push(this.src); window.__audio = this; return Promise.resolve(); } pause() { this.paused = true; } };
-    }, [V, theme]);
+    }, [V, theme, !!cacheOn]);
     const reqs = [];
+    const mediaHits = [];
+    await ctx.route(/media\.example/, r => { const u = r.request().url(); mediaHits.push(u); if (/broken/.test(u)) return r.abort(); r.fulfill({ status: 200, contentType: 'audio/mpeg', headers: { 'access-control-allow-origin': '*' }, body: Buffer.from('ID3-fake-mp3-bytes-' + u) }); });
     await ctx.route(/sefaria|hebcal/, r => {
       const u = decodeURIComponent(r.request().url()); reqs.push(u); let body = '{"items":[],"calendar_items":[]}', m;
       if ((m = u.match(/api\/texts\/(\w+) (\d+):(\d+)-(\d+):(\d+)/)) && m[2] === m[4]) body = JSON.stringify({ he: Array.from({ length: +m[5] - +m[3] + 1 }, (_, i) => verses(i)), sections: [+m[2], +m[3]], toSections: [+m[4], +m[5]] });
@@ -36,13 +38,13 @@ const verses = k => [V1, V2, V3][k % 3];
     const page = await ctx.newPage(); const errors = []; page.on('pageerror', e => errors.push(e.message)); page.on('dialog', d => d.accept());
     await page.goto('http://127.0.0.1:8791/index.html'); await page.waitForTimeout(2200);
     await page.evaluate(() => showTab('parasha')); await page.waitForTimeout(1200);
-    await fn({ page, errors, reqs });
+    await fn({ page, errors, reqs, mediaHits, ctx, theme });
     await ctx.close();
   };
   const tabs = page => page.evaluate(() => [...document.querySelectorAll('#aliya-tabs .aliya-tab')].map(t => t.textContent.trim()));
   const clickTab = (page, label) => page.evaluate(l => { const t = [...document.querySelectorAll('#aliya-tabs .aliya-tab')].find(x => x.textContent.trim() === l); t.click(); }, label);
 
-  for (const [theme, w] of [['light', 380], ['dark', 360]]) await run(theme, w, async ({ page, errors, reqs }) => {
+  for (const [theme, w] of [['light', 380], ['dark', 360]]) await run(theme, w, async ({ page, errors, reqs, mediaHits }) => {
     const T = `[${theme} ${w}px] `;
     // ── 1. maftir ──
     await page.evaluate(() => loadSpecificParasha('Genesis 12:1-17:27')); await page.waitForTimeout(1200);
@@ -116,10 +118,10 @@ const verses = k => [V1, V2, V3][k % 3];
     await clickTab(page, 'מפטיר'); await page.waitForTimeout(1200);
     await page.click('#tk-audio-btn'); await page.waitForTimeout(800);
     let a = await page.evaluate(() => ({ played: window.__played, msg: document.querySelector('.tk-msg')?.textContent, btn: document.getElementById('tk-audio-btn').textContent, hl: document.querySelector('.tk-playing')?.dataset.i }));
-    ok(T + 'reading found → plays the first verse clip; verse highlighted; source + Ashkenazi stated', a.played.length === 1 && /gen17_24\.mp3$/.test(a.played[0]) && a.hl === '0' && /PocketTorah/.test(a.msg) && /אשכנז/.test(a.msg) && /השהה/.test(a.btn), a);
+    ok(T + 'reading found → plays the first verse clip (fetched from the clip URL); verse highlighted; source + Ashkenazi stated', a.played.length === 1 && mediaHits.some(u => /gen17_24\.mp3$/.test(u)) && a.hl === '0' && /PocketTorah/.test(a.msg) && /אשכנז/.test(a.msg) && /השהה/.test(a.btn), a);
     await page.evaluate(() => window.__audio.onended());
     await page.waitForTimeout(300);
-    ok(T + 'next verse plays when a clip ends, highlight moves', await page.evaluate(() => window.__played.length === 2 && /gen17_25/.test(window.__played[1]) && document.querySelector('.tk-playing').dataset.i === '1'));
+    ok(T + 'next verse plays when a clip ends, highlight moves', await page.evaluate(() => window.__played.length === 2 && document.querySelector('.tk-playing').dataset.i === '1'));
     await page.click('#tk-audio-btn'); await page.waitForTimeout(200);
     ok(T + 'pause / resume', await page.evaluate(() => /המשך/.test(document.getElementById('tk-audio-btn').textContent) && window.__audio.paused === true));
     await clickTab(page, 'ב'); await page.waitForTimeout(1200);
@@ -146,6 +148,65 @@ const verses = k => [V1, V2, V3][k % 3];
     ok('no page errors (search/bookmark)', errors.length === 0, errors);
   });
 
+
+  // ── caching: text, clip list, clip audio (IndexedDB, tab "tikkun") ──
+  await run('light', 380, async ({ page, errors, reqs, mediaHits }) => {
+    const rows = () => page.evaluate(async () => { const st = await cacheStats(); return { tikkun: st.byTab.tikkun, parasha: st.byTab.parasha }; });
+    const count = (arr, re) => arr.filter(u => re.test(u)).length;
+    await page.evaluate(() => loadSpecificParasha('Genesis 12:1-17:27')); await page.waitForTimeout(1200);
+    await page.evaluate(() => { const t = [...document.querySelectorAll('#aliya-tabs .aliya-tab')].find(x => x.textContent.trim() === 'מפטיר'); t.click(); }); await page.waitForTimeout(1500);
+    await page.click('#view-tikkun-btn'); await page.waitForTimeout(500);
+    const textReq1 = count(reqs, /api\/texts\/Genesis 17:24-17:27/);
+    await page.click('#tk-audio-btn'); await page.waitForTimeout(2500);
+    let r = await rows();
+    ok('first play: clip list requested once (/api/related), clips downloaded once each (current + fetched ahead)', count(reqs, /api\/related\//) === 1 && [24, 25, 26, 27].every(v => count(mediaHits, new RegExp(`gen17_${v}\\.mp3`)) === 1), { rel: count(reqs, /api\/related\//), media: mediaHits });
+    ok('IndexedDB tab "tikkun" now holds the clip list + 4 clips (bytes counted); the text is in tab "parasha"', r.tikkun.count === 5 && r.tikkun.bytes > 100 && r.parasha.count >= 1, r);
+    ok('playback uses the stored bytes (blob URL), not the remote URL', await page.evaluate(() => /^blob:/.test(window.__played[0])), await page.evaluate(() => window.__played));
+    await page.evaluate(() => tikkunAudioStop()); 
+    await page.reload(); await page.waitForTimeout(2200);
+    await page.evaluate(() => showTab('parasha')); await page.waitForTimeout(800);
+    await page.evaluate(() => loadSpecificParasha('Genesis 12:1-17:27')); await page.waitForTimeout(1200);
+    await page.evaluate(() => { const t = [...document.querySelectorAll('#aliya-tabs .aliya-tab')].find(x => x.textContent.trim() === 'מפטיר'); t.click(); }); await page.waitForTimeout(1200);
+    await page.evaluate(() => setParashaView('tikkun')); await page.waitForTimeout(500);
+    ok('after a reload the maftir text comes from the cache (no second /api/texts request)', count(reqs, /api\/texts\/Genesis 17:24-17:27/) === textReq1, count(reqs, /api\/texts\/Genesis 17:24-17:27/));
+    await page.click('#tk-audio-btn'); await page.waitForTimeout(1500);
+    ok('after a reload: clip list + audio come from IndexedDB — zero new network requests, still plays', count(reqs, /api\/related\//) === 1 && mediaHits.length === 4 && await page.evaluate(() => window.__played.length >= 1 && /^blob:/.test(window.__played[0])), { rel: count(reqs, /api\/related\//), media: mediaHits.length });
+    await page.evaluate(() => tikkunAudioStop());
+    const settings = await page.evaluate(async () => { openSettings(); await renderCacheSettings(); return document.getElementById('cache-tab-rows').textContent; });
+    ok('Settings → cache shows the "הקראות תיקון קוראים" row with its size', /הקראות תיקון קוראים/.test(settings) && /5 פריטים/.test(settings), settings.replace(/\s+/g, ' ').slice(0, 300));
+    await page.evaluate(async () => { closeSettings(); await cacheClear('tikkun'); });
+    ok('clearing that tab removes only the audio entries', (await rows()).tikkun.count === 0 && (await rows()).parasha.count >= 1);
+    // eviction: a small budget keeps only the newest entries
+    const ev = await page.evaluate(async () => { CACHE_TAB_MAX_BYTES.tikkun = 1000; const mk = n => new Blob([new Uint8Array(600).fill(n)]); await cachePutBlob('k1', mk(1), 'tikkun'); await new Promise(r => setTimeout(r, 5)); await cachePutBlob('k2', mk(2), 'tikkun'); await new Promise(r => setTimeout(r, 5)); await cachePutBlob('k3', mk(3), 'tikkun'); const st = await cacheStats(); return { n: st.byTab.tikkun.count, bytes: st.byTab.tikkun.bytes, k1: !!(await cacheGetBlob('k1', 'tikkun')), k3: !!(await cacheGetBlob('k3', 'tikkun')) }; });
+    ok('byte budget: oldest clips are evicted first', ev.n === 1 && ev.bytes === 600 && !ev.k1 && ev.k3, ev);
+    ok('empty bodies are never stored', await page.evaluate(async () => (await cachePutBlob('empty', new Blob([]), 'tikkun')) === false && !(await cacheGetBlob('empty', 'tikkun'))));
+    ok('no page errors (cache)', errors.length === 0, errors);
+  }, true);
+
+  // a clip host without CORS headers (download impossible) → the clip is streamed, nothing half-cached
+  await run('light', 380, async ({ page, errors, reqs, mediaHits }) => {
+    await page.evaluate(() => loadSpecificParasha('Genesis 12:1-17:27')); await page.waitForTimeout(1200);
+    await page.evaluate(() => { const t = [...document.querySelectorAll('#aliya-tabs .aliya-tab')].find(x => x.textContent.trim() === 'מפטיר'); t.click(); }); await page.waitForTimeout(1500);
+    await page.evaluate(() => {   // pretend the downloads fail (CORS): every clip fetch rejects
+      const f = window.fetch; window.fetch = (u, i) => /media\.example/.test(String(u)) ? Promise.reject(new TypeError('Failed to fetch')) : f(u, i);
+    });
+    await page.click('#view-tikkun-btn'); await page.waitForTimeout(400);
+    await page.click('#tk-audio-btn'); await page.waitForTimeout(1500);
+    const s = await page.evaluate(async () => ({ played: window.__played, st: (await cacheStats()).byTab.tikkun }));
+    ok('download blocked → clip is streamed from its URL, still plays; no clip bytes stored (only the list)', s.played.length >= 1 && /^https:\/\/media\.example\/gen17_24\.mp3$/.test(s.played[0]) && s.st.count === 1, s);
+    ok('no page errors (stream fallback)', errors.length === 0, errors);
+  }, true);
+
+  // cache switched off → nothing stored, everything still works
+  await run('light', 380, async ({ page, errors }) => {
+    await page.evaluate(() => loadSpecificParasha('Genesis 12:1-17:27')); await page.waitForTimeout(1200);
+    await page.evaluate(() => { const t = [...document.querySelectorAll('#aliya-tabs .aliya-tab')].find(x => x.textContent.trim() === 'מפטיר'); t.click(); }); await page.waitForTimeout(1500);
+    await page.click('#view-tikkun-btn'); await page.waitForTimeout(400);
+    await page.click('#tk-audio-btn'); await page.waitForTimeout(1500);
+    const s = await page.evaluate(async () => ({ played: window.__played.length, st: await cacheStats() }));
+    ok('cache off: plays, nothing written to IndexedDB', s.played >= 1 && s.st.total.count === 0, s);
+    ok('no page errors (cache off)', errors.length === 0, errors);
+  }, false);
   console.log(`${n - f}/${n} passed`); await browser.close(); process.exit(f ? 1 : 0);
 })();
 async function txtAll(page) { return page.evaluate(() => document.getElementById('tikkun-opts').textContent); }
