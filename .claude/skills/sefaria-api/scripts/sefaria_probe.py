@@ -8,6 +8,7 @@
   python3 sefaria_probe.py links  "Sanhedrin 2a" [CollectiveTitle]   # e.g. Rashi, Tosafot
   python3 sefaria_probe.py commentaries "Tanya,_Part_I;_Likkutei_Amarim.1"
   python3 sefaria_probe.py tocheck-all                       # the project's known refs (see references/refs-catalog.md)
+  python3 sefaria_probe.py media-check "Genesis 1:1-2:3"      # audio/video 'media' attached to a ref (Torah Readings = PocketTorah chanting?)
   python3 sefaria_probe.py rambam-check [js/rambam-data.js]  # all 84 Mishneh Torah sets: chapter counts + Steinsaltz coverage (≈340 requests)
 
 Env: SEFARIA_BASE overrides https://www.sefaria.org/api/ (for mocks / sefaria.org.il).
@@ -121,6 +122,19 @@ def cmd_known():
     cmd_text(refs)
 
 
+def cmd_media_check(ref):
+    """What does /api/related say about audio for this ref? (used to verify js/tikkun.js's recorded-reading assumption)"""
+    d = get(f'related/{quote(ref)}')
+    if '_error' in d: print(d['_error']); sys.exit(1)
+    print('keys in the response:', sorted(d.keys()) if isinstance(d, dict) else type(d).__name__)
+    media = d.get('media') if isinstance(d, dict) else None
+    if not media:
+        print('no "media" entries for', ref); return
+    print(len(media), 'media entries; fields of the first:', sorted(media[0].keys()))
+    for m in media[:25]:
+        print(' ', m.get('anchorRef'), '|', m.get('source'), '|', m.get('source_site'), '|', m.get('media_type') or '', '|', m.get('media_url'))
+
+
 def cmd_rambam_check(path=None):
     """Verify js/rambam-data.js against Sefaria: for every set, the last chapter exists with Hebrew,
     chapter last+1 does not, and Steinsaltz answers for the first and last chapter (range ref)."""
@@ -163,5 +177,5 @@ if __name__ == '__main__':
     c, a = sys.argv[1], sys.argv[2:]
     {'text': lambda: cmd_text(a), 'calendar': lambda: cmd_calendar(a), 'index': lambda: cmd_index(a),
      'shape': lambda: cmd_shape(a), 'links': lambda: cmd_links(*a[:2]), 'commentaries': lambda: cmd_links(a[0]),
-     'tocheck-all': cmd_known, 'rambam-check': lambda: cmd_rambam_check(a[0] if a else None)}.get(c, lambda: (print(__doc__), sys.exit(2)))()
+     'tocheck-all': cmd_known, 'rambam-check': lambda: cmd_rambam_check(a[0] if a else None), 'media-check': lambda: cmd_media_check(a[0] if a else 'Genesis 1:1-2:3')}.get(c, lambda: (print(__doc__), sys.exit(2)))()
     sys.exit(1 if failed else 0)

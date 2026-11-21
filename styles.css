@@ -825,3 +825,39 @@ body.bm-pressing, body.bm-pressing * {
 .rb-approx { font-size: 10px; opacity: .75; font-style: normal; }
 mark.rb-hit { background: rgba(201,165,74,.32); color: inherit; border-radius: 3px; padding: 0 1px; }
 mark.rb-hit.rb-hit-on { background: var(--gold); color: #000; }
+
+/* ─── תיקון קוראים (Torah-scroll view) ───────────────── */
+@font-face { font-family: 'Itim Stam Ashkenaz'; src: url('fonts/ItimStamAshkenaz.woff2') format('woff2'), url('fonts/ItimStamAshkenaz.ttf') format('truetype'); font-display: swap; }
+@font-face { font-family: 'Itim Stam Sefarad'; src: url('fonts/ItimStamSefarad.woff2') format('woff2'), url('fonts/ItimStamSefarad.ttf') format('truetype'); font-display: swap; }
+:root { --tk-parchment: #f6edd2; --tk-ink: #261c10; --tk-edge: #cdb98a; --tk-sub: #6b5a2c; --tk-acc: #8a6d1f; }
+:root:not([data-theme="light"]) { --tk-parchment: #2a2216; --tk-ink: #ecdfc2; --tk-edge: #5a4a2c; --tk-sub: #c2b080; --tk-acc: #d9b95a; }
+.tk-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.tk-chip { background: var(--surface); border: 1px solid var(--border); color: var(--gold); border-radius: 16px; padding: 5px 12px; font-size: 12px; font-family: 'Heebo', sans-serif; cursor: pointer; }
+.tk-chip.on { background: var(--gold); color: var(--bg); border-color: var(--gold); font-weight: 700; }
+.tk-msg { font-size: 11.5px; color: var(--muted); margin: 0 2px 8px; line-height: 1.6; }
+.tk-scroll { background: var(--tk-parchment); color: var(--tk-ink); border: 1px solid var(--tk-edge); border-radius: 10px; padding: 12px 14px; box-shadow: inset 0 0 22px rgba(120,90,30,.12); }
+.tk-v { margin-bottom: 4px; }
+.tk-n { color: var(--tk-acc); font-size: 11px; font-family: 'Heebo', sans-serif; margin-left: 6px; }
+.tk-t { font-size: calc(var(--font-size) * 1.6); line-height: 1.75; color: var(--tk-ink); }
+.tk-t.tk-marks { line-height: 2.25; }
+.tk-ashkenaz { font-family: 'Itim Stam Ashkenaz', 'Frank Ruhl Libre', serif; }
+.tk-sefarad { font-family: 'Itim Stam Sefarad', 'Frank Ruhl Libre', serif; }
+.tk-big { font-size: 1.5em; line-height: 1; }
+.tk-small { font-size: .7em; }
+.tk-sup { vertical-align: super; font-size: .7em; }
+.tk-pe { margin-bottom: 1.1em; }
+.tk-se .tk-t::after { content: ''; display: inline-block; width: 1.4em; }
+.tk-mk { font-size: 11px; color: var(--tk-acc); border: 1px solid var(--tk-edge); border-radius: 4px; padding: 0 4px; margin-right: 6px; font-family: 'Heebo', sans-serif; vertical-align: middle; }
+.tk-v.tk-playing { background: rgba(201,165,74,.28); border-radius: 6px; }
+.tk-scroll > div[style*="text-align:center"] { color: var(--tk-acc) !important; }
+.tk-troplist { background: var(--tk-parchment); color: var(--tk-ink); border: 1px solid var(--tk-edge); border-radius: 10px; padding: 10px 12px; }
+.tk-trop-intro { font-size: 12px; color: var(--tk-sub); margin-bottom: 8px; line-height: 1.6; }
+.tk-trop-h { font-weight: 700; font-size: 14px; margin: 12px 0 6px; padding-bottom: 3px; border-bottom: 1px solid var(--tk-edge); }
+.tk-trop-h span { display: block; font-weight: 400; font-size: 11px; color: var(--tk-sub); }
+.tk-trop { display: flex; align-items: center; gap: 12px; padding: 5px 0; }
+.tk-trop + .tk-trop { border-top: 1px dashed rgba(120,90,30,.25); }
+.tk-trop-sign { flex: none; min-width: 3.2em; text-align: center; font-size: 34px; line-height: 2.1; }
+.tk-trop-alt { min-width: 0; font-size: 26px; opacity: .8; }
+.tk-trop-txt { display: flex; flex-direction: column; gap: 1px; font-family: 'Heebo', sans-serif; }
+.tk-trop-txt b { font-size: 14.5px; }
+.tk-trop-txt span { font-size: 11.5px; color: var(--tk-sub); line-height: 1.5; }

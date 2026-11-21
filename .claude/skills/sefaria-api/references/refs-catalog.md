@@ -25,6 +25,9 @@ Items matched by `title.en`/`title.he` substring: Daf Yomi ([prod][test]), Mishn
 
 - **All of Mishneh Torah (v5.141)**: `Mishneh Torah, {Title} {chapter}` for 84 sets, e.g. `Mishneh Torah, Sabbath 5`, `Mishneh Torah, Rest on the Tenth of Tishrei 2` [prod-code, untested live]. Titles + chapter counts: Hebcal `mishnehTorah.json` (snapshot `Tests/data/hebcal_mishnehTorah.json`; Hebcal links to `sefaria.org/Mishneh_Torah,_<Title>.<perek>`). Steinsaltz: `Steinsaltz on Mishneh Torah, {Title} {ch}:1-{N}` (N = the chapter's halacha count) → he[halacha][comment], comments open with `<b>lemma</b>`. Verify with `sefaria_probe.py rambam-check`.
 
+- **Torah chanting audio (v5.142)**: Sefaria's resource panel "Torah Readings" = PocketTorah recordings (human, Ashkenazi trope only, per verse, CC-BY-SA; per Sefaria's help center article "How to Hear a Verse of Torah Chanted"). API exposure **[unverified]** – check with `sefaria_probe.py media-check "<ref>"` (looks at `/api/related/{ref}` → `media[]`).
+- **Aliyot / maftir data**: Hebcal `aliyot.json` (@hebcal/leyning, BSD-2): `fullkriyah` 1-7 + `M`; the same as `leyning` in Hebcal's API. Snapshot `Tests/data/hebcal_aliyot.json`.
+
 ## Prayer (siddur engine, `js/siddur.js`, `js/siddur-inserts.js`)
 Bases: Sfard `Weekday_Siddur_Sefard_Linear`, Ashkenaz `Siddur_Ashkenaz`, Edot HaMizrach `Siddur_Edot_HaMizrach`. Ref = `{Base},_{Path}` with underscores and commas, e.g.
 - `Weekday_Siddur_Sefard_Linear,_The_Morning_Prayers,_Shemoneh_Esrei` [prod][test]

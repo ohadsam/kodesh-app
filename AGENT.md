@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.141 (Nov 17, 2026)
+**Last updated:** v5.142 (Nov 21, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -570,6 +570,30 @@ v5.124 specifically so both Sukkot items sit in the same place).
 
 ## Known Issues / Open Items
 
+### 🟡 תיקון קוראים – recorded reading unverified; no Sephardi/other nusach (v5.142)
+Sefaria's help center says every verse of the Five Books can be heard chanted in the resource panel
+("Torah Readings"): human recordings from the PocketTorah app, **Ashkenazi trope only**, CC-BY-SA, one clip per
+verse; website only (the mobile app does not play them). No other nusach exists there, so none is offered.
+Whether the public API exposes them is unknown (sandbox cannot reach sefaria.org): `tikkunAudioToggle` asks
+`/api/related/<aliya>` for `media` entries (audio files, source matching /pocket|torah reading|chant/), plays
+them verse by verse and says so in Hebrew when none are found. The `media_url` / `anchorRef` field names are an
+ASSUMPTION. Verify: `python3 .claude/skills/sefaria-api/scripts/sefaria_probe.py media-check "Genesis 1:1-2:3"`.
+If the API does not carry them the 🎧 button simply reports "not found" – then a different source (e.g. the
+PocketTorah recordings themselves, CC-BY-SA) would have to be wired with its real URL scheme.
+
+### 🟡 Haftara table vs Hebcal (found while checking the aliyot, not fixed)
+`HAFTARA_REFS` differs from Hebcal's `haft` for 8 parshiot: Achrei Mot / Kedoshim look swapped (app: Ezekiel 22
+/ Amos 9; Hebcal: Amos 9 / Ezekiel 22 – the Ashkenazi custom differs between non-combined and combined years),
+Vayeilech (app Hosea 14:2-10, Hebcal Isaiah 55:6-56:8 – Shabbat Shuva question), and Shemot / Yitro / Mishpatim / Tzav /
+Masei where Hebcal's entry has another structure (ashk/seph split) so the comparison was inconclusive. The live
+path uses Hebcal's leyning; only the static fallback is affected. Needs a rabbinic source before changing.
+
+### 🟡 Stam fonts are a derived work (v5.142)
+`fonts/ItimStam*` combine Stam CLM + Keter YG outlines (both GPL-2 + font exception, Yoram Gnat/Culmus). The
+exception lets pages embed them; the font files themselves stay GPL-2 (licence + build script in the repo).
+Mark placement is a simple GPOS (centre above/below + a trop-below-vowel chain): rare stacks (e.g. pashta over
+holam) can overlap. The ta'amim names/notes were written from the standard Chumash lists, not from Sefaria.
+
 ### 🟡 ספרי הרמב"ם – not verified against live Sefaria (v5.141)
 The sandbox cannot reach sefaria.org, so the data was cross-checked only against Hebcal's table.
 Unverified: (1) each set's chapter count as Sefaria has it – notably "The Order of Prayer" (4 in
@@ -673,6 +697,31 @@ Backed up in git; to reuse in another project copy the folder to `<project>/.cla
 `~/.claude/skills/`. Update the catalog whenever a ref is added/verified (CLAUDE.md §1).
 
 ## Recently Fixed
+
+### v5.142 (Nov 21, 2026) – Maftir button, תיקון קוראים view, ta'amim list, aliyot table fix
+- ✅ **Static aliyot table was wrong for ~a dozen parshiot.** `PARASHA_ALIYOT` (used when a parasha is
+  picked from the dropdown / no live Hebcal leyning) held a non-standard division for Tzav, Tazria,
+  Nasso, Pinchas, Eikev, Ki Teitzei, Vayeshev, Mishpatim, Terumah, Achrei Mot, Emor (aliyot shifted by one,
+  a 7th aliya of 15 verses …) and ~20 wrong maftir ranges. Regenerated from Hebcal's own aliyot data
+  (@hebcal/leyning 10.1.0, snapshot `Tests/data/hebcal_aliyot.json`) = exactly what the live path gets;
+  `Tests/test_parasha_aliyot.py` guards it (equality + structural checks: maftir ⊂ aliya 7).
+- ✅ **Maftir button**: the aliya buttons now end with "מפטיר" in the dropdown path too (static table keeps
+  8 entries; the Hebcal paths already had `leyning.M`). The maftir is an ordinary aliya ref, so
+  Rashi / Onkelos / Sacks / the new view all work on it. Vezot Haberakhah has none (not in Hebcal's data).
+- ✅ **תיקון קוראים view** (`parashaView === 'tikkun'`, `js/tikkun.js`): the parasha in Torah-scroll letters
+  with layers on the same text – ניקוד, טעמי המקרא, verse numbers, כתב אשכנז/ספרד (`appState.tikkun`).
+  `tikkunTransform` strips points / accents / maqaf (a space in the scroll) / footnotes, keeps big-small
+  letters, turns `{פ}`/`{ס}` into paragraph spacing + a small marker. Aliyot, maftir and "הכל" keep working.
+  Sub-view "📋 רשימת הטעמים" (`js/taamim-data.js`: 18 disjunctive, 8 conjunctive, 7 other; code points
+  verified against Unicode names and against the accents occurring in the Torah text).
+- ✅ **Fonts** (`fonts/`, `tools/build_stam_pointed.py`): Culmus' Stam Ashkenaz/Sefarad CLM letters have EMPTY
+  glyphs for every point and accent (a scroll has none) and a browser cannot mix a letter of one font with the
+  marks of another (checked: it falls back for the whole cluster). So the mark outlines of Keter YG (same
+  Culmus GPL-2 + font exception) are attached to the Stam letters with a generated GPOS table → "Itim Stam
+  Ashkenaz/Sefarad" (woff2, ~10 KB each). Licence files in `fonts/`; SW precaches them.
+- 🟡 **Recorded reading (🎧)** – implemented best-effort, NOT verified live (see Known Issues).
+- Tests: `Tests/test_parasha_aliyot.py` (4), `Tests/test_tikkun.py` (21), `Tests/browser/tikkun.js` (62,
+  Playwright, mocked Sefaria, both themes).
 
 ### v5.141 (Nov 17, 2026) – ספרי הרמב"ם: all of Mishneh Torah + Steinsaltz
 - ✅ New sub-mode in the רמב"ם tab (`#rb-mode-daily` / `#rb-mode-books`, `setRambamMode`).

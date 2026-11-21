@@ -70,6 +70,7 @@ js/app.js           → showTab, loadTab, navigation
 js/calendar.js      → Hebrew dates, zmanim, events
 js/content.js       → Parasha, Daf Yomi, Mishna, Rambam
 js/tehilim.js       → Tehilim by day
+js/tikkun.js        → תיקון קוראים view (Torah-scroll font + layers) + js/taamim-data.js
 js/search.js        → Global search (🔍 top bar) + js/search-data.js vocabulary
 js/autoscroll.js    → Auto-scroll: ▶ button on long pages + toolbar (init from init.js, hook in showTab)
 js/bookmarks.js     → Per-tab bookmarks: long-press to save, bar + flag to return (init from init.js, hook in showTab)
@@ -170,6 +171,16 @@ SKILL.md (how to use the Sefaria API), references/refs-catalog.md (all known ref
 
 ### Tests/probe_sefaria.py
 Manual network probe (not run by test_runner): daily calendars, structure/Hebrew size of Duties of the Heart + Chovat HaTalmidim, Tanya commentary links.
+
+### js/tikkun.js + js/taamim-data.js (תיקון קוראים view of the parasha tab)
+| Function | Description |
+|---|---|
+| `tikkunTransform(raw, {nikud, teamim})` | Pure: Sefaria verse → `{html, pe, se, text}` for the chosen layers (strips marks / maqaf, `{פ}`/`{ס}` flags, big/small tokens, escapes) |
+| `renderTikkun(el, helpers)` | Called by `renderParasha()` when `parashaView === 'tikkun'`; scroll block or the ta'amim table |
+| `tikkunToggle`, `tikkunSetScript`, `tikkunShowTaamim`, `tikkunBackToText` | Toolbar (`#tikkun-opts`), options in `appState.tikkun` |
+| `tikkunParseMedia(related, verseKeys)`, `tikkunAudioToggle/Stop/Rate` | Best-effort recorded reading (Sefaria "Torah Readings"); see Known Issues |
+| `TAAMIM_DISJUNCTIVE/CONJUNCTIVE/OTHER`, `taamimSign` | taamim-data.js: names, code points, position, notes |
+| `fonts/ItimStam{Ashkenaz,Sefarad}.{woff2,ttf}` | Built by `tools/build_stam_pointed.py` from Culmus fonts (see fonts/README.md) |
 
 ### js/rambam-data.js + js/rambam-books.js (ספרי הרמב"ם sub-tab)
 | Function | Description |

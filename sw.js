@@ -1,16 +1,19 @@
-const APP_VERSION = '5.141';
+const APP_VERSION = '5.142';
 const CACHE = `kodesh-v${APP_VERSION}`;
 
 const FONT_URLS = [
   'https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@300;400;500;700;900&family=Heebo:wght@300;400;500;700&display=swap'
 ];
 
+// Local fonts of the תיקון קוראים view (Torah-scroll letters with nikud/ta'amim) – kept for offline use
+const LOCAL_FONTS = ['fonts/ItimStamAshkenaz.woff2', 'fonts/ItimStamSefarad.woff2'];
+
 self.addEventListener('install', e => {
   console.log('[SW] installing v' + APP_VERSION);
   // Install immediately — take over without waiting
   self.skipWaiting();
   e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(FONT_URLS).catch(() => {}))
+    caches.open(CACHE).then(c => c.addAll(FONT_URLS).catch(() => {}).then(() => c.addAll(LOCAL_FONTS).catch(() => {})))
   );
 });
 
@@ -47,6 +50,14 @@ self.addEventListener('fetch', e => {
     e.respondWith(
       caches.match(e.request).then(r => r || fetch(e.request))
     );
+    return;
+  }
+
+  // Our own font files: cache-first (they never change within a version)
+  if (url.includes(self.location.origin) && url.includes('/fonts/')) {
+    e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).then(resp => {
+      const clone = resp.clone(); caches.open(CACHE).then(c => c.put(e.request, clone)); return resp;
+    })));
     return;
   }
 

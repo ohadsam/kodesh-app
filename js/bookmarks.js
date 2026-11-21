@@ -99,7 +99,7 @@ function _bmDateAdapter(rootId, loaderName, tabName) {
   };
 }
 
-const _BM_PARASHA_VIEWS = { text: '', rashi: 'רש"י', onkelos: 'אונקלוס', haftara: 'הפטרה', sacks: 'הרב זקס' };
+const _BM_PARASHA_VIEWS = { text: '', rashi: 'רש"י', onkelos: 'אונקלוס', haftara: 'הפטרה', sacks: 'הרב זקס', tikkun: 'תיקון קוראים' };
 const _BM_ALIYA_NAMES = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'מפטיר'];
 
 const BM_ADAPTERS = {

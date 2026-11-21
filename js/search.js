@@ -296,7 +296,7 @@ function srSearch(query, idx) {
   const cn = P.ctxNums;
   const hasP = hasHint('parasha') || P.aliya != null || P.pview != null;
   const aliyaName = n => (n === 'all' ? 'כל העליות' : n === 8 ? 'מפטיר' : 'עליה ' + _srG(n));
-  const pviewName = { rashi: 'רש"י', onkelos: 'אונקלוס', haftara: 'הפטרה', sacks: 'הרב זקס', text: 'פשט' };
+  const pviewName = { rashi: 'רש"י', onkelos: 'אונקלוס', haftara: 'הפטרה', sacks: 'הרב זקס', text: 'פשט', tikkun: 'תיקון קוראים' };
   const cviewName = { rashi: 'רש"י', tosafot: 'תוספות', bartenura: 'ברטנורא', steinsaltz: 'שטיינזלץ' };
   const numsOf = left => left.map(srHebNum).filter(n => n != null);
 
