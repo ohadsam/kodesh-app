@@ -5,10 +5,9 @@
 // English titles and chapter counts are Hebcal's `mishnehTorah.json` (@hebcal/learning 6.13.2,
 // which builds Sefaria links as "Mishneh_Torah,_<Title>.<perek>"), cross-checked in
 // Tests/test_rambam_books.py. Hebrew names/grouping are the standard ones.
-// TODO: verify source – the sandbox cannot reach sefaria.org, so the chapter counts were
-// NOT re-checked against Sefaria's own index. Run
-//   python3 .claude/skills/sefaria-api/scripts/sefaria_probe.py rambam-check
-// on a machine with network access (it compares every set's chapter count and Steinsaltz coverage).
+// Verified against sefaria.org on Nov 22, 2026 (GitHub Actions run of `sefaria_probe.py rambam-check`): all 84 last
+// chapters exist with Hebrew text; the only deviation from Hebcal is The Order of Prayer = 5 chapters (Hebcal: 4).
+// Re-run `python3 .claude/skills/sefaria-api/scripts/sefaria_probe.py rambam-check` after changing this table.
 // ═══════════════════════════════════════════════════════════════════════
 
 // [Sefaria title, Hebrew name, chapters]
@@ -27,7 +26,7 @@ const RAMBAM_SEFARIM = [
     ['Fringes', 'הלכות ציצית', 3],
     ['Blessings', 'הלכות ברכות', 11],
     ['Circumcision', 'הלכות מילה', 3],
-    ['The Order of Prayer', 'סדר תפילות כל השנה', 4],
+    ['The Order of Prayer', 'סדר תפילות כל השנה', 5],   // Hebcal says 4; Sefaria has a chapter 5 (checked live Nov 2026)
   ] },
   { id: 'zmanim', he: 'ספר זמנים', hil: [
     ['Sabbath', 'הלכות שבת', 30],

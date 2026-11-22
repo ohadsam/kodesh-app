@@ -440,6 +440,26 @@ function _buildAliyaTabs(tabsEl, aliyotArr) {
   `<div class="aliya-tab" onclick="showAliya('all', this)">הכל</div>`;
 }
 
+// ── Hebcal's `leyning` object (verified against the live API, Nov 2026) ─────────────────────────
+// Keys: "1".."7", "maftir", "haftarah" (+ "torah", "triennial"). NOT "M" / "haftara": the app used to read those
+// names, so the maftir never came from Hebcal and the haftara was ALWAYS taken from the static table.
+// A Shabbat that is also a holiday appends a note: "Numbers 7:1-7:17 | Chanukah Day 1 (on Shabbat)" – cut it off.
+// Only one contiguous range ("Book c:v-c:v" / "Book c:v-v") can be loaded as an aliya; anything else is ignored.
+function _hebcalRef(s) {
+  s = String(s == null ? '' : s).split('|')[0].trim();
+  return /^[A-Za-z][A-Za-z ]* \d+:\d+(-\d+(:\d+)?)?$/.test(s) ? s : null;
+}
+function _readHebcalLeyning(l) {
+  if (!l) return [];
+  const a = ['1', '2', '3', '4', '5', '6', '7'].map(k => _hebcalRef(l[k])).filter(Boolean);
+  const m = _hebcalRef(l.maftir || l.M);
+  return a.length >= 3 && m ? a.concat([m]) : a;
+}
+function _hebcalHaftara(l) {
+  const h = String((l && (l.haftarah || l.haftara)) || '').split('|')[0].trim();
+  return h || null;
+}
+
 // Some sources (Sefaria's calendar, Hebcal without `M`) give only the 7 aliyot. Add the maftir from the static table
 // (Hebcal's data, incl. the combined weeks) when its 7th aliya ends where ours ends – otherwise leave it out
 // rather than show a wrong maftir.
@@ -480,9 +500,9 @@ async function loadSpecificParasha(ref) {
         )
       );
       if (matchEvent?.leyning) {
-        aliyot = ['1','2','3','4','5','6','7','M'].map(k => matchEvent.leyning[k]).filter(Boolean).map(r => r.trim());
+        aliyot = _readHebcalLeyning(matchEvent.leyning);
         // Load haftara from Hebcal
-        if (matchEvent.leyning.haftara) _kickoffHaftara(matchEvent.leyning.haftara);
+        if (_hebcalHaftara(matchEvent.leyning)) _kickoffHaftara(_hebcalHaftara(matchEvent.leyning));
       }
     } catch(e) { console.warn('[Parasha] Hebcal fallback failed:', e.message); }
   }
@@ -636,10 +656,7 @@ async function loadParasha() {
     // Handle combined parshiot: Hebcal returns correct aliyot for the combined reading
     // Hebcal leyning format: {"1":"Leviticus 9:1-9:16", "2":..., "M":..., "haftara":"..."}
     const leyning = parashaEvent.leyning || {};
-    const hebcalAliyot = ['1','2','3','4','5','6','7','M']
-      .map(k => leyning[k])
-      .filter(Boolean)
-      .map(r => r.trim());
+    const hebcalAliyot = _readHebcalLeyning(leyning);
 
     if (hebcalAliyot.length >= 3) {
       aliyot = hebcalAliyot;
@@ -667,8 +684,8 @@ async function loadParasha() {
 
     // Start haftara loading in background
     haftaraLoaded = false; haftaraVerses = []; _haftaraRef = null; _sacksLoaded = false; _sacksContent = "";
-    if (leyning.haftara) {
-      _kickoffHaftara(leyning.haftara);
+    if (_hebcalHaftara(leyning)) {
+      _kickoffHaftara(_hebcalHaftara(leyning));
     } else if (HAFTARA_REFS[matchP.ref]) {
       _kickoffHaftara(HAFTARA_REFS[matchP.ref]);
     }
@@ -757,6 +774,17 @@ const HAFTARA_REFS = {
 async function _kickoffHaftara(haftaraRef) {
   if (!haftaraRef) return;
   // Normalize: Hebcal may return "I Kings 18:46 - 19:21" with spaces around dash
+  // "Isaiah 66:1-24; 66:23" (several ranges, e.g. Shabbat Rosh Chodesh) → one text per range, in order
+  if (String(haftaraRef).includes(';')) {
+    const parts = String(haftaraRef).split(';').map(x => x.trim()).filter(Boolean);
+    const book = (parts[0].match(/^(.*?)\s+\d+:/) || [])[1];
+    const refs = parts.map(x => (/^\d+:/.test(x) && book ? book + ' ' + x : x));
+    _haftaraRef = refs.join('; '); haftaraLoaded = false; haftaraVerses = [];
+    try { for (const r of refs) { const d = await sefariaText(r.replace(/\s*-\s*/g, '-'), 200, 'parasha'); haftaraVerses.push(...heFlat(d)); } }
+    catch (e) { console.warn('[Haftara] multi-range failed:', e.message); }
+    haftaraLoaded = true; if (parashaView === 'haftara') renderParasha();
+    return;
+  }
   const normalRef = haftaraRef.replace(/\s*-\s*/g, '-').trim();
   _haftaraRef = normalRef;
   haftaraLoaded = false;
