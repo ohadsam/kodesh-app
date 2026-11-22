@@ -1,0 +1,84 @@
+# One-off network probe: GitHub-hosted runners can reach sefaria.org / hebcal.com (the dev sandbox cannot).
+# Runs only on pushes to the claude/sefaria-probe branch; prints everything to the job log.
+name: sefaria-probe
+on:
+  push:
+    branches: [claude/sefaria-probe]
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Torah reading audio (/api/related media)
+        continue-on-error: true
+        run: |
+          for r in "Genesis 1:1-2:3" "Genesis 17:24-17:27" "Genesis 1:1"; do echo "=== $r"; python3 -I .claude/skills/sefaria-api/scripts/sefaria_probe.py media-check "$r"; done
+          python3 - <<'PY'
+          import json, urllib.request, urllib.parse
+          ref = "Genesis 1:1"
+          d = json.load(urllib.request.urlopen("https://www.sefaria.org/api/related/" + urllib.parse.quote(ref), timeout=60))
+          print("related keys:", list(d.keys()))
+          for k, v in d.items():
+              print(k, type(v).__name__, len(v) if hasattr(v, "__len__") else v)
+          print("media sample:", json.dumps(d.get("media", [])[:5], ensure_ascii=False, indent=1)[:3000])
+          PY
+      - name: Which audio does Sefaria have besides PocketTorah (search media / topics / sources)
+        continue-on-error: true
+        run: |
+          python3 - <<'PY'
+          import json, urllib.request, urllib.parse, collections
+          def get(u):
+              try: return json.load(urllib.request.urlopen(u, timeout=60))
+              except Exception as e: return {"_error": str(e)}
+          # sources of all media entries over several refs
+          src = collections.Counter(); sample = {}
+          for ref in ["Genesis 1:1-1:5", "Exodus 1:1", "Leviticus 1:1", "Numbers 1:1", "Deuteronomy 1:1", "Genesis 12:1", "Psalms 23:1", "Isaiah 40:1"]:
+              d = get("https://www.sefaria.org/api/related/" + urllib.parse.quote(ref))
+              for m in d.get("media", []) or []:
+                  k = (m.get("source"), m.get("source_site"), m.get("license"))
+                  src[k] += 1; sample.setdefault(k, m)
+          print("media sources seen:")
+          for k, n in src.most_common(): print(" ", n, k, json.dumps(sample[k], ensure_ascii=False)[:400])
+          # Sefaria "Torah Readings" / audio mentions in the index / topics
+          for q in ["Torah Readings", "chanting", "trope", "audio"]:
+              d = get("https://www.sefaria.org/api/search-wrapper/es8?q=" + urllib.parse.quote(q)) if False else get("https://www.sefaria.org/api/name/" + urllib.parse.quote(q))
+              print("name/", q, "->", json.dumps(d, ensure_ascii=False)[:300])
+          PY
+      - name: Sefaria calendars + the refs/shapes the app depends on
+        continue-on-error: true
+        run: |
+          python3 -I .claude/skills/sefaria-api/scripts/sefaria_probe.py calendar
+          python3 -I .claude/skills/sefaria-api/scripts/sefaria_probe.py tocheck-all
+          for r in "Rashi on Genesis 17" "Rashi on Genesis 17:7-17:27" "Rashi on Numbers 6"; do python3 -I .claude/skills/sefaria-api/scripts/sefaria_probe.py text "$r"; done
+          python3 - <<'PY'
+          import json, urllib.request, urllib.parse
+          for ref in ["Rashi on Genesis 17", "Rashi on Numbers 6"]:
+              d = json.load(urllib.request.urlopen("https://www.sefaria.org/api/texts/" + urllib.parse.quote(ref) + "?lang=he&commentary=0&context=0", timeout=60))
+              he = d.get("he"); print(ref, "he len", len(he), "non-empty verses", sum(1 for x in he if x), "last non-empty idx", max([i+1 for i,x in enumerate(he) if x] or [0]))
+          PY
+      - name: Mishneh Torah structure + Steinsaltz shape
+        continue-on-error: true
+        run: |
+          python3 - <<'PY'
+          import json, urllib.request, urllib.parse
+          def get(u):
+              try: return json.load(urllib.request.urlopen(u, timeout=60))
+              except Exception as e: return {"_error": str(e)}
+          for ref in ["Steinsaltz on Mishneh Torah, Sabbath 5:1-6", "Steinsaltz on Mishneh Torah, Prayer and the Priestly Blessing 4:1-20", "Mishneh Torah, Sabbath 5"]:
+              d = get("https://www.sefaria.org/api/texts/" + urllib.parse.quote(ref) + "?lang=he&commentary=0&context=0")
+              he = d.get("he")
+              print("==", ref, "| error:", d.get("error") or d.get("_error"), "| sections:", d.get("sections"), "toSections:", d.get("toSections"))
+              if isinstance(he, list):
+                  print("   top-level len", len(he), "| first element type", type(he[0]).__name__ if he else None, "| first:", json.dumps(he[0], ensure_ascii=False)[:300] if he else None)
+          PY
+          python3 -I .claude/skills/sefaria-api/scripts/sefaria_probe.py rambam-check
+      - name: Hebcal (leyning in the API response? parsha audio page)
+        continue-on-error: true
+        run: |
+          curl -sS "https://www.hebcal.com/hebcal?v=1&cfg=json&s=on&i=on&start=2026-11-22&end=2026-12-20" | python3 -c "import sys,json; d=json.load(sys.stdin); it=[i for i in d['items'] if i['category']=='parashat']; print(json.dumps(it[:2],ensure_ascii=False,indent=1)[:1500])"
+          echo ---- with leyning=on
+          curl -sS "https://www.hebcal.com/hebcal?v=1&cfg=json&s=on&i=on&leyning=on&start=2026-11-22&end=2026-12-20" | python3 -c "import sys,json; d=json.load(sys.stdin); it=[i for i in d['items'] if i['category']=='parashat']; print(json.dumps(it[:1],ensure_ascii=False,indent=1)[:2500])"
+          echo ---- audio page
+          curl -sSL "https://www.hebcal.com/home/498/torah-trope-chanting-audio-leyning" | sed 's/<[^>]*>/ /g' | tr -s ' \n' | head -c 2500
