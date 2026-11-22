@@ -19,7 +19,7 @@ vm.runInContext(fs.readFileSync('js/taamim-data.js','utf8') + ';this.T={TAAMIM_D
 const u = fs.readFileSync('js/utils.js','utf8'); const gi = u.indexOf('function toGematria'); let d = 0, k = u.indexOf('{', gi); const gs = k; for (; k < u.length; k++) { if (u[k] === '{') d++; else if (u[k] === '}') { d--; if (!d) { k++; break; } } }
 vm.runInContext(u.slice(gi, k) + ';', ctx);                       // the real toGematria
 vm.runInContext(fs.readFileSync('js/tikkun.js','utf8') + ';this.K={tikkunTransform};', ctx);
-vm.runInContext(fs.readFileSync('js/tikkun-audio.js','utf8') + ';this.A={tikkunParseMedia,tikkunDurAt,tikkunTotal,tikkunLocate,tikkunAbs,tikkunFmtTime,tikkunRefHe,tikkunJumpItems,tikkunJumpFilter,TK_RATES};', ctx);
+vm.runInContext(fs.readFileSync('js/tikkun-audio.js','utf8') + ';this.A={tikkunParseMedia,tikkunChunkRefs,tikkunDurAt,tikkunTotal,tikkunLocate,tikkunAbs,tikkunFmtTime,tikkunRefHe,tikkunJumpItems,tikkunJumpFilter,TK_RATES};', ctx);
 const K = ctx.K, T = ctx.T, A = ctx.A, out = {};
 const V = 'בְּרֵאשִׁ֖ית בָּרָ֣א אֱלֹהִ֑ים אֵ֥ת הַשָּׁמַ֖יִם וְאֵ֥ת הָאָֽרֶץ׃';
 out.plain = K.tikkunTransform(V, {}).text; out.nikud = K.tikkunTransform(V, { nikud: true }).text; out.teamim = K.tikkunTransform(V, { teamim: true }).text; out.both = K.tikkunTransform(V, { nikud: true, teamim: true }).text; out.src = V;
@@ -39,6 +39,15 @@ const rel = { media: [
   { media_url: 'https://x.org/page.html', source: 'PocketTorah', anchorRef: 'Genesis 1:3' },
   { media_url: 'https://x.org/gen1_4.mp3', source: 'Torah Readings', anchorRef: 'Genesis 1:4' } ] };
 out.media = A.tikkunParseMedia(rel, ['1:1', '1:2', '1:3', '1:4']);
+// the REAL shape (verified 2026-11-22 via Sefaria's /api/related): one mp3 per aliya, each verse = a start/end slice of it
+const real = { media: [14, 15, 16].map((v, j) => ({ media_url: 'https://raw.githubusercontent.com/rneiss/PocketTorah/master/data/audio/Lech-Lecha-2.mp3', source: 'PocketTorah', source_he: 'פוקט תורה', start_time: 2 * j + 0.5, end_time: 2 * j + 2.5, anchorRef: 'Genesis 12:' + v, source_site: 'http://www.pockettorah.com', license: 'CC-BY-SA', description: { en: 'Torah reading, Avery-Binder style.' } })).concat([{ media_url: 'https://x.org/Lech-Lecha-2-H.mp3', source: 'PocketTorah', start_time: 5, end_time: 5, anchorRef: 'Genesis 12:17' }]) };
+out.real = A.tikkunParseMedia(real, ['12:14', '12:15', '12:16', '12:17']);
+out.chunks = [A.tikkunChunkRefs(['12:14','12:15','12:16','12:17','12:18','12:19','12:20','13:1','13:2','13:3','13:4'], 'Genesis', 5), A.tikkunChunkRefs(['17:24'], 'Genesis'), A.tikkunChunkRefs(['5:1','5:3'], 'Genesis')];
+// Hebcal leyning keys (real: "1".."7", "maftir", "haftarah"; holiday values carry " | Chanukah Day 1 (on Shabbat)")
+const hsrc = fs.readFileSync('js/content.js','utf8'); const pick = n => { const i = hsrc.indexOf('function ' + n); let d = 0, k = hsrc.indexOf('{', i); for (; k < hsrc.length; k++) { if (hsrc[k] === '{') d++; else if (hsrc[k] === '}') { d--; if (!d) { k++; break; } } } return hsrc.slice(i, k); };
+vm.runInContext(['_hebcalRef', '_readHebcalLeyning', '_hebcalHaftara'].map(pick).join('\n') + ';this.H={_hebcalRef,_readHebcalLeyning,_hebcalHaftara};', ctx);
+const lv = { '1': 'Genesis 1:1-2:3', '2': 'Genesis 2:4-2:19', '3': 'Genesis 2:20-3:21', '4': 'Genesis 3:22-4:18', '5': 'Genesis 4:19-4:22', '6': 'Genesis 4:23-5:24', '7': 'Genesis 5:25-6:8', maftir: 'Genesis 6:5-6:8', haftarah: 'Isaiah 42:5-43:10', torah: 'Genesis 1:1-6:8' };
+out.hl = { n: ctx.H._readHebcalLeyning(lv).length, m: ctx.H._readHebcalLeyning(lv)[7], h: ctx.H._hebcalHaftara(lv), partial: ctx.H._readHebcalLeyning({ '1': 'Genesis 1:1-2:3', maftir: 'x' }).length, hol: ctx.H._hebcalRef('Numbers 7:1-7:17 | Chanukah Day 1 (on Shabbat)'), bad: ctx.H._hebcalRef('Rosh Chodesh Day 1'), none: ctx.H._readHebcalLeyning(null).length, hnone: ctx.H._hebcalHaftara({}) };
 out.mediaNone = A.tikkunParseMedia({ links: [] }, ['1:1']);
 // timeline helpers
 const durs = [2, 3, 0, 5];                                   // the third clip is not measured yet → the average (10/3)
@@ -90,6 +99,15 @@ def run() -> TestSuite:
     s.check('audio parser: only https audio files from Torah-reading sources, in reading order, others ignored, missing counted',
             [i['key'] for i in m['items']] == ['1:1', '1:2', '1:4'] and m['missing'] == 1 and m['items'][0]['url'].endswith('gen1_1.mp3'), m)
     s.check('audio parser: a response without media → no items', d['mediaNone']['items'] == [] and d['mediaNone']['missing'] == 1)
+    r = d['real']
+    s.check('audio parser (real Sefaria shape): slices kept, a zero-length slice is dropped to "whole file", same file for all verses',
+            [(i['key'], i['start'], i['end']) for i in r['items']] == [('12:14', 0.5, 2.5), ('12:15', 2.5, 4.5), ('12:16', 4.5, 6.5), ('12:17', None, None)] and len({i['url'] for i in r['items'][:3]}) == 1 and r['source'] == 'PocketTorah', r)
+    c = d['chunks']
+    s.check('chunk refs: ≤5 consecutive verses of one chapter per request (long ranges 504 on Sefaria)',
+            [x['ref'] for x in c[0]] == ['Genesis 12:14-12:18', 'Genesis 12:19-12:20', 'Genesis 13:1-13:4'] and c[1][0]['ref'] == 'Genesis 17:24' and [x['ref'] for x in c[2]] == ['Genesis 5:1', 'Genesis 5:3'], c)
+    h = d['hl']
+    s.check('Hebcal leyning: keys "1".."7"+"maftir" → 8 refs, holiday suffix stripped, haftarah read, a partial/garbled list is not padded with a bogus maftir, non-refs rejected',
+            h['n'] == 8 and h['m'] == 'Genesis 6:5-6:8' and h['h'] == 'Isaiah 42:5-43:10' and h['partial'] == 1 and h['hol'] == 'Numbers 7:1-7:17' and h['bad'] is None and h['none'] == 0 and h['hnone'] is None, h)
     # ── timeline / jump helpers
     tl = d['tl']
     s.check('timeline: unmeasured clip = average of the measured ones; total adds up', abs(tl['n3'] - 10 / 3) < 1e-9 and abs(tl['total'] - (2 + 3 + 10 / 3 + 5)) < 1e-9 and tl['none'] == 12, tl)

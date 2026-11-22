@@ -1,11 +1,16 @@
 // ═══════════════════════════════════════════════════════════════════════
 // TIKKUN-AUDIO.JS – the recorded reading of the current aliya (תיקון קוראים view)
 //
-// Sefaria shows "Torah Readings" in a verse's resource panel: human recordings from the PocketTorah app,
-// Ashkenazi trope, CC-BY-SA, one clip per verse. Whether Sefaria's public API returns them is NOT verified (the
-// sandbox cannot reach sefaria.org): we ask /api/related for the aliya, keep audio files whose source looks like
-// those recordings, and say so in Hebrew when nothing is found. No synthesized speech is ever used.
-// Verify with: python3 .claude/skills/sefaria-api/scripts/sefaria_probe.py media-check "Genesis 1:1-2:3"
+// Sefaria shows "Torah Readings" in a verse's resource panel: human recordings from the PocketTorah app (Avery-Binder
+// style Ashkenazi trope, CC-BY-SA; the ONLY audio source Sefaria has – 40 Tanakh refs scanned, Nov 2026).
+// VERIFIED LIVE (GitHub Actions probe, Nov 22 2026): GET /api/related/<ref> returns `media: [{media_url, source:
+// "PocketTorah", start_time, end_time, anchorRef, license:"CC-BY-SA", source_site, description…}]`, one entry per
+// verse. A "clip" is NOT a file: media_url is the recording of a whole ALIYA (…/data/audio/Lech-Lecha-7.mp3, ~1 MB,
+// raw.githubusercontent.com, `access-control-allow-origin: *`) and start_time/end_time (seconds) are the verse's
+// slice of it; consecutive verses are contiguous (end of one = start of the next). So an aliya plays gaplessly from
+// ONE file and the verse boundaries are known exactly. /api/related is slow for big ranges (an aliya-sized range
+// can 504), so the aliya is asked for in chunks of ≤5 verses, 4 at a time, each retried; the result is cached.
+// No synthesized speech is ever used.
 //
 // What it does (all per aliya, the clips are played one after the other):
 //   • speeds 0.5×…2× (pitch kept, so the melody is not distorted)
@@ -45,7 +50,10 @@ function tikkunParseMedia(related, verseKeys) {
     const mm = ref.match(/(\d+):(\d+)$/) || ref.match(/(\d+):(\d+)-\d+(?::\d+)?$/);
     if (!mm) return;
     const key = mm[1] + ':' + mm[2];
-    if (!byKey[key]) byKey[key] = { key, url, source: String(m.source || m.source_site || '') };
+    const num = x => { const n = parseFloat(x); return isFinite(n) ? n : null; };
+    let start = num(m.start_time), end = num(m.end_time);
+    if (start == null || end == null || end <= start) { start = null; end = null; }          // no usable slice: the file is the clip
+    if (!byKey[key]) byKey[key] = { key, url, start, end, source: String(m.source || m.source_site || '') };
   });
   const items = verseKeys.map(k => byKey[k]).filter(Boolean);
   return { items, missing: verseKeys.length - items.length, source: (items[0] && items[0].source) || '' };
@@ -93,6 +101,17 @@ function tikkunJumpFilter(items, q, norm) {
   return items.filter(it => { const h = norm(it.hay || it.label); return toks.every(t => h.includes(t)); });
 }
 
+// verse keys of the aliya → [{ref:'Genesis 1:6-1:10', keys:[...]}]: consecutive verses of one chapter, at most `size` each
+function tikkunChunkRefs(verseKeys, book, size) {
+  size = size || 5; const out = []; let cur = null;
+  verseKeys.forEach(k => {
+    const [c, v] = k.split(':').map(Number); if (!c) return;
+    if (!cur || cur.c !== c || cur.keys.length >= size || v !== cur.lastV + 1) { cur = { c, lastV: v, keys: [], first: v }; out.push(cur); }
+    cur.keys.push(k); cur.lastV = v;
+  });
+  return out.map(g => ({ ref: g.keys.length === 1 ? `${book} ${g.c}:${g.first}` : `${book} ${g.c}:${g.first}-${g.c}:${g.lastV}`, keys: g.keys }));
+}
+
 // ── Prefs ───────────────────────────────────────────────────────────────
 function _tkLoadPrefs() {
   const a = TK_AUDIO; if (a.prefsLoaded) return; a.prefsLoaded = true;
@@ -104,6 +123,13 @@ function _tkSavePrefs() { appState.tikkunAudio = { rate: TK_AUDIO.rate, sync: TK
 
 // ── Clip list + clip bytes (cached) ─────────────────────────────────────
 const _tkListMem = {};
+const _tkSleep = ms => new Promise(r => setTimeout(r, ms));
+async function _tkFetchRelated(ref) {           // /api/related answers 504 now and then: retry
+  for (let k = 0; ; k++) {
+    try { return await fetchWithDelay('https://www.sefaria.org/api/related/' + encodeURI(ref), 0); }
+    catch (e) { if (k >= 2) throw e; await _tkSleep(700 * (k + 1)); }
+  }
+}
 async function _tkClipList(ref) {
   const key = 'tikkun-audio-list:' + ref;
   if (_tkListMem[ref]) return _tkListMem[ref];
@@ -111,10 +137,21 @@ async function _tkClipList(ref) {
     const hit = await cacheGetJson(key, 'tikkun');
     if (hit && Array.isArray(hit.audioItems)) { console.log('[Cache] HIT tikkun clip list', ref); return (_tkListMem[ref] = hit); }
   }
-  const data = await fetchWithDelay('https://www.sefaria.org/api/related/' + encodeURI(ref), 0);
-  const found = tikkunParseMedia(data, _aliyaVerseNums.filter(Boolean));
-  const list = { audioItems: found.items, missing: found.missing, source: found.source };
-  if (found.items.length) { _tkListMem[ref] = list; if (typeof cachePutJson === 'function') cachePutJson(key, list, 'tikkun'); }
+  const keys = _aliyaVerseNums.filter(Boolean), book = (String(ref).match(/^(.+?)\s+\d+:/) || [])[1] || String(ref);
+  const chunks = tikkunChunkRefs(keys, book, 5), byKey = {};
+  let done = 0, errors = 0, next = 0;
+  const worker = async () => {
+    while (next < chunks.length) {
+      const ch = chunks[next++];
+      try { tikkunParseMedia(await _tkFetchRelated(ch.ref), ch.keys).items.forEach(it => { byKey[it.key] = it; }); }
+      catch (e) { errors++; console.warn('[Tikkun] related failed for', ch.ref, e.message); }
+      done++; if (chunks.length > 2 && TK_AUDIO.state === 'loading') _tkSetMsg(`מחפש הקראה… ${done}/${chunks.length}`);
+    }
+  };
+  await Promise.all([worker(), worker(), worker(), worker()]);
+  const items = keys.map(k => byKey[k]).filter(Boolean);
+  const list = { audioItems: items, missing: keys.length - items.length, source: (items[0] && items[0].source) || '', errors };
+  if (items.length && !errors) { _tkListMem[ref] = list; if (typeof cachePutJson === 'function') cachePutJson(key, list, 'tikkun'); }   // an incomplete list is not kept: the next try asks again
   return list;
 }
 
@@ -154,8 +191,8 @@ async function _tkWarm(from, token) {
   const order = []; for (let j = from; j < n; j++) order.push(j); for (let j = 0; j < Math.min(from, n); j++) order.push(j);
   for (const j of order) {
     if (token !== _tkWarmToken || a.state === 'idle') return;
-    const src = await _tkClipSrc(a.items[j]);
-    if (!(a.durs[j] > 0)) { await _tkMeasure(j, src); if (token === _tkWarmToken) _tkUpdateProgress(); }
+    const src = await _tkClipSrc(a.items[j]);            // one file per aliya: fetched (and cached) once, then it is a lookup
+    if (!(a.durs[j] > 0) && a.items[j].start == null) { await _tkMeasure(j, src); if (token === _tkWarmToken) _tkUpdateProgress(); }
   }
 }
 
@@ -195,38 +232,69 @@ async function _tkStart({ idx = 0, key = null, t = 0, autoplay = true }) {
     a.state = 'idle'; _tkSetMsg('לא ניתן לבדוק הקראה כרגע (' + e.message + ')'); return false;
   }
   if (!list.audioItems.length) { a.state = 'idle'; a.ref = null; _tkSetMsg('לא נמצאה בספריא הקראה מוקלטת (עם טעמים) לעליה זו.'); return false; }
-  a.items = list.audioItems; a.durs = new Array(a.items.length).fill(0); a.source = list.source;
+  a.items = list.audioItems; a.source = list.source; a.curUrl = null;
+  a.durs = a.items.map(it => (it.start != null && it.end != null) ? it.end - it.start : 0);      // exact: start/end_time of each verse
   if (key) idx = Math.max(0, a.items.findIndex(x => x.key === key));
   a.el = a.el || new Audio();
   for (const p of ['preservesPitch', 'webkitPreservesPitch', 'mozPreservesPitch']) { try { a.el[p] = true; } catch (e) { /* not supported */ } }   // the melody must not change with the speed
   _tkApplyRate();
   a.el.onratechange = _tkApplyRate;                                   // something reset it (new clip, OS media keys…): put the chosen speed back
-  a.el.onended = () => { if (a.i + 1 < a.items.length) _tkPlayAt(a.i + 1, 0, true); else tikkunAudioStop(); };
+  a.el.onended = () => { if (a.i + 1 < a.items.length) _tkPlayAt(a.i + 1, 0, true); else tikkunAudioStop(); };      // end of a FILE
   a.el.onerror = () => { if (a.state !== 'idle') { _tkSetMsg('קובץ ההקראה לא נטען'); tikkunAudioStop(true); } };
   a.el.ontimeupdate = _tkUpdateProgress;
   _tkInitScrollGuards();
-  a.msg = `הקראה אנושית · ${a.source || 'ספריא'} · נוסח אשכנז` + (list.missing ? ` · חסרים ${list.missing} פסוקים` : '');
+  a.msg = `הקראה אנושית · ${a.source || 'PocketTorah'} (CC-BY-SA, בסגנון אברי-בינדר) · נוסח אשכנז` + (list.missing ? ` · חסרים ${list.missing} פסוקים` + (list.errors ? ' (שגיאת רשת בחלק מהבקשות – נסה שוב)' : '') : '');
   await _tkPlayAt(idx, t, autoplay);
   return true;
 }
 
+// go to verse i (+ t seconds into it) and play / stay paused. Verses of one aliya are slices of ONE file: when it is
+// already loaded this is just a seek (gapless); otherwise the file is loaded (from IndexedDB or the network) first.
+let _tkBound = 0;
 async function _tkPlayAt(i, t, autoplay) {
-  const a = TK_AUDIO; a.i = i;
+  const a = TK_AUDIO, it = a.items[i]; if (!it) return;
+  a.i = i;
   const token = ++_tkWarmToken;
   a.state = autoplay ? 'playing' : 'paused';
   _tikkunRenderOpts(); _tkHighlight(i);
-  const src = await _tkClipSrc(a.items[i]);
-  if (a.i !== i || a.state === 'idle') return;                       // stopped / jumped while the clip was being fetched
-  a.el.onloadedmetadata = () => {
-    _tkApplyRate();
-    if (isFinite(a.el.duration) && a.el.duration > 0) a.durs[i] = a.el.duration;
-    if (t > 0) { try { a.el.currentTime = Math.min(t, Math.max(0, (a.durs[i] || t + 1) - 0.05)); } catch (e) { /* ignore */ } }
-    _tkUpdateProgress();
-  };
-  _tkApplyRate(); a.el.src = src; _tkApplyRate();
-  if (autoplay) { _tkApplyRate(); const p = a.el.play(); if (p && p.catch) p.catch(() => { a.state = 'paused'; _tikkunRenderOpts(); }); }
-  _tkSyncStart();
+  const at = (it.start || 0) + (t || 0);
+  if (a.curUrl === it.url && a.el.src) {
+    try { a.el.currentTime = at; } catch (e) { /* ignore */ }
+    _tkApplyRate(); if (autoplay) { const p = a.el.play(); if (p && p.catch) p.catch(() => { a.state = 'paused'; _tikkunRenderOpts(); }); } else a.el.pause();
+  } else {
+    const src = await _tkClipSrc(it);
+    if (a.i !== i || a.state === 'idle') return;                     // stopped / jumped while the file was being fetched
+    a.curUrl = it.url;
+    a.el.onloadedmetadata = () => {
+      _tkApplyRate();
+      if (it.start == null && isFinite(a.el.duration) && a.el.duration > 0) a.durs[a.i] = a.el.duration;      // whole-file clip: measure
+      if (at > 0) { try { a.el.currentTime = at; } catch (e) { /* ignore */ } }
+      _tkUpdateProgress();
+    };
+    _tkApplyRate(); a.el.src = src; _tkApplyRate();
+    if (autoplay) { _tkApplyRate(); const p = a.el.play(); if (p && p.catch) p.catch(() => { a.state = 'paused'; _tikkunRenderOpts(); }); }
+  }
+  clearInterval(_tkBound); _tkBound = setInterval(_tkBoundary, 40);
+  _tkSyncStart(); _tkUpdateProgress();
   _tkWarm(i + 1, token);
+}
+
+// verse boundaries inside the file (checked every 40 ms: timeupdate alone is too coarse – ~250 ms)
+function _tkBoundary() {
+  const a = TK_AUDIO; if (a.state !== 'playing' || !a.el || a.i < 0) return;
+  const cur = a.el.currentTime || 0; let it = a.items[a.i]; if (!it) return;
+  let moved = false;
+  for (;;) {                                                           // reached the next verse of the same file?
+    const nx = a.items[a.i + 1];
+    if (nx && nx.url === it.url && nx.start != null && cur >= nx.start - 0.02) { a.i++; it = nx; moved = true; } else break;
+  }
+  if (it.end != null && cur >= it.end - 0.02) {                        // end of this verse's slice
+    const nx = a.items[a.i + 1];
+    if (!nx) { tikkunAudioStop(); return; }
+    if (nx.url !== it.url || nx.start == null) { _tkPlayAt(a.i + 1, 0, true); return; }
+    a.el.currentTime = nx.start; a.i++; moved = true;                  // same file, a gap between the slices: skip it
+  }
+  if (moved) { _tkHighlight(a.i); _tkUpdateProgress(); }
 }
 
 function tikkunAudioPause() {
@@ -240,7 +308,9 @@ function tikkunAudioResume() {
 }
 function tikkunAudioStop(keepMsg) {
   const a = TK_AUDIO;
+  clearInterval(_tkBound);
   if (a.el) { a.el.onended = null; a.el.ontimeupdate = null; a.el.pause(); }
+  a.curUrl = null;
   a.state = 'idle'; a.i = -1; a.items = []; a.durs = []; a.ref = null; a.jumpOpen = false; _tkWarmToken++; cancelAnimationFrame(_tkRaf);
   Object.keys(_tkObjUrls).forEach(u => { URL.revokeObjectURL(_tkObjUrls[u]); delete _tkObjUrls[u]; });   // the bytes stay in IndexedDB
   if (!keepMsg) a.msg = '';
@@ -292,7 +362,7 @@ function _tkSyncTick(ts) {
   if (v && performance.now() > _tkHoldUntil && !a.seeking) {
     const r = v.getBoundingClientRect();
     const dur = a.durs[a.i] || (a.el && a.el.duration) || 0;
-    const delta = tikkunFollowDelta(r.top, r.height, window.innerHeight, a.el.currentTime || 0, dur, a.el.playbackRate || a.rate);
+    const delta = tikkunFollowDelta(r.top, r.height, window.innerHeight, _tkInVerse(), dur, a.el.playbackRate || a.rate);
     if (Math.abs(delta) > window.innerHeight * 1.5) window.scrollBy({ top: delta, behavior: 'instant' });      // far jump: no long slide
     else if (Math.abs(delta) > 0.5) window.scrollBy({ top: delta * (1 - Math.exp(-dt / TK_FOLLOW_TAU)), behavior: 'instant' });   // frame-rate independent easing
   }
@@ -310,7 +380,9 @@ function _tkInitScrollGuards() {
 }
 
 // ── Progress bar ────────────────────────────────────────────────────────
-function _tkPos() { const a = TK_AUDIO; return tikkunAbs(a.durs, Math.max(0, a.i), a.el ? a.el.currentTime || 0 : 0); }
+// seconds into the CURRENT verse (the file's currentTime minus where this verse starts in it)
+function _tkInVerse() { const a = TK_AUDIO, it = a.items[a.i]; return Math.max(0, (a.el ? a.el.currentTime || 0 : 0) - ((it && it.start) || 0)); }
+function _tkPos() { const a = TK_AUDIO; return tikkunAbs(a.durs, Math.max(0, a.i), _tkInVerse()); }
 function _tkUpdateProgress() {
   const a = TK_AUDIO; if (a.state === 'idle' || a.seeking) return;
   const n = a.items.length, total = tikkunTotal(a.durs, n), pos = _tkPos();
@@ -334,8 +406,7 @@ function tikkunSeekCommit(val) {
   const a = TK_AUDIO; a.seeking = false; if (a.state === 'idle' || !a.items.length) return;
   const n = a.items.length, loc = tikkunLocate(a.durs, n, val / 1000 * tikkunTotal(a.durs, n));
   const playing = a.state === 'playing';
-  if (loc.i === a.i && a.el && a.el.src) { a.el.currentTime = loc.t; _tkUpdateProgress(); }
-  else _tkPlayAt(loc.i, loc.t, playing);
+  _tkPlayAt(loc.i, loc.t, playing);                                   // same file → just a seek
   _tkHoldUntil = 0;
 }
 
@@ -418,7 +489,7 @@ function tikkunAudioAfterRender() {
 function tikkunAudioCapture() {
   const a = TK_AUDIO;
   if (!a.items.length || a.ref !== _currentAliyaRef || (a.state !== 'playing' && a.state !== 'paused') || !a.items[a.i]) return undefined;
-  return { key: a.items[a.i].key, t: Math.round((a.el.currentTime || 0) * 10) / 10, rate: a.rate, sync: a.sync };
+  return { key: a.items[a.i].key, t: Math.round(_tkInVerse() * 10) / 10, rate: a.rate, sync: a.sync };
 }
 async function tikkunRestoreAudio(au) {
   if (!au || !au.key) return;

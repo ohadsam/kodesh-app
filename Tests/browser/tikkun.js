@@ -2,7 +2,7 @@
 //   python3 -m http.server 8791 &   (repo root)   then   node Tests/browser/tikkun.js
 // Env: PW, CHROME, V (app version), OUT (screenshot dir)
 const { chromium } = require(process.env.PW || '/opt/node22/lib/node_modules/playwright');
-const V = process.env.V || '5.145';
+const V = process.env.V || '5.146';
 const OUT = process.env.OUT || '/tmp';
 let n = 0, f = 0;
 const ok = (d, c, x) => { n++; if (c) console.log('OK:', d); else { f++; console.log('FAIL:', d, x !== undefined ? JSON.stringify(x) : ''); } };
@@ -16,13 +16,17 @@ function satStr() { const d = new Date(), add = d.getDay() === 6 ? 0 : 6 - d.get
 
 (async () => {
   const browser = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium' });
+  const ALIYA_FILES = [
+    { url: 'https://media.example/Lech-Lecha-2.mp3', keys: [...[14,15,16,17,18,19,20].map(v => `12:${v}`), ...[1,2,3,4].map(v => `13:${v}`)] },
+    { url: 'https://media.example/Lech-Lecha-7.mp3', keys: [24, 25, 26, 27].map(v => `17:${v}`) },
+  ];
   const run = async (theme, w, fn, cacheOn) => {
     const ctx = await browser.newContext({ viewport: { width: w, height: 800 }, serviceWorkers: 'block' });
     await ctx.addInitScript(([v, t, cacheOn]) => {
       if (!sessionStorage.getItem('s')) { sessionStorage.setItem('s', '1'); localStorage.setItem('theme', t); localStorage.setItem('kodesh_app_v1', JSON.stringify({ _lastSeenVersion: v, cacheSettings: { enabled: !!cacheOn } })); }
       // a fake <audio>: records what would be played, lets the test finish a clip
       window.__played = [];
-      window.Audio = class { constructor() { this.paused = true; this.playbackRate = 1; this.currentTime = 0; this.duration = NaN; } set src(v) { this._src = v; setTimeout(() => { this.duration = 2; this.onloadedmetadata && this.onloadedmetadata(); }, 5); } get src() { return this._src; } play() { this.paused = false; window.__played.push(this._src); window.__audio = this; return Promise.resolve(); } pause() { this.paused = true; } };
+      window.Audio = class { constructor() { this.paused = true; this.playbackRate = 1; this.currentTime = 0; this.duration = NaN; } set src(v) { this._src = v; this.currentTime = 0; setTimeout(() => { this.duration = 2; this.onloadedmetadata && this.onloadedmetadata(); }, 5); } get src() { return this._src; } play() { this.paused = false; window.__played.push(this._src); window.__audio = this; return Promise.resolve(); } pause() { this.paused = true; } };
     }, [V, theme, !!cacheOn]);
     const reqs = [];
     const st = { cal: null };
@@ -36,8 +40,13 @@ function satStr() { const d = new Date(), add = d.getDay() === 6 ? 0 : 6 - d.get
       else if (/api\/texts\/Rashi/.test(u)) body = JSON.stringify({ he: Array.from({ length: 40 }, (_, i) => [`פירוש ${i + 1}`]) });
       else if (st.cal && /hebcal\.com\/hebcal/.test(u) && /s=on/.test(u)) body = JSON.stringify({ items: [{ category: 'parashat', date: satStr(), hebrew: st.cal.he, title: 'Parashat X' }] });
       else if (st.cal && /api\/calendars/.test(u)) body = JSON.stringify({ calendar_items: [{ title: { en: 'Parashat X' }, extraDetails: { aliyot: st.cal.aliyot } }] });
-      else if (/api\/related\/Genesis 12:14-13:4/.test(u)) body = JSON.stringify({ links: [], media: [...[14,15,16,17,18,19,20].map(v => `12:${v}`), ...[1,2,3,4].map(v => `13:${v}`)].map(k => ({ media_url: `https://media.example/gen${k.replace(':','_')}.mp3`, source: 'PocketTorah', anchorRef: `Genesis ${k}` })) });
-      else if (/api\/related\/Genesis 17:24-17:27/.test(u)) body = JSON.stringify({ links: [], media: [24, 25, 26, 27].map(v => ({ media_url: `https://media.example/gen17_${v}.mp3`, source: 'PocketTorah', anchorRef: `Genesis 17:${v}` })) });
+      else if ((m = u.match(/api\/related\/Genesis (\d+):(\d+)(?:-(\d+):(\d+))?$/)) && ALIYA_FILES.some(f => f.keys.includes(m[1] + ':' + m[2]))) {
+        // Sefaria's real shape: ONE mp3 per aliya; each verse = a start/end slice of it (contiguous, 2 s each)
+        const f = ALIYA_FILES.find(f => f.keys.includes(m[1] + ':' + m[2])), last = m[3] ? m[3] + ':' + m[4] : m[1] + ':' + m[2];
+        const from = f.keys.indexOf(m[1] + ':' + m[2]), to = f.keys.indexOf(last);
+        if (st.relFail && st.relFail-- > 0) { r.fulfill({ status: 504, body: 'timeout' }); return; }
+        body = JSON.stringify({ links: [], media: f.keys.slice(from, to + 1).map((k, j) => ({ media_url: f.url, source: 'PocketTorah', source_he: 'פוקט תורה', start_time: (from + j) * 2, end_time: (from + j) * 2 + 2, anchorRef: 'Genesis ' + k, description: { en: 'Torah reading, Avery-Binder style.' } })) });
+      }
       else if (/api\/related\//.test(u)) body = JSON.stringify({ links: [], media: [] });
       r.fulfill({ status: 200, contentType: 'application/json', body });
     });
@@ -124,17 +133,17 @@ function satStr() { const d = new Date(), add = d.getDay() === 6 ? 0 : 6 - d.get
     await clickTab(page, 'מפטיר'); await page.waitForTimeout(1200);
     await page.click('#tk-audio-btn'); await page.waitForTimeout(800);
     let a = await page.evaluate(() => ({ played: window.__played, msg: document.querySelector('.tk-msg')?.textContent, btn: document.getElementById('tk-audio-btn').textContent, hl: document.querySelector('.tk-playing')?.dataset.i }));
-    ok(T + 'reading found → plays the first verse clip (fetched from the clip URL); verse highlighted; source + Ashkenazi stated', a.played.length === 1 && mediaHits.some(u => /gen17_24\.mp3$/.test(u)) && a.hl === '0' && /PocketTorah/.test(a.msg) && /אשכנז/.test(a.msg) && /השהה/.test(a.btn), a);
-    await page.evaluate(() => window.__audio.onended());
+    ok(T + 'reading found → plays the aliya file from the first verse slice (file fetched once); verse highlighted; source + Ashkenazi stated', a.played.length === 1 && mediaHits.length >= 1 && mediaHits.every(u => /Lech-Lecha-7\.mp3$/.test(u)) && a.hl === '0' && /PocketTorah/.test(a.msg) && /אשכנז/.test(a.msg) && /השהה/.test(a.btn), a);
+    await page.evaluate(() => { window.__audio.currentTime = 2.1; });       // the reading passes the end of verse 1's slice
     await page.waitForTimeout(300);
-    ok(T + 'next verse plays when a clip ends, highlight moves', await page.evaluate(() => window.__played.length === 2 && document.querySelector('.tk-playing').dataset.i === '1'));
+    ok(T + 'next verse = the next slice of the SAME file (no new load, gapless), highlight moves', await page.evaluate(() => window.__played.length === 1 && document.querySelector('.tk-playing').dataset.i === '1'));
     await page.click('#tk-audio-btn'); await page.waitForTimeout(200);
     ok(T + 'pause / resume', await page.evaluate(() => /המשך/.test(document.getElementById('tk-audio-btn').textContent) && window.__audio.paused === true));
     await clickTab(page, 'ג'); await page.waitForTimeout(1200);
     ok(T + 'changing aliya stops the reading', await page.evaluate(() => !document.querySelector('.tk-playing') && /הקראה/.test(document.getElementById('tk-audio-btn').textContent)));
     await page.click('#tk-audio-btn'); await page.waitForTimeout(800);
     const nr = await page.evaluate(() => ({ msg: (document.querySelector('.tk-msg') || {}).textContent, played: window.__played.length }));
-    ok(T + 'no recording for an aliya → honest Hebrew message, nothing plays', /לא נמצאה בספריא הקראה מוקלטת/.test(nr.msg || '') && nr.played === 2, nr);
+    ok(T + 'no recording for an aliya → honest Hebrew message, nothing plays', /לא נמצאה בספריא הקראה מוקלטת/.test(nr.msg || '') && nr.played === 1, nr);
     await page.click('#view-text-btn'); await page.waitForTimeout(300);
     ok(T + 'leaving the view hides the options and resets it', !(await vis('#tikkun-opts')));
     ok(T + 'no page errors', errors.length === 0, errors);
@@ -195,21 +204,21 @@ function satStr() { const d = new Date(), add = d.getDay() === 6 ? 0 : 6 - d.get
     await page.selectOption('#tk-rate', '0.5'); a = await aud();
     ok('speed 0.5× (slower than normal) applied', a.rate === 0.5);
     await page.selectOption('#tk-rate', '2'); a = await aud();
-    ok('speed 2× (faster) applied; the next clip starts at the chosen speed', a.rate === 2 && (await page.evaluate(() => { window.__audio.onended(); return new Promise(r => setTimeout(() => r(window.__audio.playbackRate), 150)); })) === 2);
+    ok('speed 2× (faster) applied; the next verse (next slice of the file) keeps the chosen speed', a.rate === 2 && (await page.evaluate(() => { window.__audio.currentTime = 2.1; return new Promise(r => setTimeout(() => r([TK_AUDIO.i, window.__audio.playbackRate]), 150)); })).join() === '1,2');
     // progress bar
-    await page.evaluate(() => { window.__audio.currentTime = 1; window.__audio.ontimeupdate(); });
+    await page.evaluate(() => { window.__audio.currentTime = 3; window.__audio.ontimeupdate(); });
     let pr = await page.evaluate(() => ({ v: document.getElementById('tk-seek').value, time: document.getElementById('tk-time').textContent, vl: document.getElementById('tk-vlabel').textContent }));
-    ok('progress bar follows the reading: clip 2 at 1s of 8s total = 375/1000, "0:03 / 0:08", verse label 2/4', pr.v === '375' && pr.time === '0:03 / 0:08' && /1\/4|2\/4/.test(pr.vl) && /פסוק כ״ה · 2\/4/.test(pr.vl), pr);
+    ok('progress bar follows the reading: verse 2 at 1s of 8s total = 375/1000, "0:03 / 0:08", verse label 2/4', pr.v === '375' && pr.time === '0:03 / 0:08' && /1\/4|2\/4/.test(pr.vl) && /פסוק כ״ה · 2\/4/.test(pr.vl), pr);
     const before = (await aud()).played;
     await page.evaluate(() => { const s = document.getElementById('tk-seek'); s.value = 750; s.dispatchEvent(new Event('input')); s.dispatchEvent(new Event('change')); }); await page.waitForTimeout(400);
     a = await aud();
-    ok('dragging the bar to 75% moves to verse 4 (second 6 of 8) and keeps playing', a.i === 3 && a.st === 'playing' && a.played === before + 1 && await page.evaluate(() => document.querySelector('.tk-playing').dataset.i === '3'), a);
+    ok('dragging the bar to 75% moves to verse 4 (second 6 of 8) and keeps playing', a.i === 3 && a.st === 'playing' && a.played === before + 1 && Math.abs(a.t - 6) < 0.1 && await page.evaluate(() => document.querySelector('.tk-playing').dataset.i === '3'), a);
     // follow-along scroll
     await page.waitForTimeout(1200);
     let r = await page.evaluate(() => { const v = document.querySelector('.tk-v[data-i="3"]').getBoundingClientRect(); return { top: Math.round(v.top), h: innerHeight }; });
     ok('text scrolled by itself so that the verse being read sits at ~38% of the screen', r.top > r.h * 0.15 && r.top < r.h * 0.6, r);
     const y1 = (await aud()).y;
-    await page.evaluate(() => { window.__audio.currentTime = 2; window.__audio.ontimeupdate(); }); await page.waitForTimeout(800);   // fake "end of the verse" → the reading point moves down inside the verse
+    await page.evaluate(() => { window.__audio.currentTime = 7; window.__audio.ontimeupdate(); }); await page.waitForTimeout(800);   // fake "end of the verse" → the reading point moves down inside the verse
     ok('the scroll advances with the reading position inside the verse', (await aud()).y > y1, { y1, y2: (await aud()).y });
     await page.click('#tk-audio-btn'); await page.waitForTimeout(150);
     const yp = (await aud()).y; await page.waitForTimeout(500);
@@ -226,7 +235,7 @@ function satStr() { const d = new Date(), add = d.getDay() === 6 ? 0 : 6 - d.get
     ok('the generic auto-scroll is stopped while the follow-along runs (no two scrollers)', await page.evaluate(() => _asState === 'idle'));
     await page.click('#tk-audio-panel .tk-chip >> text=גלילה עם ההקראה'); await page.waitForTimeout(100);
     await page.evaluate(() => { tikkunSeekCommit(0); scrollTo(0, 0); }); await page.waitForTimeout(300);
-    await page.evaluate(() => { scrollTo(0, 0); }); await page.evaluate(() => { window.__audio.onended(); }); await page.waitForTimeout(700);
+    await page.evaluate(() => { scrollTo(0, 0); }); await page.evaluate(() => { window.__audio.currentTime = 2.1; }); await page.waitForTimeout(700);
     ok('follow-along switched off: the reading continues, the text stays', (await aud()).st === 'playing' && (await aud()).y < 5 && await page.evaluate(() => appState.tikkunAudio.sync === false));
     await page.click('#tk-audio-panel .tk-chip >> text=גלילה עם ההקראה');
     // jump drop-down with search
@@ -270,8 +279,8 @@ function satStr() { const d = new Date(), add = d.getDay() === 6 ? 0 : 6 - d.get
     const textReq1 = count(reqs, /api\/texts\/Genesis 17:24-17:27/);
     await page.click('#tk-audio-btn'); await page.waitForTimeout(2500);
     let r = await rows();
-    ok('first play: clip list requested once (/api/related), clips downloaded once each (current + fetched ahead)', count(reqs, /api\/related\//) === 1 && [24, 25, 26, 27].every(v => count(mediaHits, new RegExp(`gen17_${v}\\.mp3`)) === 1), { rel: count(reqs, /api\/related\//), media: mediaHits });
-    ok('IndexedDB tab "tikkun" now holds the clip list + 4 clips (bytes counted); the text is in tab "parasha"', r.tikkun.count === 5 && r.tikkun.bytes > 100 && r.parasha.count >= 1, r);
+    ok('first play: clip list requested once (/api/related), the aliya file downloaded ONCE (all 4 verses are slices of it)', count(reqs, /api\/related\//) === 1 && mediaHits.length === 1 && /Lech-Lecha-7\.mp3$/.test(mediaHits[0]), { rel: count(reqs, /api\/related\//), media: mediaHits });
+    ok('IndexedDB tab "tikkun" now holds the clip list + the 1 aliya file (bytes counted); the text is in tab "parasha"', r.tikkun.count === 2 && r.tikkun.bytes > 100 && r.parasha.count >= 1, r);
     ok('playback uses the stored bytes (blob URL), not the remote URL', await page.evaluate(() => /^blob:/.test(window.__played[0])), await page.evaluate(() => window.__played));
     await page.evaluate(() => tikkunAudioStop()); 
     await page.reload(); await page.waitForTimeout(2200);
@@ -281,10 +290,10 @@ function satStr() { const d = new Date(), add = d.getDay() === 6 ? 0 : 6 - d.get
     await page.evaluate(() => setParashaView('tikkun')); await page.waitForTimeout(500);
     ok('after a reload the maftir text comes from the cache (no second /api/texts request)', count(reqs, /api\/texts\/Genesis 17:24-17:27/) === textReq1, count(reqs, /api\/texts\/Genesis 17:24-17:27/));
     await page.click('#tk-audio-btn'); await page.waitForTimeout(1500);
-    ok('after a reload: clip list + audio come from IndexedDB — zero new network requests, still plays', count(reqs, /api\/related\//) === 1 && mediaHits.length === 4 && await page.evaluate(() => window.__played.length >= 1 && /^blob:/.test(window.__played[0])), { rel: count(reqs, /api\/related\//), media: mediaHits.length });
+    ok('after a reload: clip list + audio come from IndexedDB — zero new network requests, still plays', count(reqs, /api\/related\//) === 1 && mediaHits.length === 1 && await page.evaluate(() => window.__played.length >= 1 && /^blob:/.test(window.__played[0])), { rel: count(reqs, /api\/related\//), media: mediaHits.length });
     await page.evaluate(() => tikkunAudioStop());
     const settings = await page.evaluate(async () => { openSettings(); await renderCacheSettings(); return document.getElementById('cache-tab-rows').textContent; });
-    ok('Settings → cache shows the "הקראות תיקון קוראים" row with its size', /הקראות תיקון קוראים/.test(settings) && /5 פריטים/.test(settings), settings.replace(/\s+/g, ' ').slice(0, 300));
+    ok('Settings → cache shows the "הקראות תיקון קוראים" row with its size', /הקראות תיקון קוראים/.test(settings) && /2 פריטים/.test(settings), settings.replace(/\s+/g, ' ').slice(0, 300));
     await page.evaluate(async () => { closeSettings(); await cacheClear('tikkun'); });
     ok('clearing that tab removes only the audio entries', (await rows()).tikkun.count === 0 && (await rows()).parasha.count >= 1);
     // eviction: a small budget keeps only the newest entries
@@ -304,9 +313,21 @@ function satStr() { const d = new Date(), add = d.getDay() === 6 ? 0 : 6 - d.get
     await page.click('#view-tikkun-btn'); await page.waitForTimeout(400);
     await page.click('#tk-audio-btn'); await page.waitForTimeout(1500);
     const s = await page.evaluate(async () => ({ played: window.__played, st: (await cacheStats()).byTab.tikkun }));
-    ok('download blocked → clip is streamed from its URL, still plays; no clip bytes stored (only the list)', s.played.length >= 1 && /^https:\/\/media\.example\/gen17_24\.mp3$/.test(s.played[0]) && s.st.count === 1, s);
+    ok('download blocked → clip is streamed from its URL, still plays; no clip bytes stored (only the list)', s.played.length >= 1 && /^https:\/\/media\.example\/Lech-Lecha-7\.mp3$/.test(s.played[0]) && s.st.count === 1, s);
     ok('no page errors (stream fallback)', errors.length === 0, errors);
   }, true);
+
+  // Sefaria's /api/related answers 504 now and then, and only small ranges: a long aliya is asked for in 5-verse chunks, each retried
+  await run('light', 380, async ({ page, errors, reqs, st }) => {
+    await page.evaluate(() => loadSpecificParasha('Genesis 12:1-17:27')); await page.waitForTimeout(1200);
+    await clickTab(page, 'ב'); await page.waitForTimeout(1500);
+    await page.click('#view-tikkun-btn'); await page.waitForTimeout(400);
+    const count = (arr, re) => arr.filter(u => re.test(u)).length; st.relFail = 2;
+    await page.click('#tk-audio-btn'); await page.waitForTimeout(5000);
+    const s = await page.evaluate(() => ({ st: TK_AUDIO.state, n: TK_AUDIO.items.length, played: window.__played.length, first: TK_AUDIO.items[0] && [TK_AUDIO.items[0].start, TK_AUDIO.items[0].end], last: TK_AUDIO.items[6] && [TK_AUDIO.items[6].start, TK_AUDIO.items[6].end] }));
+    ok('long aliya (7 verses in the mock text): asked in 2 chunks (4+3 verses), two 504s retried → all found, one file, slices 0-2 … 18-20', s.n === 7 && s.st === 'playing' && s.played === 1 && s.first.join() === '0,2' && s.last.join() === '18,20' && count(reqs, /api\/related\//) === 4, { s, rel: count(reqs, /api\/related\//) });
+    ok('no page errors (chunked related)', errors.length === 0, errors);
+  }, false);
 
   // cache switched off → nothing stored, everything still works
   await run('light', 380, async ({ page, errors }) => {

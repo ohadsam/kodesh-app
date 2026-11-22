@@ -62,9 +62,12 @@ def run() -> TestSuite:
     items = list(hebcal.items())[4:]            # the first four are the introductory items, not hilchot sets
     mine = [(h[0], h[1]) for h in d['hil']]
     s.check('84 sets of hilchot in 14 sefarim', len(mine) == 84 and len(d['sefarim']) == 14, f'{len(mine)} / {len(d["sefarim"])}')
-    s.check('English titles + chapter counts equal Hebcal\'s Mishneh Torah table, in the same order', mine == items,
+    # Sefaria itself (checked live on 2026-11-22 by `sefaria_probe.py rambam-check`) has 5 chapters in The Order of Prayer, Hebcal lists 4
+    SEFARIA_OVERRIDES = {'The Order of Prayer': 5}
+    items = [(k, SEFARIA_OVERRIDES.get(k, v)) for k, v in items]
+    s.check('English titles + chapter counts equal Hebcal\'s Mishneh Torah table (plus the one Sefaria-verified override), in the same order', mine == items,
             fail_detail=str([(a, b) for a, b in zip(mine, items) if a != b][:3]))
-    s.check('total chapters == Hebcal total minus the 12 intro items', d['total'] == sum(hebcal.values()) - 12, d['total'])
+    s.check('total chapters == Hebcal total minus the 12 intro items, plus the override', d['total'] == sum(hebcal.values()) - 12 + 1, d['total'])
     slugs = [h[2] for h in d['hil']]
     s.check('slugs unique and ASCII-only (safe in onclick / ids)', len(set(slugs)) == 84 and all(x.isascii() and x.replace('_', '').isalnum() for x in slugs), slugs[:3])
     s.check('every set has a Hebrew name starting הלכות (or סדר תפילות כל השנה)', all(h[3].startswith('הלכות ') or h[3] == 'סדר תפילות כל השנה' for h in d['hil']))

@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.145 (Nov 24, 2026)
+**Last updated:** v5.146 (Nov 24, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -576,16 +576,16 @@ fallback `caches.match` finds nothing, so a cold start with no network cannot lo
 fonts, Sefaria/Hebcal responses (SW) and the IndexedDB text/audio cache survive offline. Precaching the shell
 would fix it (version-keyed cache, bump = refresh) – a separate, risky change since pushing to main is the deploy.
 
-### 🟡 תיקון קוראים – recorded reading unverified; no Sephardi/other nusach (v5.142)
-Sefaria's help center says every verse of the Five Books can be heard chanted in the resource panel
-("Torah Readings"): human recordings from the PocketTorah app, **Ashkenazi trope only**, CC-BY-SA, one clip per
-verse; website only (the mobile app does not play them). No other nusach exists there, so none is offered.
-Whether the public API exposes them is unknown (sandbox cannot reach sefaria.org): `tikkunAudioToggle` asks
-`/api/related/<aliya>` for `media` entries (audio files, source matching /pocket|torah reading|chant/), plays
-them verse by verse and says so in Hebrew when none are found. The `media_url` / `anchorRef` field names are an
-ASSUMPTION. Verify: `python3 .claude/skills/sefaria-api/scripts/sefaria_probe.py media-check "Genesis 1:1-2:3"`.
-If the API does not carry them the 🎧 button simply reports "not found" – then a different source (e.g. the
-PocketTorah recordings themselves, CC-BY-SA) would have to be wired with its real URL scheme.
+### ✅/ℹ️ תיקון קוראים – recorded reading (verified v5.146; single style, Ashkenazi only)
+Verified Nov 2026 by probing from GitHub Actions (the sandbox cannot reach sefaria.org; `.github/workflows` probe
+was temporary): `/api/related/<ref>` returns `media[]` = `{media_url, source:"PocketTorah", start_time, end_time,
+anchorRef, license:"CC-BY-SA", source_site, description("…Avery-Binder style.")}`. `media_url` is ONE mp3 per ALIYA
+(raw.githubusercontent.com/rneiss/PocketTorah/…/Lech-Lecha-7.mp3, ~1 MB; `-H` = haftara), every verse is its
+`start_time`–`end_time` slice (contiguous); maftir verses point to the aliya-7 file. The host sends
+`access-control-allow-origin: *` and supports range requests. **Only PocketTorah exists** (40 sampled refs) →
+no style selector is possible; Hebcal only links to Sefaria's PocketTorah embed. Big ranges 504 → asked in 5-verse
+chunks, retried. Attribution (CC-BY-SA) is shown in the reading message; the PocketTorah repo itself has no license
+file (Sefaria states CC-BY-SA). No Sephardi/other nusach exists, none is offered.
 
 ### 🟡 Haftara table vs Hebcal (found while checking the aliyot, not fixed)
 `HAFTARA_REFS` differs from Hebcal's `haft` for 8 parshiot: Achrei Mot / Kedoshim look swapped (app: Ezekiel 22
@@ -704,6 +704,19 @@ Backed up in git; to reuse in another project copy the folder to `<project>/.cla
 
 ## Recently Fixed
 
+### v5.146 (Nov 24, 2026) – recorded reading rebuilt on Sefaria's real data model; Hebcal leyning keys; Order of Prayer
+- ✅ **Audio model was wrong** (v5.142–5.145 assumed one clip per verse): Sefaria gives one file per aliya + a
+  start/end slice per verse, so every verse would have played the whole aliya. `js/tikkun-audio.js` now plays slices
+  of the one file (`_tkBoundary` every 40 ms, same-file seeks = gapless, file fetched/cached once, durations from the
+  slices), `tikkunParseMedia` keeps start/end, `tikkunChunkRefs` splits the aliya into ≤5-verse `related` requests
+  (4 parallel, 504 retried 3×; an incomplete list is not cached). Question "other styles?": no – see Known Issues.
+- ✅ **Hebcal leyning keys**: real keys are `"1".."7"`, `maftir`, `haftarah` – the app read `M` / `haftara`, so maftir
+  never came from Hebcal and the haftara always from the static table. New `_hebcalRef/_readHebcalLeyning/_hebcalHaftara`
+  (js/content.js; holiday-Shabbat suffix " | Chanukah Day 1…" stripped; `;`-separated multi-range haftarot).
+- ✅ Rambam "Order of Prayer" = 5 chapters (js/rambam-data.js; test override in Tests/test_rambam_books.py).
+- Tests: Tests/test_tikkun.py (+real-shape parse, chunk refs, Hebcal leyning), Tests/browser/tikkun.js (one-file/slice
+  mocks, chunk+504 retry), tikkun_sync.js (real WAV, 4 slices of one file).
+
 ### v5.145 (Nov 24, 2026) – follow-along scroll keeps up at every reading speed
 - ✅ Owner-reported: after changing the reading speed the text scroll no longer matched the audio. Reproduced with
   a REAL `<audio>` (WAV clips, headless Chromium, multi-line verses; `Tests/browser/tikkun_sync.js`): at 2× the
@@ -773,7 +786,7 @@ Backed up in git; to reuse in another project copy the folder to `<project>/.cla
   marks of another (checked: it falls back for the whole cluster). So the mark outlines of Keter YG (same
   Culmus GPL-2 + font exception) are attached to the Stam letters with a generated GPOS table → "Itim Stam
   Ashkenaz/Sefarad" (woff2, ~10 KB each). Licence files in `fonts/`; SW precaches them.
-- 🟡 **Recorded reading (🎧)** – implemented best-effort, NOT verified live (see Known Issues).
+- ✅ **Recorded reading (🎧)** – verified live via GitHub Actions probes (v5.146): one style only (PocketTorah, Ashkenazi), per-aliya mp3 + start/end slices.
 - Tests: `Tests/test_parasha_aliyot.py` (4), `Tests/test_tikkun.py` (21), `Tests/browser/tikkun.js` (62,
   Playwright, mocked Sefaria, both themes).
 

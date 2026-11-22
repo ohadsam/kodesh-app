@@ -1,7 +1,7 @@
 // REAL <audio> (no stub) in headless Chromium: does the chosen speed survive a clip change, and does the follow-along
 // scroll stay on the reading point at 0.5× / 1× / 2×?   (node Tests/browser/tikkun_sync.js; server on :8791)
 const { chromium } = require(process.env.PW || '/opt/node22/lib/node_modules/playwright');
-const V = process.env.V || '5.145';
+const V = process.env.V || '5.146';
 let n = 0, f = 0;
 const ok = (d, c, x) => { n++; if (c) console.log('OK:', d); else { f++; console.log('FAIL:', d, x !== undefined ? JSON.stringify(x) : ''); } };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -19,12 +19,12 @@ const V1 = Array(14).fill(V0).join(' ');     // a verse of several lines, so pro
   const browser = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium', args: ['--autoplay-policy=no-user-gesture-required'] });
   const ctx = await browser.newContext({ viewport: { width: 380, height: 800 }, serviceWorkers: 'block' });
   await ctx.addInitScript(v => { localStorage.setItem('kodesh_app_v1', JSON.stringify({ _lastSeenVersion: v, cacheSettings: { enabled: false } })); }, V);
-  const clip = wav(3);
+  const clip = wav(12);        // ONE file for the aliya, like Sefaria's PocketTorah; the 4 verses are its 3-second slices
   await ctx.route(/media\.example/, r => r.fulfill({ status: 200, contentType: 'audio/wav', headers: { 'access-control-allow-origin': '*' }, body: clip }));
   await ctx.route(/sefaria|hebcal/, r => {
     const u = decodeURIComponent(r.request().url()); let body = '{"items":[],"calendar_items":[]}', m;
     if ((m = u.match(/api\/texts\/(\w+) (\d+):(\d+)-(\d+):(\d+)/)) && m[2] === m[4]) body = JSON.stringify({ he: Array.from({ length: +m[5] - +m[3] + 1 }, () => V1), sections: [+m[2], +m[3]] });
-    else if (/api\/related\/Genesis 17:24-17:27/.test(u)) body = JSON.stringify({ links: [], media: [24, 25, 26, 27].map(v => ({ media_url: `https://media.example/gen17_${v}.wav`, source: 'PocketTorah', anchorRef: `Genesis 17:${v}` })) });
+    else if (/api\/related\/Genesis 17:24-17:27/.test(u)) body = JSON.stringify({ links: [], media: [24, 25, 26, 27].map((v, j) => ({ media_url: 'https://media.example/Lech-Lecha-7.wav', source: 'PocketTorah', start_time: 3 * j, end_time: 3 * j + 3, anchorRef: `Genesis 17:${v}` })) });
     else if (/api\/(texts\/(Rashi|Onkelos)|related)/.test(u)) body = '{"he":[],"media":[]}';
     r.fulfill({ status: 200, contentType: 'application/json', body });
   });
@@ -37,13 +37,13 @@ const V1 = Array(14).fill(V0).join(' ');     // a verse of several lines, so pro
   await page.addStyleTag({ content: '.tk-v { margin-bottom: 700px !important; }' });
   await page.click('#tk-audio-btn'); await page.waitForTimeout(2500);
   const real = await page.evaluate(() => ({ state: TK_AUDIO.state, dur: TK_AUDIO.el.duration, t: TK_AUDIO.el.currentTime, durs: TK_AUDIO.durs.map(x => +x.toFixed(2)) }));
-  ok('real audio plays (clip duration ≈ 3 s, time advancing, all 4 durations measured for the progress bar)', real.state === 'playing' && Math.abs(real.dur - 3) < 0.1 && real.t > 0.5 && real.durs.length === 4 && real.durs.every(d => Math.abs(d - 3) < 0.1), real);
+  ok('real audio plays (the one file ≈ 12 s, time advancing, the 4 verse durations come from the slices)', real.state === 'playing' && Math.abs(real.dur - 12) < 0.1 && real.t > 0.5 && real.durs.length === 4 && real.durs.every(d => Math.abs(d - 3) < 0.1), real);
 
   // sample: media position, reading point (px from the target line) and whether the speed is what was chosen
   const sample = () => page.evaluate(() => {
     const a = TK_AUDIO, v = document.querySelector(`.tk-v[data-i="${_aliyaVerseNums.indexOf(a.items[a.i].key)}"]`), r = v.getBoundingClientRect();
-    const p = Math.min(1, a.el.currentTime / (a.durs[a.i] || a.el.duration));
-    return { i: a.i, t: a.el.currentTime, rate: a.el.playbackRate, want: a.rate, err: r.top + p * r.height - innerHeight * 0.38, y: scrollY };
+    const it = a.items[a.i], tv = a.el.currentTime - it.start, p = Math.min(1, Math.max(0, tv / a.durs[a.i]));
+    return { i: a.i, t: tv, rate: a.el.playbackRate, want: a.rate, err: r.top + p * r.height - innerHeight * 0.38, y: scrollY };
   });
   const speeds = {};
   for (const rate of ['0.5', '1', '2']) {

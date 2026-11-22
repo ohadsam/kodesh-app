@@ -178,7 +178,7 @@ Manual network probe (not run by test_runner): daily calendars, structure/Hebrew
 | `tikkunTransform(raw, {nikud, teamim})` | Pure: Sefaria verse → `{html, pe, se, text}` for the chosen layers (strips marks / maqaf, `{פ}`/`{ס}` flags, big/small tokens, escapes) |
 | `renderTikkun(el, helpers)` | Called by `renderParasha()` when `parashaView === 'tikkun'`; scroll block or the ta'amim table |
 | `tikkunToggle`, `tikkunSetScript`, `tikkunShowTaamim`, `tikkunBackToText` | Toolbar (`#tikkun-opts`), options in `appState.tikkun` |
-| js/tikkun-audio.js: `tikkunParseMedia`, `tikkunLocate/Total/Abs/DurAt/FmtTime`, `tikkunRefHe`, `tikkunJumpItems/Filter` (pure); `_tkClipList`, `_tkClipSrc`, `_tkWarm`, `_tkStart`, `_tkPlayAt`, `tikkunAudioToggle/Pause/Resume/Stop/SetRate/ToggleSync`, `_tkSyncTick`, `tikkunSeekPreview/Commit`, `tikkunJump*`, `tikkunAudioCapture/RestoreAudio` | Best-effort recorded reading (Sefaria "Torah Readings"); see Known Issues |
+| js/tikkun-audio.js: `tikkunParseMedia` (start/end slices), `tikkunChunkRefs`, `_tkFetchRelated`, `_tkBoundary`, `tikkunLocate/Total/Abs/DurAt/FmtTime`, `tikkunRefHe`, `tikkunJumpItems/Filter` (pure); `_tkClipList`, `_tkClipSrc`, `_tkWarm`, `_tkStart`, `_tkPlayAt`, `tikkunAudioToggle/Pause/Resume/Stop/SetRate/ToggleSync`, `_tkSyncTick`, `tikkunSeekPreview/Commit`, `tikkunJump*`, `tikkunAudioCapture/RestoreAudio` | Recorded reading: Sefaria PocketTorah, one mp3 per aliya, verse = start/end slice (verified v5.146) |
 | `TAAMIM_DISJUNCTIVE/CONJUNCTIVE/OTHER`, `taamimSign` | taamim-data.js: names, code points, position, notes |
 | `fonts/ItimStam{Ashkenaz,Sefarad}.{woff2,ttf}` | Built by `tools/build_stam_pointed.py` from Culmus fonts (see fonts/README.md) |
 
@@ -214,6 +214,7 @@ Manual network probe (not run by test_runner): daily calendars, structure/Hebrew
 | Function | Description |
 |---|---|
 | `loadParasha()` | Fetch parasha from Hebcal + Sefaria aliyot. Matches Hebcal's Hebrew name against `ALL_PARASHIOT` — tries `cleanSpaced` (hyphen→space) BEFORE the combined-parshiot hyphen-split fallback, since Hebcal writes multi-word single names like "כי-תצא" with a hyphen too |
+| `_hebcalRef` / `_readHebcalLeyning(l)` / `_hebcalHaftara(l)` | Read Hebcal `leyning` (keys `"1"`..`"7"`, `maftir`, `haftarah`; strips the " \| Chanukah…" suffix; verified 2026-11-22) |
 | `loadAliyaText(ref)` | Load aliya text from Sefaria, scroll to top |
 | `loadRashiForRef(ref)` | 3-strategy Rashi loader. Per-chapter `s1WorthRetrying`/`s2WorthRetrying` flags skip re-fetching a strategy on retry once it deterministically fails (HTTP ok, insufficient data) — only genuine exceptions stay retryable. Strategy 3 only accepts a zero-entry result on the final attempt |
 | `loadDafYomi()` | Fetch daily Daf from Sefaria calendar |
