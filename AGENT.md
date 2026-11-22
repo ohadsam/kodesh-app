@@ -1,5 +1,5 @@
 # Kodesh App – Agent Memory File
-**Last updated:** v5.144 (Nov 23, 2026)
+**Last updated:** v5.145 (Nov 24, 2026)
 **URL:** https://ohadsam.github.io/kodesh-app/
 **Stack:** Vanilla JS PWA, GitHub Pages, RTL Hebrew, Sefaria API + Hebcal API
 **Owner:** Ohad (Full Stack Team Lead, Petah Tikva)
@@ -703,6 +703,19 @@ Backed up in git; to reuse in another project copy the folder to `<project>/.cla
 `~/.claude/skills/`. Update the catalog whenever a ref is added/verified (CLAUDE.md §1).
 
 ## Recently Fixed
+
+### v5.145 (Nov 24, 2026) – follow-along scroll keeps up at every reading speed
+- ✅ Owner-reported: after changing the reading speed the text scroll no longer matched the audio. Reproduced with
+  a REAL `<audio>` (WAV clips, headless Chromium, multi-line verses; `Tests/browser/tikkun_sync.js`): at 2× the
+  text trailed the reading point by ~78 px (70 px right after a speed change). Cause: the eased scroll (15 % of the
+  gap per frame) lags the target by a fixed ~TAU of REAL time, which is rate × TAU of MEDIA time – so the faster
+  the reading, the further behind. Fix in `js/tikkun-audio.js`: `tikkunFollowDelta` looks `rate × TAU` ahead in media
+  time (cancels the trail at any speed), frame-rate independent easing (`1 − e^(−dt/TAU)`), re-lock on a speed
+  change. Now ≤ 16 px at 0.5× / 1× / 2×, also for 1×→2× and 2×→0.5× mid-verse.
+- ✅ Speed robustness: `_tkApplyRate()` sets `defaultPlaybackRate` + `playbackRate` on load, play and `ratechange`
+  (browsers reset the rate when a new `src` loads – seen on mobile engines; not reproducible in Chromium).
+- ✅ The generic auto-scroll (js/autoscroll.js) refuses to start while a reading owns the scroll
+  (`tikkunAudioOwnsScroll`): a fixed-speed scroller drifts off the voice as soon as the speed changes.
 
 ### v5.144 (Nov 23, 2026) – Maftir button on the current parasha, full reading controls
 - ✅ **Maftir button missing** on the CURRENT parasha: the app asks Hebcal without `leyning=on` (no `M`), falls

@@ -235,7 +235,14 @@ function _asEnd() {
 }
 
 // ── Public controls ─────────────────────────────────────────────────────
+// While a recorded reading is open with "גלילה עם ההקראה" on, THAT scroller owns the page: it moves the text at the
+// pace of the voice at every speed. A second, fixed-speed scroller would drift away from the voice as soon as the
+// reading speed is changed, so it is not started.
 function autoScrollStart() {
+  if (typeof tikkunAudioOwnsScroll === 'function' && tikkunAudioOwnsScroll()) {
+    if (typeof _bmToast === 'function') _bmToast('הטקסט גולל עם ההקראה (לכיבוי: "גלילה עם ההקראה" בסרגל התיקון קוראים)', null, 3500);
+    return;
+  }
   _asEnsureUI();
   _asState = 'playing';
   _asAcquireWake();
@@ -252,6 +259,7 @@ function autoScrollPause() {
 }
 
 function autoScrollResume() {
+  if (typeof tikkunAudioOwnsScroll === 'function' && tikkunAudioOwnsScroll()) return autoScrollStart();
   if (_asState === 'ended') {
     // finished and sitting at the bottom → "play" means start again from the top
     if (_asMaxScroll() - window.scrollY < 10) window.scrollTo({ top: 0, behavior: 'instant' });

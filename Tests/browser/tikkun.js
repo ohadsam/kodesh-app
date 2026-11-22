@@ -2,7 +2,7 @@
 //   python3 -m http.server 8791 &   (repo root)   then   node Tests/browser/tikkun.js
 // Env: PW, CHROME, V (app version), OUT (screenshot dir)
 const { chromium } = require(process.env.PW || '/opt/node22/lib/node_modules/playwright');
-const V = process.env.V || '5.144';
+const V = process.env.V || '5.145';
 const OUT = process.env.OUT || '/tmp';
 let n = 0, f = 0;
 const ok = (d, c, x) => { n++; if (c) console.log('OK:', d); else { f++; console.log('FAIL:', d, x !== undefined ? JSON.stringify(x) : ''); } };

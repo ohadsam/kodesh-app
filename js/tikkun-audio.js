@@ -20,6 +20,8 @@
 // Prefs persist in appState.tikkunAudio = { rate, sync }.
 // ═══════════════════════════════════════════════════════════════════════
 
+// (speed note) currentTime/duration are in media time, so the progress inside a verse does not depend on the speed;
+// what depends on it is how fast it changes – see tikkunFollowDelta.
 const TK_RATES = [0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
 const TK_AUDIO = { state: 'idle', ref: null, items: [], durs: [], i: -1, el: null, rate: 1, sync: true, msg: '', source: '',
   seeking: false, pendingStart: false, jumpOpen: false, jumpQ: '', prefsLoaded: false };
@@ -197,7 +199,8 @@ async function _tkStart({ idx = 0, key = null, t = 0, autoplay = true }) {
   if (key) idx = Math.max(0, a.items.findIndex(x => x.key === key));
   a.el = a.el || new Audio();
   for (const p of ['preservesPitch', 'webkitPreservesPitch', 'mozPreservesPitch']) { try { a.el[p] = true; } catch (e) { /* not supported */ } }   // the melody must not change with the speed
-  a.el.playbackRate = a.rate;
+  _tkApplyRate();
+  a.el.onratechange = _tkApplyRate;                                   // something reset it (new clip, OS media keys…): put the chosen speed back
   a.el.onended = () => { if (a.i + 1 < a.items.length) _tkPlayAt(a.i + 1, 0, true); else tikkunAudioStop(); };
   a.el.onerror = () => { if (a.state !== 'idle') { _tkSetMsg('קובץ ההקראה לא נטען'); tikkunAudioStop(true); } };
   a.el.ontimeupdate = _tkUpdateProgress;
@@ -215,12 +218,13 @@ async function _tkPlayAt(i, t, autoplay) {
   const src = await _tkClipSrc(a.items[i]);
   if (a.i !== i || a.state === 'idle') return;                       // stopped / jumped while the clip was being fetched
   a.el.onloadedmetadata = () => {
+    _tkApplyRate();
     if (isFinite(a.el.duration) && a.el.duration > 0) a.durs[i] = a.el.duration;
     if (t > 0) { try { a.el.currentTime = Math.min(t, Math.max(0, (a.durs[i] || t + 1) - 0.05)); } catch (e) { /* ignore */ } }
     _tkUpdateProgress();
   };
-  a.el.src = src; a.el.playbackRate = a.rate;
-  if (autoplay) { const p = a.el.play(); if (p && p.catch) p.catch(() => { a.state = 'paused'; _tikkunRenderOpts(); }); }
+  _tkApplyRate(); a.el.src = src; _tkApplyRate();
+  if (autoplay) { _tkApplyRate(); const p = a.el.play(); if (p && p.catch) p.catch(() => { a.state = 'paused'; _tikkunRenderOpts(); }); }
   _tkSyncStart();
   _tkWarm(i + 1, token);
 }
@@ -231,7 +235,7 @@ function tikkunAudioPause() {
 }
 function tikkunAudioResume() {
   const a = TK_AUDIO; if (!a.el) return;
-  a.state = 'playing'; const p = a.el.play(); if (p && p.catch) p.catch(() => { a.state = 'paused'; _tikkunRenderOpts(); });
+  a.state = 'playing'; _tkApplyRate(); const p = a.el.play(); if (p && p.catch) p.catch(() => { a.state = 'paused'; _tikkunRenderOpts(); });
   _tikkunRenderOpts(); _tkSyncStart();
 }
 function tikkunAudioStop(keepMsg) {
@@ -243,9 +247,17 @@ function tikkunAudioStop(keepMsg) {
   _tkHighlight(-1); _tikkunRenderOpts();
 }
 
+// A new `src` resets playbackRate to defaultPlaybackRate (browsers do this when the element loads a clip), so the chosen
+// speed must be set as the default too and re-applied whenever the element loads, plays or reports a rate change.
+function _tkApplyRate() {
+  const a = TK_AUDIO, el = a.el; if (!el) return;
+  try { el.defaultPlaybackRate = a.rate; if (el.playbackRate !== a.rate) el.playbackRate = a.rate; } catch (e) { /* ignore */ }
+}
 function tikkunAudioSetRate(r) {
   const a = TK_AUDIO; r = parseFloat(r); if (!TK_RATES.includes(r)) return;
-  a.rate = r; if (a.el) a.el.playbackRate = r; _tkSavePrefs();
+  a.rate = r; _tkApplyRate(); _tkSavePrefs();
+  _tkLastTs = 0; _tkHoldUntil = 0;                         // the follow-along re-locks onto the reading point at once
+  if (a.state === 'playing') _tkSyncStart();
 }
 function tikkunAudioToggleSync() {
   const a = TK_AUDIO; a.sync = !a.sync; _tkSavePrefs();
@@ -256,26 +268,38 @@ function tikkunAudioToggleSync() {
 // ── Follow-along scrolling ──────────────────────────────────────────────
 // The reading point (progress through the current verse) is kept at ~38% of the screen height, eased every frame, so
 // the text moves exactly as fast as the reading does (a different playback speed = a different scroll speed).
-let _tkRaf = 0, _tkHoldUntil = 0, _tkGuards = false;
+let _tkRaf = 0, _tkHoldUntil = 0, _tkGuards = false, _tkLastTs = 0;
+const TK_FOLLOW_TAU = 0.18;        // s – how quickly the text catches up with the reading point
 function _tkSyncStart() {
-  const a = TK_AUDIO; cancelAnimationFrame(_tkRaf);
+  const a = TK_AUDIO; cancelAnimationFrame(_tkRaf); _tkLastTs = 0;
   if (!a.sync || a.state !== 'playing') return;
   if (typeof autoScrollStop === 'function' && typeof _asState !== 'undefined' && _asState !== 'idle') autoScrollStop();   // two scrollers would fight
   _tkRaf = requestAnimationFrame(_tkSyncTick);
 }
-function _tkSyncTick() {
+// Where (in px, relative to the target line) is the reading point of the verse being read? `lead` = how far ahead in
+// MEDIA time to look: the smoothing makes the text trail the target by TAU seconds of real time, which is
+// rate × TAU of media time – looking that far ahead cancels the trail at every speed (0.5× … 2×), so the text is
+// not behind the voice when it is fast, nor ahead of it when it is slow.
+function tikkunFollowDelta(rectTop, rectH, vh, cur, dur, rate, tau) {
+  const lead = (rate || 1) * (tau == null ? TK_FOLLOW_TAU : tau);
+  const p = dur > 0 ? Math.min(1, Math.max(0, (cur + lead) / dur)) : 0;
+  return rectTop + p * rectH - vh * 0.38;
+}
+function _tkSyncTick(ts) {
   const a = TK_AUDIO; if (!a.sync || a.state !== 'playing') return;
+  const dt = _tkLastTs ? Math.min(0.1, (ts - _tkLastTs) / 1000) : 1 / 60; _tkLastTs = ts;
   const v = _tkVerseEl(_aliyaVerseNums.indexOf((a.items[a.i] || {}).key));
   if (v && performance.now() > _tkHoldUntil && !a.seeking) {
     const r = v.getBoundingClientRect();
     const dur = a.durs[a.i] || (a.el && a.el.duration) || 0;
-    const p = dur > 0 ? Math.min(1, Math.max(0, (a.el.currentTime || 0) / dur)) : 0;
-    const delta = r.top + p * r.height - window.innerHeight * 0.38;
+    const delta = tikkunFollowDelta(r.top, r.height, window.innerHeight, a.el.currentTime || 0, dur, a.el.playbackRate || a.rate);
     if (Math.abs(delta) > window.innerHeight * 1.5) window.scrollBy({ top: delta, behavior: 'instant' });      // far jump: no long slide
-    else if (Math.abs(delta) > 1) window.scrollBy({ top: delta * 0.15, behavior: 'instant' });
+    else if (Math.abs(delta) > 0.5) window.scrollBy({ top: delta * (1 - Math.exp(-dt / TK_FOLLOW_TAU)), behavior: 'instant' });   // frame-rate independent easing
   }
   _tkRaf = requestAnimationFrame(_tkSyncTick);
 }
+// true while a reading is open (playing or paused) and the follow-along is on
+function tikkunAudioOwnsScroll() { const a = TK_AUDIO; return a.sync && (a.state === 'playing' || a.state === 'paused'); }
 function tikkunAudioUserScrolled() { _tkHoldUntil = performance.now() + 4000; }     // the reader took over: let go for a moment
 function _tkInitScrollGuards() {
   if (_tkGuards) return; _tkGuards = true;
