@@ -18,6 +18,7 @@ exits non-zero if anything blocking is wrong. Use `--verbose` to see passing che
 4. Update `var V = 'X.X'` in inline HEAD script (top of `<head>`)
 5. Push → GitHub Pages auto-deploys
 6. Hard reload on device OR press **"💥 איפוס מוחלט"** in settings
+7. **Update the store "OS APPs and Downs"** (`ohadsam/os_app_store`, https://ohadsam.github.io/os_app_store/): GitHub Actions -> "Sync catalog" -> Run workflow (`sync-catalog.yml`; it reads `APP_VERSION` from `sw.js`). If this release changes what the app does, also edit its entry (`kodesh`) in `web/data/apps.json` (highlights, what's new he + en, screenshots). Say in the report that the store was updated.
 
 **Important:** The inline HEAD script is the ONLY version guard. Do NOT add another in utils.js — causes infinite reload loop.
 
